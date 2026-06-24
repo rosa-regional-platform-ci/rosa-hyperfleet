@@ -15,9 +15,6 @@
 # drive its SharedIndexInformer (TRIM_HORIZON shard polling).
 # =============================================================================
 
-data "aws_region" "current" {}
-data "aws_caller_identity" "current" {}
-
 locals {
   common_tags = merge(
     var.tags,

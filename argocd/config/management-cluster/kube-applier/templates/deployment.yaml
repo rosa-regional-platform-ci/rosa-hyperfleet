@@ -41,10 +41,10 @@ spec:
             {{- end }}
           ports:
             - name: metrics
-              containerPort: 8081
+              containerPort: {{ trimPrefix ":" .Values.kubeApplier.config.metricsListenAddress | int }}
               protocol: TCP
             - name: healthz
-              containerPort: 8083
+              containerPort: {{ trimPrefix ":" .Values.kubeApplier.config.healthzListenAddress | int }}
               protocol: TCP
           livenessProbe:
             httpGet:

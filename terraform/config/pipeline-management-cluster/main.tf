@@ -190,6 +190,8 @@ resource "aws_iam_role_policy" "codebuild_policy" {
           "kms:ListGrants",
           "kms:RevokeGrant",
           "kms:RetireGrant",
+          # DynamoDB - For kube-applier DynamoDB table provisioning (same-account case)
+          "dynamodb:*",
           # Logs - For EKS control plane logs and ECS task logs
           "logs:CreateLogGroup",
           "logs:DeleteLogGroup",
