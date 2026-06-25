@@ -27,15 +27,15 @@ locals {
 
   # The six table names for this MC
   specs_tables = toset([
-    "mc-${var.mc_name}-specs-applydesires",
-    "mc-${var.mc_name}-specs-deletedesires",
-    "mc-${var.mc_name}-specs-readdesires",
+    "${var.mc_name}-specs-applydesires",
+    "${var.mc_name}-specs-deletedesires",
+    "${var.mc_name}-specs-readdesires",
   ])
 
   status_tables = toset([
-    "mc-${var.mc_name}-status-applydesires",
-    "mc-${var.mc_name}-status-deletedesires",
-    "mc-${var.mc_name}-status-readdesires",
+    "${var.mc_name}-status-applydesires",
+    "${var.mc_name}-status-deletedesires",
+    "${var.mc_name}-status-readdesires",
   ])
 
   # IAM role ARN for the kube-applier pod running in the MC account
