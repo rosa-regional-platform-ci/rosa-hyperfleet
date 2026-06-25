@@ -3,8 +3,8 @@
 #
 # The controller needs cross-account DynamoDB access to tables in the RC account.
 # Permissions are scoped to only the tables for this specific MC:
-#   Specs tables (mc-{mc}-specs-*): read-only + DynamoDB Streams
-#   Status tables (mc-{mc}-status-*): read-write
+#   Specs tables ({mc}-specs-*): read-only + DynamoDB Streams
+#   Status tables ({mc}-status-*): read-write
 # =============================================================================
 
 # IAM role for kube-applier with EKS Pod Identity
@@ -51,7 +51,7 @@ resource "aws_iam_role_policy" "kube_applier_specs" {
           "dynamodb:Query",
         ]
         Resource = [
-          "arn:aws:dynamodb:${var.aws_region}:${var.rc_aws_account_id}:table/mc-${var.management_id}-specs-*",
+          "arn:aws:dynamodb:${var.aws_region}:${var.rc_aws_account_id}:table/${var.management_id}-specs-*",
         ]
       },
       {
@@ -64,8 +64,8 @@ resource "aws_iam_role_policy" "kube_applier_specs" {
           "dynamodb:ListStreams",
         ]
         Resource = [
-          "arn:aws:dynamodb:${var.aws_region}:${var.rc_aws_account_id}:table/mc-${var.management_id}-specs-*",
-          "arn:aws:dynamodb:${var.aws_region}:${var.rc_aws_account_id}:table/mc-${var.management_id}-specs-*/stream/*",
+          "arn:aws:dynamodb:${var.aws_region}:${var.rc_aws_account_id}:table/${var.management_id}-specs-*",
+          "arn:aws:dynamodb:${var.aws_region}:${var.rc_aws_account_id}:table/${var.management_id}-specs-*/stream/*",
         ]
       },
     ]
@@ -89,7 +89,7 @@ resource "aws_iam_role_policy" "kube_applier_status" {
         "dynamodb:DeleteItem",
       ]
       Resource = [
-        "arn:aws:dynamodb:${var.aws_region}:${var.rc_aws_account_id}:table/mc-${var.management_id}-status-*",
+        "arn:aws:dynamodb:${var.aws_region}:${var.rc_aws_account_id}:table/${var.management_id}-status-*",
       ]
     }]
   })
