@@ -112,40 +112,27 @@ resource "aws_dynamodb_table" "status" {
 # =============================================================================
 
 resource "aws_dynamodb_resource_policy" "specs" {
-  for_each    = local.specs_tables
+  for_each     = local.specs_tables
   resource_arn = aws_dynamodb_table.specs[each.key].arn
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowMCKubeApplierRead"
-        Effect = "Allow"
-        Principal = {
-          AWS = local.mc_kube_applier_role_arn
-        }
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:Scan",
-          "dynamodb:Query",
-        ]
-        Resource = aws_dynamodb_table.specs[each.key].arn
-      },
-      {
-        Sid    = "AllowMCKubeApplierStreams"
-        Effect = "Allow"
-        Principal = {
-          AWS = local.mc_kube_applier_role_arn
-        }
-        Action = [
-          "dynamodb:DescribeStream",
-          "dynamodb:GetRecords",
-          "dynamodb:GetShardIterator",
-          "dynamodb:ListStreams",
-        ]
-        Resource = "${aws_dynamodb_table.specs[each.key].arn}/stream/*"
-      },
-    ]
+    Statement = [{
+      Sid    = "AllowMCKubeApplierRead"
+      Effect = "Allow"
+      Principal = {
+        AWS = local.mc_kube_applier_role_arn
+      }
+      # Streams actions (DescribeStream, GetRecords, GetShardIterator, ListStreams)
+      # are NOT valid in DynamoDB table resource policies — they are covered by
+      # the identity-based policy on the MC kube-applier role (kube-applier/iam.tf).
+      Action = [
+        "dynamodb:GetItem",
+        "dynamodb:Scan",
+        "dynamodb:Query",
+      ]
+      Resource = aws_dynamodb_table.specs[each.key].arn
+    }]
   })
 }
 
