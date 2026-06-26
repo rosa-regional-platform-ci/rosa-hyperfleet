@@ -106,51 +106,65 @@ resource "aws_dynamodb_table" "status" {
 # =============================================================================
 # Cross-account resource-based policies
 #
-# DynamoDB requires a resource-based policy on the table in addition to the
+# DynamoDB requires a resource-based policy on the resource in addition to the
 # identity-based policy on the caller's role for cross-account access.
 # These grant the MC kube-applier role the minimum required permissions.
+#
+# AWS treats tables and streams as distinct resource types with separate ARNs,
+# and strictly validates that only actions valid for that resource type appear
+# in the policy attached to it. Table actions (GetItem, Scan, etc.) must be
+# attached to the table ARN; stream actions (DescribeStream, GetRecords, etc.)
+# must be attached to the stream ARN. Mixing them in a single policy causes a
+# ValidationException from PutResourcePolicy.
 # =============================================================================
 
+# Table-level policy: read access for the MC kube-applier role.
 resource "aws_dynamodb_resource_policy" "specs" {
   for_each     = local.specs_tables
   resource_arn = aws_dynamodb_table.specs[each.key].arn
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowMCKubeApplierRead"
-        Effect = "Allow"
-        Principal = {
-          AWS = local.mc_kube_applier_role_arn
-        }
-        Action = [
-          "dynamodb:DescribeTable",
-          "dynamodb:GetItem",
-          "dynamodb:Scan",
-          "dynamodb:Query",
-        ]
-        Resource = aws_dynamodb_table.specs[each.key].arn
-      },
-      {
-        # For cross-account access, DescribeStream / GetRecords / GetShardIterator
-        # must be permitted in the resource-based policy on the table in addition
-        # to the identity-based policy on the MC role. The resource is the stream
-        # ARN (table/.../stream/*), not the table ARN itself.
-        Sid    = "AllowMCKubeApplierStreams"
-        Effect = "Allow"
-        Principal = {
-          AWS = local.mc_kube_applier_role_arn
-        }
-        Action = [
-          "dynamodb:DescribeStream",
-          "dynamodb:GetRecords",
-          "dynamodb:GetShardIterator",
-          "dynamodb:ListStreams",
-        ]
-        Resource = "${aws_dynamodb_table.specs[each.key].arn}/stream/*"
-      },
-    ]
+    Statement = [{
+      Sid    = "AllowMCKubeApplierRead"
+      Effect = "Allow"
+      Principal = {
+        AWS = local.mc_kube_applier_role_arn
+      }
+      Action = [
+        "dynamodb:DescribeTable",
+        "dynamodb:GetItem",
+        "dynamodb:Scan",
+        "dynamodb:Query",
+      ]
+      Resource = aws_dynamodb_table.specs[each.key].arn
+    }]
+  })
+}
+
+# Stream-level policy: stream read access for the MC kube-applier role.
+# Attached to the stream ARN, not the table ARN, because stream actions are
+# invalid in a table resource policy.
+resource "aws_dynamodb_resource_policy" "specs_stream" {
+  for_each     = local.specs_tables
+  resource_arn = aws_dynamodb_table.specs[each.key].stream_arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid    = "AllowMCKubeApplierStreams"
+      Effect = "Allow"
+      Principal = {
+        AWS = local.mc_kube_applier_role_arn
+      }
+      Action = [
+        "dynamodb:DescribeStream",
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator",
+        "dynamodb:ListStreams",
+      ]
+      Resource = aws_dynamodb_table.specs[each.key].stream_arn
+    }]
   })
 }
 
