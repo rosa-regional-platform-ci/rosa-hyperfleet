@@ -35,6 +35,9 @@ resource "aws_iam_role" "kube_applier" {
 }
 
 # Policy: Read specs tables + DynamoDB Streams (for the DynamoDB Streams-backed informers)
+# For cross-account access AWS requires the action to be permitted on BOTH sides:
+# the identity-based policy here (MC account) AND the resource-based policy on
+# the RC-account table (kube-applier-dynamodb/main.tf). Both must be present.
 resource "aws_iam_role_policy" "kube_applier_specs" {
   name = "${var.management_id}-kube-applier-specs"
   role = aws_iam_role.kube_applier.id
