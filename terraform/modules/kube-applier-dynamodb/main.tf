@@ -169,11 +169,13 @@ resource "aws_dynamodb_resource_policy" "specs_stream" {
       Principal = {
         AWS = local.mc_kube_applier_role_arn
       }
+      # dynamodb:ListStreams is an account-level action with no resource target
+      # and is not valid in a stream resource policy — it remains covered by
+      # the identity-based policy on the MC kube-applier role.
       Action = [
         "dynamodb:DescribeStream",
         "dynamodb:GetRecords",
         "dynamodb:GetShardIterator",
-        "dynamodb:ListStreams",
       ]
       Resource = aws_dynamodb_table.specs[each.key].stream_arn
     }]
