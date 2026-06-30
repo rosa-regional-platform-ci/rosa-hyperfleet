@@ -85,7 +85,7 @@ resource "aws_iam_role_policy" "hyperfleet_operator_dynamodb" {
           "dynamodbstreams:GetShardIterator",
           "dynamodbstreams:ListStreams"
         ]
-        Resource = "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.mc_name}-status-readdesires/stream/*"
+        Resource = "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.mc_name}-status-*/stream/*"
       }
     ]
   })

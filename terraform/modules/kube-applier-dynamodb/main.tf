@@ -76,12 +76,10 @@ resource "aws_dynamodb_table" "specs" {
 # =============================================================================
 # Status Tables (read-write for the agent)
 #
-# The status-readdesires table has DynamoDB Streams enabled so the
-# hyperfleet-operator can react to status changes written by kube-applier-aws
-# within seconds instead of polling. This is the inverse of the specs tables
-# pattern: kube-applier watches specs streams, the operator watches status
-# streams. Only readdesires needs streaming — it drives manifest status
-# feedback for time-sensitive SRE operations (ZOA).
+# All status tables have DynamoDB Streams enabled so the hyperfleet-operator
+# can react to status changes written by kube-applier-aws within seconds
+# instead of polling. This is the inverse of the specs tables pattern:
+# kube-applier watches specs streams, the operator watches status streams.
 # =============================================================================
 
 resource "aws_dynamodb_table" "status" {
@@ -96,8 +94,8 @@ resource "aws_dynamodb_table" "status" {
     type = "S"
   }
 
-  stream_enabled   = endswith(each.key, "-readdesires")
-  stream_view_type = endswith(each.key, "-readdesires") ? "NEW_AND_OLD_IMAGES" : null
+  stream_enabled   = true
+  stream_view_type = "NEW_AND_OLD_IMAGES"
 
   point_in_time_recovery {
     enabled = var.enable_pitr
