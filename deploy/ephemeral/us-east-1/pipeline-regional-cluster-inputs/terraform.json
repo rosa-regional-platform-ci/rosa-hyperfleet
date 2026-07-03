@@ -17,5 +17,6 @@
   "enable_sns_alerting": true,
   "regional_id": "eph-46b43207-regional",
   "eph_prefix": "eph-46b43207",
-  "management_clusters_info": [{"account_id": "855246887846", "id": "eph-46b43207-mc01"}]
+  "management_clusters_info": [{"account_id": "855246887846", "id": "eph-46b43207-mc01"}],
+  "delete": true
 }
