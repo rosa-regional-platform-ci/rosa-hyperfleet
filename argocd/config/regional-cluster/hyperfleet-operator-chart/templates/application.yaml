@@ -18,8 +18,10 @@ spec:
         {{- toYaml (index .Values "hyperfleet-operator-chart" "helmValues") | nindent 8 }}
         {{- end }}
         awsRegion: {{ .Values.global.aws_region }}
-        fleetDBClusterName: {{ .Values.global.fleet_db_cluster_name }}
         baseDomain: {{ .Values.baseDomain }}
+        fleetstore:
+          secretName: {{ .Values.global.fleetstore_secret_name | default "fleetstore-dsn" }}
+          secretKey: {{ .Values.global.fleetstore_secret_key | default "dsn" }}
 
   destination:
     server: https://kubernetes.default.svc

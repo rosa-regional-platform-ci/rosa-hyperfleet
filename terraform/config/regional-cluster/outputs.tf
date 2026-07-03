@@ -45,9 +45,9 @@ output "cluster_security_group_id" {
   value       = module.vpc.cluster_security_group_id
 }
 
-output "fleet_db_cluster_security_group_id" {
-  description = "Fleet-DB EKS cluster security group ID"
-  value       = aws_security_group.fleet_db_cluster.id
+output "fleetstore_rds_security_group_id" {
+  description = "FleetStore RDS security group ID"
+  value       = module.fleetstore_rds.security_group_id
 }
 
 output "node_security_group_id" {
@@ -273,19 +273,19 @@ output "hyperfleet_operator_role_arn" {
   value       = aws_iam_role.hyperfleet_operator.arn
 }
 
-output "fleet_db_cluster_name" {
-  description = "Fleet-DB EKS cluster name (used by operator and platform-api for IAM auth)"
-  value       = module.fleet_db_cluster.cluster_name
+output "fleetstore_rds_endpoint" {
+  description = "FleetStore RDS endpoint (host:port)"
+  value       = module.fleetstore_rds.endpoint
 }
 
-output "fleet_db_cluster_arn" {
-  description = "Fleet-DB EKS cluster ARN"
-  value       = module.fleet_db_cluster.cluster_arn
+output "fleetstore_dsn_secret_arn" {
+  description = "ARN of the Secrets Manager secret containing the FleetStore DSN"
+  value       = module.fleetstore_rds.dsn_secret_arn
 }
 
-output "fleet_db_cluster_endpoint" {
-  description = "Fleet-DB EKS cluster API server endpoint"
-  value       = module.fleet_db_cluster.cluster_endpoint
+output "fleetstore_dsn_secret_name" {
+  description = "Name of the Secrets Manager secret containing the FleetStore DSN"
+  value       = module.fleetstore_rds.dsn_secret_name
 }
 
 # =============================================================================

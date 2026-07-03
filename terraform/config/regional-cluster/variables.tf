@@ -111,7 +111,63 @@ variable "enable_sns_alerting" {
   default     = false
 }
 
+# =============================================================================
+# FleetStore RDS Variables
+# =============================================================================
 
+variable "fleetstore_instance_class" {
+  description = "RDS instance class for FleetStore"
+  type        = string
+  default     = "db.r6g.large"
+}
+
+variable "fleetstore_allocated_storage" {
+  description = "Initial storage allocation in GiB for FleetStore RDS"
+  type        = number
+  default     = 100
+}
+
+variable "fleetstore_max_allocated_storage" {
+  description = "Maximum storage for autoscaling in GiB (0 disables)"
+  type        = number
+  default     = 500
+}
+
+variable "fleetstore_engine_version" {
+  description = "PostgreSQL engine version for FleetStore"
+  type        = string
+  default     = "16.9"
+}
+
+variable "fleetstore_backup_retention_period" {
+  description = "Days to retain automated backups (PITR window)"
+  type        = number
+  default     = 14
+}
+
+variable "fleetstore_deletion_protection" {
+  description = "Enable deletion protection for FleetStore RDS"
+  type        = bool
+  default     = true
+}
+
+variable "fleetstore_skip_final_snapshot" {
+  description = "Skip final snapshot when destroying (ephemeral only)"
+  type        = bool
+  default     = false
+}
+
+variable "fleetstore_performance_insights_enabled" {
+  description = "Enable Performance Insights for FleetStore RDS"
+  type        = bool
+  default     = true
+}
+
+variable "fleetstore_monitoring_interval" {
+  description = "Enhanced Monitoring interval in seconds for FleetStore RDS (0 to disable)"
+  type        = number
+  default     = 60
+}
 
 # =============================================================================
 # Platform API Variables

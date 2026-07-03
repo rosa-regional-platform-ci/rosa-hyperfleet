@@ -9,7 +9,7 @@ hyperfleet-operator-chart:
 
   source:
     repoURL: https://github.com/typeid/hyperfleet-operator.git
-    targetRevision: main
+    targetRevision: single_dynamodb
     path: charts/hyperfleet-operator
 
   syncPolicy:
@@ -20,7 +20,7 @@ hyperfleet-operator-chart:
   helmValues:
     image:
       repository: quay.io/cbusse_openshift/hyperfleet-operator
-      tag: "0.1.0-a"
+      tag: "single_dynamodb_a"
       pullPolicy: Always
 
     replicaCount: 1

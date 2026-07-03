@@ -22,6 +22,11 @@ dns:
 regional_cluster:
   enable_bastion: true
   node_instance_families: ["m8i-flex", "m7i-flex"]
+  fleetstore_instance_class: "db.t4g.medium"
+  fleetstore_deletion_protection: false
+  fleetstore_skip_final_snapshot: true
+  fleetstore_performance_insights_enabled: false
+  fleetstore_monitoring_interval: 0
 
 management_cluster_defaults:
   enable_bastion: true

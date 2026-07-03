@@ -18,14 +18,13 @@ platformApi:
     name: platform-api
     image:
       repository: quay.io/cbusse_openshift/rosa-regional-platform-api
-      tag: "fleet-db-a"
+      tag: "single_dynamodb_a"
       pullPolicy: Always
 
     # Application arguments
     args:
       logLevel: info
       logFormat: json
-      fleetDbClusterName: ""
       allowedAccounts: "123456789012"
       dynamodbRegion: us-east-2
       dynamodbPrefix: rosa
@@ -42,6 +41,11 @@ platformApi:
       limits:
         cpu: 500m
         memory: 512Mi
+
+  # FleetStore database connection
+  fleetstore:
+    secretName: fleetstore-dsn
+    secretKey: dsn
 
   # Envoy sidecar configuration
   envoy:

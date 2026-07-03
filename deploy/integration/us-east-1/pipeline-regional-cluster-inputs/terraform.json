@@ -17,5 +17,10 @@
   "enable_sns_alerting": true,
   "regional_id": "regional",
   "eph_prefix": "",
+  "fleetstore_instance_class": "db.r6g.large",
+  "fleetstore_deletion_protection": true,
+  "fleetstore_skip_final_snapshot": false,
+  "fleetstore_performance_insights_enabled": true,
+  "fleetstore_monitoring_interval": 60,
   "management_clusters_info": [{"account_id": "ssm:///infra/integration/us-east-1/mc01/account_id", "id": "mc01"}]
 }
