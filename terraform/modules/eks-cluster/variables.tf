@@ -82,9 +82,9 @@ variable "enable_karpenter" {
 }
 
 variable "karpenter_version" {
-  description = "OSS Karpenter version string (e.g. \"1.5.0\"). Used to select the Helm chart version when deploying via ArgoCD."
+  description = "OSS Karpenter version string (e.g. \"1.13.0\"). Used to select the Helm chart version when deploying via ArgoCD."
   type        = string
-  default     = "1.5.0"
+  default     = "1.13.0"
 }
 
 variable "ami_kms_key_arn" {
