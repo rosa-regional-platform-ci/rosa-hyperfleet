@@ -4,10 +4,8 @@ kind: EC2NodeClass
 metadata:
   name: fips
 spec:
-  amiFamily: Bottlerocket
   amiSelectorTerms:
-    - name: "bottlerocket-aws-k8s-*-fips-*"
-      owner: "136693071363"
+    - alias: bottlerocket@latest
   role: {{ $clusterName }}-karpenter-node-role
   subnetSelectorTerms:
     - tags:
