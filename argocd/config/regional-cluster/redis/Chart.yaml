@@ -1,6 +1,0 @@
-apiVersion: v2
-name: redis
-description: Redis for Platform API rate limiting (standalone, no persistence)
-type: application
-version: 0.1.0
-appVersion: "7.0"

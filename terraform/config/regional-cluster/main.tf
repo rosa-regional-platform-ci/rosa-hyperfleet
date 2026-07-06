@@ -441,6 +441,8 @@ module "hyperfleet_infrastructure" {
 
   mq_instance_type   = var.hyperfleet_mq_instance_type
   mq_deployment_mode = var.hyperfleet_mq_deployment_mode
+
+  enable_rate_limit_redis = var.enable_rate_limit_redis
 }
 
 # =============================================================================
