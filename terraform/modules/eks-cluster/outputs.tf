@@ -105,3 +105,8 @@ output "karpenter_node_instance_profile_name" {
   description = "Instance profile name for Karpenter-provisioned nodes (matches EC2NodeClass.spec.role). Null when enable_karpenter = false."
   value       = var.enable_karpenter ? aws_iam_instance_profile.karpenter_node[0].name : null
 }
+
+output "karpenter_version" {
+  description = "Karpenter Helm chart version configured for this cluster. Pass to ecs-bootstrap so both install the same version."
+  value       = var.karpenter_version
+}

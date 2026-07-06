@@ -193,6 +193,7 @@ module "ecs_bootstrap" {
 
   karpenter_controller_role_arn = module.regional_cluster.karpenter_controller_role_arn != null ? module.regional_cluster.karpenter_controller_role_arn : ""
   karpenter_queue_url           = module.regional_cluster.karpenter_queue_url != null ? module.regional_cluster.karpenter_queue_url : ""
+  karpenter_version             = module.regional_cluster.karpenter_version
 }
 
 # =============================================================================

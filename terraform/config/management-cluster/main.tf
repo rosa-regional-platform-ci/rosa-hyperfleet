@@ -70,6 +70,7 @@ module "ecs_bootstrap" {
 
   karpenter_controller_role_arn = module.management_cluster.karpenter_controller_role_arn != null ? module.management_cluster.karpenter_controller_role_arn : ""
   karpenter_queue_url           = module.management_cluster.karpenter_queue_url != null ? module.management_cluster.karpenter_queue_url : ""
+  karpenter_version             = module.management_cluster.karpenter_version
 }
 
 # =============================================================================

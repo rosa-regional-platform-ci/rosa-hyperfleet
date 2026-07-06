@@ -78,8 +78,7 @@ variable "karpenter_queue_url" {
 }
 
 variable "karpenter_version" {
-  description = "Karpenter Helm chart version to install during bootstrap."
+  description = "Karpenter Helm chart version to install during bootstrap. Must match eks-cluster.karpenter_version — sourced from that module's output."
   type        = string
-  default     = "1.5.0"
 }
 
