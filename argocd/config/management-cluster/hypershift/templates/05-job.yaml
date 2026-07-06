@@ -46,6 +46,7 @@ spec:
         - /bin/sh
         - -c
         - |
+          set -e
           mkdir -p /tmp/aws
 
           # Private platform creds — Pod Identity provides MC-account credentials
@@ -73,11 +74,14 @@ spec:
             --oidc-storage-provider-s3-bucket-name $(OIDC_BUCKET_NAME) \
             --oidc-storage-provider-s3-region $(OIDC_BUCKET_REGION) \
             --oidc-storage-provider-s3-credentials /tmp/aws/oidc-creds \
+            {{- if .Values.hypershift.externalDns.domain }}
             --external-dns-provider aws \
             --external-dns-domain-filter {{ .Values.hypershift.externalDns.domain }} \
             --external-dns-secret external-dns \
             --external-dns-image {{ .Values.hypershift.externalDns.image }} \
+            {{- end }}
 
+          {{ if .Values.hypershift.externalDns.domain }}
           # TODO(hypershift): Upstream --aws-assume-role + Pod Identity support
           # to hypershift install CLI, then replace this post-install patch
           # with native flags.
@@ -110,5 +114,6 @@ spec:
               ]}' \
               -o /dev/null -w "  HTTP %{http_code}\n"
           fi
+          {{ end }}
       restartPolicy: Never
       serviceAccountName: hypershift-installer
