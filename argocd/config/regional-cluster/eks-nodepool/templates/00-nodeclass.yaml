@@ -4,6 +4,7 @@ kind: EC2NodeClass
 metadata:
   name: fips
 spec:
+  amiFamily: Bottlerocket
   amiSelectorTerms:
     - name: "bottlerocket-aws-k8s-*-fips-*"
       owner: "136693071363"
