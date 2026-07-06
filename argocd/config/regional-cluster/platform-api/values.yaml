@@ -17,8 +17,8 @@ platformApi:
   app:
     name: platform-api
     image:
-      repository: quay.io/slopezz/rosa-regional-platform-api
-      tag: "6f65042"
+      repository: quay.io/travi/rosa-hyperfleet-api
+      tag: "ratelimit"
       pullPolicy: Always
 
     # Application arguments
