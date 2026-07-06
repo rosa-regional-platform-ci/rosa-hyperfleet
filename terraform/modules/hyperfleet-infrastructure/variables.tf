@@ -152,25 +152,25 @@ variable "mq_username" {
 }
 
 # =============================================================================
-# ElastiCache Redis Configuration
+# ElastiCache Valkey Configuration
 # =============================================================================
 
 variable "enable_rate_limit_redis" {
-  description = "Enable ElastiCache Redis for Platform API rate limiting"
+  description = "Enable ElastiCache Valkey for Platform API rate limiting"
   type        = bool
   default     = true
 }
 
-variable "redis_node_type" {
-  description = "ElastiCache node type for rate limiting Redis"
+variable "valkey_node_type" {
+  description = "ElastiCache node type for rate limiting Valkey"
   type        = string
   default     = "cache.t4g.micro"
 }
 
-variable "redis_engine_version" {
-  description = "Redis engine version for ElastiCache"
+variable "valkey_engine_version" {
+  description = "Valkey engine version for ElastiCache"
   type        = string
-  default     = "7.1"
+  default     = "9.1"
 }
 
 # =============================================================================

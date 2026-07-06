@@ -117,17 +117,17 @@ output "adapter_role_name" {
 }
 
 # =============================================================================
-# ElastiCache Redis Outputs
+# ElastiCache Valkey Outputs
 # =============================================================================
 
 output "redis_endpoint" {
-  description = "ElastiCache Redis endpoint for rate limiting"
-  value       = var.enable_rate_limit_redis ? aws_elasticache_cluster.hyperfleet[0].cache_nodes[0].address : null
+  description = "ElastiCache Valkey endpoint for rate limiting"
+  value       = var.enable_rate_limit_redis ? aws_elasticache_replication_group.hyperfleet[0].primary_endpoint_address : null
 }
 
 output "redis_port" {
-  description = "ElastiCache Redis port"
-  value       = var.enable_rate_limit_redis ? aws_elasticache_cluster.hyperfleet[0].cache_nodes[0].port : null
+  description = "ElastiCache Valkey port"
+  value       = var.enable_rate_limit_redis ? aws_elasticache_replication_group.hyperfleet[0].port : null
 }
 
 # =============================================================================
@@ -158,8 +158,8 @@ output "configuration_summary" {
     }
     redis = {
       enabled  = var.enable_rate_limit_redis
-      endpoint = var.enable_rate_limit_redis ? aws_elasticache_cluster.hyperfleet[0].cache_nodes[0].address : null
-      port     = var.enable_rate_limit_redis ? aws_elasticache_cluster.hyperfleet[0].cache_nodes[0].port : null
+      endpoint = var.enable_rate_limit_redis ? aws_elasticache_replication_group.hyperfleet[0].primary_endpoint_address : null
+      port     = var.enable_rate_limit_redis ? aws_elasticache_replication_group.hyperfleet[0].port : null
     }
   }
 }

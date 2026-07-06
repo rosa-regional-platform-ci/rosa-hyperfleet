@@ -1,19 +1,21 @@
 # =============================================================================
-# ElastiCache Redis for Platform API Rate Limiting
+# ElastiCache Valkey for Platform API Rate Limiting
 #
-# Single-node Redis for shared rate limit counters (GCRA algorithm).
+# Single-node Valkey for shared rate limit counters (GCRA algorithm).
+# Valkey is the open-source (BSD 3-Clause) fork of Redis, fully compatible
+# with go-redis/v9 and redis_rate. 20% cheaper than Redis OSS on ElastiCache.
 # No persistence, no AUTH, no backups — counters are ephemeral by design.
-# Gated by enable_rate_limit_redis (default: false).
+# Gated by enable_rate_limit_redis (default: true).
 # =============================================================================
 
-# Security Group for ElastiCache Redis
+# Security Group for ElastiCache Valkey
 # Ingress rules are standalone resources so the SG (and ElastiCache) can
 # provision in parallel with EKS, rather than waiting for EKS security group IDs.
 resource "aws_security_group" "hyperfleet_redis" {
   count = var.enable_rate_limit_redis ? 1 : 0
 
   name        = "${var.regional_id}-hyperfleet-redis"
-  description = "Security group for Platform API rate limiting Redis"
+  description = "Security group for Platform API rate limiting Valkey"
   vpc_id      = var.vpc_id
 
   revoke_rules_on_delete = false
@@ -42,7 +44,7 @@ resource "aws_security_group_rule" "hyperfleet_redis_eks_cluster" {
   count = var.enable_rate_limit_redis ? 1 : 0
 
   type                     = "ingress"
-  description              = "Redis from EKS cluster additional security group"
+  description              = "Valkey from EKS cluster additional security group"
   from_port                = 6379
   to_port                  = 6379
   protocol                 = "tcp"
@@ -54,7 +56,7 @@ resource "aws_security_group_rule" "hyperfleet_redis_eks_primary" {
   count = var.enable_rate_limit_redis ? 1 : 0
 
   type                     = "ingress"
-  description              = "Redis from EKS cluster primary security group (Auto Mode)"
+  description              = "Valkey from EKS cluster primary security group (Auto Mode)"
   from_port                = 6379
   to_port                  = 6379
   protocol                 = "tcp"
@@ -66,7 +68,7 @@ resource "aws_security_group_rule" "hyperfleet_redis_bastion" {
   count = var.enable_rate_limit_redis && var.bastion_enabled ? 1 : 0
 
   type                     = "ingress"
-  description              = "Redis from bastion"
+  description              = "Valkey from bastion"
   from_port                = 6379
   to_port                  = 6379
   protocol                 = "tcp"
@@ -90,12 +92,12 @@ resource "aws_elasticache_subnet_group" "hyperfleet" {
   )
 }
 
-# Parameter Group — matches the redis.conf from the former in-cluster Redis pod
+# Parameter Group
 resource "aws_elasticache_parameter_group" "hyperfleet" {
   count = var.enable_rate_limit_redis ? 1 : 0
 
   name   = "${var.regional_id}-hyperfleet-redis"
-  family = "redis7"
+  family = "valkey9"
 
   parameter {
     name  = "maxmemory-policy"
@@ -111,15 +113,19 @@ resource "aws_elasticache_parameter_group" "hyperfleet" {
   )
 }
 
-# ElastiCache Redis Cluster (single node, no HA, no backups)
-resource "aws_elasticache_cluster" "hyperfleet" {
+# ElastiCache Valkey Replication Group (single node, no HA, no backups)
+# Uses aws_elasticache_replication_group because the AWS CreateCacheCluster
+# API (aws_elasticache_cluster) does not support the Valkey engine.
+resource "aws_elasticache_replication_group" "hyperfleet" {
   count = var.enable_rate_limit_redis ? 1 : 0
 
-  cluster_id               = "${var.regional_id}-hf-rl"
-  engine                   = "redis"
-  engine_version           = var.redis_engine_version
-  node_type                = var.redis_node_type
-  num_cache_nodes          = 1
+  replication_group_id     = "${var.regional_id}-hf-rl"
+  description              = "Platform API rate limiting (Valkey)"
+  engine                   = "valkey"
+  engine_version           = var.valkey_engine_version
+  node_type                = var.valkey_node_type
+  num_node_groups          = 1
+  replicas_per_node_group  = 0
   parameter_group_name     = aws_elasticache_parameter_group.hyperfleet[0].name
   subnet_group_name        = aws_elasticache_subnet_group.hyperfleet[0].name
   security_group_ids       = [aws_security_group.hyperfleet_redis[0].id]
