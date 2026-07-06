@@ -193,13 +193,9 @@ resource "aws_iam_role_policy" "karpenter_controller" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "EC2Fleet"
+        Sid    = "EC2FleetDescribe"
         Effect = "Allow"
         Action = [
-          "ec2:CreateFleet",
-          "ec2:CreateLaunchTemplate",
-          "ec2:CreateTags",
-          "ec2:DeleteLaunchTemplate",
           "ec2:DescribeAvailabilityZones",
           "ec2:DescribeImages",
           "ec2:DescribeInstances",
@@ -209,10 +205,38 @@ resource "aws_iam_role_policy" "karpenter_controller" {
           "ec2:DescribeSecurityGroups",
           "ec2:DescribeSpotPriceHistory",
           "ec2:DescribeSubnets",
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "EC2FleetCreate"
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateFleet",
+          "ec2:CreateLaunchTemplate",
+          "ec2:CreateTags",
           "ec2:RunInstances",
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/kubernetes.io/cluster/${local.cluster_id}" = "owned"
+          }
+        }
+      },
+      {
+        Sid    = "EC2FleetDelete"
+        Effect = "Allow"
+        Action = [
+          "ec2:DeleteLaunchTemplate",
           "ec2:TerminateInstances",
         ]
         Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/kubernetes.io/cluster/${local.cluster_id}" = "owned"
+          }
+        }
       },
       {
         Sid    = "IAMInstanceProfile"
@@ -225,7 +249,7 @@ resource "aws_iam_role_policy" "karpenter_controller" {
           "iam:RemoveRoleFromInstanceProfile",
           "iam:TagInstanceProfile",
         ]
-        Resource = "*"
+        Resource = aws_iam_instance_profile.karpenter_node[0].arn
       },
       {
         Sid      = "IAMPassRole"

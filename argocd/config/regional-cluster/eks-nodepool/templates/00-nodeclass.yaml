@@ -5,7 +5,8 @@ metadata:
   name: fips
 spec:
   amiSelectorTerms:
-    - alias: bottlerocket@latest
+    - name: "bottlerocket-aws-k8s-*-fips-*"
+      owner: "136693071363"
   role: {{ $clusterName }}-karpenter-node-role
   subnetSelectorTerms:
     - tags:

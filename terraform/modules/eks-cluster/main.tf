@@ -220,7 +220,10 @@ resource "aws_eks_node_group" "karpenter_bootstrap" {
     "karpenter.sh/discovery" = aws_eks_cluster.main.name
   }
 
-  depends_on = [aws_iam_role_policy_attachment.karpenter_node_managed]
+  depends_on = [
+    aws_iam_role_policy_attachment.karpenter_node_managed,
+    aws_eks_addon.vpc_cni[0],
+  ]
 }
 
 # -----------------------------------------------------------------------------

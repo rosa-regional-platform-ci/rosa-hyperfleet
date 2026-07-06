@@ -174,7 +174,7 @@ resource "aws_iam_role_policy" "aws_lbc" {
             "ec2:CreateAction" = "CreateSecurityGroup"
           }
           Null = {
-            "aws:RequestedRegion" = "false"
+            "aws:RequestTag/elbv2.k8s.aws/cluster" = "false"
           }
         }
       },
@@ -188,7 +188,7 @@ resource "aws_iam_role_policy" "aws_lbc" {
         Resource = "arn:aws:ec2:*:*:security-group/*"
         Condition = {
           Null = {
-            "aws:RequestTag/elbv2.k8s.aws/cluster"  = "false"
+            "aws:RequestTag/elbv2.k8s.aws/cluster"  = "true"
             "aws:ResourceTag/elbv2.k8s.aws/cluster" = "false"
           }
         }

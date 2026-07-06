@@ -179,7 +179,7 @@ resource "aws_ecs_task_definition" "bootstrap" {
                     cpu: 100m
                     memory: 128Mi
               terminationGracePeriodSeconds: 0
-            PREWARM_EOF
+          PREWARM_EOF
             kubectl wait pod karpenter-prewarm -n kube-system --for=condition=Ready --timeout=8m
             kubectl delete pod karpenter-prewarm -n kube-system --wait=false
             echo "✓ Karpenter node provisioned, proceeding with ArgoCD install"
