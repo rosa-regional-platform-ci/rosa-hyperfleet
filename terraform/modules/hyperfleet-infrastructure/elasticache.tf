@@ -90,6 +90,27 @@ resource "aws_elasticache_subnet_group" "hyperfleet" {
   )
 }
 
+# Parameter Group — matches the redis.conf from the former in-cluster Redis pod
+resource "aws_elasticache_parameter_group" "hyperfleet" {
+  count = var.enable_rate_limit_redis ? 1 : 0
+
+  name   = "${var.regional_id}-hyperfleet-redis"
+  family = "redis7"
+
+  parameter {
+    name  = "maxmemory-policy"
+    value = "volatile-ttl"
+  }
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name      = "${var.regional_id}-hyperfleet-redis-params"
+      Component = "rate-limiting"
+    }
+  )
+}
+
 # ElastiCache Redis Cluster (single node, no HA, no backups)
 resource "aws_elasticache_cluster" "hyperfleet" {
   count = var.enable_rate_limit_redis ? 1 : 0
@@ -99,6 +120,7 @@ resource "aws_elasticache_cluster" "hyperfleet" {
   engine_version           = var.redis_engine_version
   node_type                = var.redis_node_type
   num_cache_nodes          = 1
+  parameter_group_name     = aws_elasticache_parameter_group.hyperfleet[0].name
   subnet_group_name        = aws_elasticache_subnet_group.hyperfleet[0].name
   security_group_ids       = [aws_security_group.hyperfleet_redis[0].id]
   port                     = 6379

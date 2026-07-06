@@ -97,7 +97,7 @@ platformApi:
 
   # Rate Limiting configuration
   rateLimit:
-    enabled: false
+    enabled: true
     redisEndpoint: ""
     config: |
       enabled: true
