@@ -32,6 +32,8 @@ resource "aws_iam_role" "aws_lbc" {
 }
 
 resource "aws_iam_role_policy" "aws_lbc" {
+  #checkov:skip=CKV_AWS_355: Describe-only APIs (EC2, ELB, ACM, etc.) do not support resource-level ARN restrictions; Resource="*" matches the upstream AWS Load Balancer Controller recommended policy.
+  #checkov:skip=CKV_AWS_290: iam:CreateServiceLinkedRole requires Resource="*" per AWS; the statement is already constrained by a Condition on iam:AWSServiceName=elasticloadbalancing.amazonaws.com.
   name = "${var.cluster_name}-aws-load-balancer-controller"
   role = aws_iam_role.aws_lbc.id
 

@@ -12,3 +12,6 @@ aws-load-balancer-controller:
   securityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
