@@ -98,7 +98,7 @@ platformApi:
   # Rate Limiting configuration
   rateLimit:
     enabled: false
-    redisEndpoint: "redis-ratelimit.redis-ratelimit.svc.cluster.local:6379"
+    redisEndpoint: "redis.redis.svc.cluster.local:6379"
     config: |
       enabled: true
       exemptAccounts: []

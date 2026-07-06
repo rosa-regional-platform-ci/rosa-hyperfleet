@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: redis-ratelimit-config
+  name: redis-config
   namespace: {{ .Release.Namespace }}
 data:
   redis.conf: |
