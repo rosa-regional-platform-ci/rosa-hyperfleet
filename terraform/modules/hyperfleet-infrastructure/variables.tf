@@ -158,7 +158,7 @@ variable "mq_username" {
 variable "enable_rate_limit_redis" {
   description = "Enable ElastiCache Redis for Platform API rate limiting"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "redis_node_type" {
