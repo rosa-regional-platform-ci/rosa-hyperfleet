@@ -12,4 +12,5 @@ eksNodePool:
     consolidateAfter: 60s
 
 global:
+  # Injected by ApplicationSet valuesObject — do not set here.
   cluster_name: ""
