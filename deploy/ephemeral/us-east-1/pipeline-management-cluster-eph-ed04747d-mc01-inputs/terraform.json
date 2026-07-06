@@ -8,5 +8,6 @@
   "region": "us-east-1",
   "alias": "eph-ed04747d-mc01",
   "management_id": "eph-ed04747d-mc01",
-  "regional_aws_account_id": "599476212575"
+  "regional_aws_account_id": "599476212575",
+  "delete": true
 }
