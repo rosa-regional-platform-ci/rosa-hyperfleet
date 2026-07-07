@@ -190,6 +190,8 @@ module "ecs_bootstrap" {
   loki_kms_key_arn   = module.loki_infrastructure.kms_key_arn
 
   management_clusters = var.management_clusters
+
+  redis_endpoint = coalesce(module.hyperfleet_infrastructure.redis_endpoint, "")
 }
 
 # =============================================================================

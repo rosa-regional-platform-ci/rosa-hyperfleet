@@ -282,6 +282,10 @@ resource "aws_ecs_task_definition" "bootstrap" {
         {
           name  = "MANAGEMENT_CLUSTERS"
           value = var.management_clusters
+        },
+        {
+          name  = "REDIS_ENDPOINT"
+          value = var.redis_endpoint
         }
       ]
 
