@@ -7,11 +7,11 @@
 
 eksNodePool:
   instanceFamilies:
-  - m8i-flex
-  - m7i-flex
+  - m8i
+  - m7i
 hypershift:
   oidcStorageS3Bucket:
     name: hypershift-mc-us-east-1
     region: us-east-1
   externalDns:
-    domain: us-east-1.dev0.rosa.devshift.net
+    domain: ''
