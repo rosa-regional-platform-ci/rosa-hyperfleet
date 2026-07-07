@@ -103,8 +103,8 @@ platformApi:
       enabled: true
       exemptAccounts: []
       default:
-        rate: 100
-        burst: 200
+        rate: 5
+        burst: 10
       routes:
         - path: "/api/v0/clusters"
           method: POST
@@ -112,8 +112,8 @@ platformApi:
           burst: 10
         - path: "/api/v0/clusters"
           method: GET
-          rate: 100
-          burst: 200
+          rate: 5
+          burst: 10
         - path: "/api/v0/clusters/*"
           method: PATCH
           rate: 10
