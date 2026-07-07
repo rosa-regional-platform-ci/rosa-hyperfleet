@@ -1,5 +1,9 @@
 # FIPS-Only Compute for EKS Auto Mode
 
+> **Superseded.** This ADR documents the EKS Auto Mode FIPS strategy, which has been
+> replaced by [OSS Karpenter Node Provisioning](./karpenter-node-provisioning.md). It is
+> retained for historical context and to explain decisions that the new ADR inherits.
+
 **Last Updated Date**: 2026-05-15
 
 ## Summary

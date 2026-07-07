@@ -6,42 +6,55 @@ Creates private EKS clusters with security-first configuration and standardized 
 
 - **Deterministic Resource Naming**: Uses `cluster_id` for all resource names (e.g., `regional`, `mc01`)
 - **Provider-Level Tagging**: Enforces required organizational tags via AWS provider default_tags
-- **Fully Private Clusters**: EKS control plane with private endpoint only
-- **GitOps Bootstrap**: Automated ArgoCD installation via ECS Fargate task for self-management
+- **Fully Private Clusters**: EKS control plane with private endpoint only, no public API access
+- **GitOps Bootstrap**: Automated Karpenter and ArgoCD installation via ECS Fargate task
 - **Security Hardening**: KMS encryption, IMDSv2 enforcement, and network segmentation
 - **High Availability**: Multi-AZ NAT Gateways for fault-tolerant egress connectivity
+- **OSS Karpenter**: Self-managed Karpenter with AL2023 bootstrap node group, SQS interruption
+  queue, and EventBridge rules (enabled by default via `enable_karpenter`)
 
-## Security & Scalability Enhancements
+## Compute Modes
 
-### Network Security
+The module supports two mutually exclusive compute modes selected by `enable_karpenter`:
 
-- **KMS Encryption**: Kubernetes secrets encrypted at rest using customer-managed keys
-- **Dedicated Security Groups**: VPC endpoints use isolated security groups (port 443 from VPC CIDR only)
-- **Restricted Egress**: Cluster egress limited to HTTPS for container registries and VPC internal traffic
-- **Auto Mode Authentication**: EKS authentication configured for API_AND_CONFIG_MAP mode
+### OSS Karpenter (default, `enable_karpenter = true`)
 
-### High Availability Network Architecture
+- EKS Auto Mode `compute_config`, `storage_config`, and `kubernetes_network_config` blocks are
+  absent — Auto Mode is fully disabled
+- An AL2023 managed node group (`t3.medium × 2`, `CriticalAddonsOnly:NoSchedule` taint) provides
+  fixed bootstrap capacity for the Karpenter controller and other `CriticalAddonsOnly` system pods
+- The Karpenter controller IAM role uses IRSA (OIDC provider resource created by the module)
+- An EC2 instance profile for Karpenter-provisioned nodes is pre-created (`<cluster_id>-karpenter-node-role`)
+- An SQS FIFO queue and four EventBridge rules receive Spot interruption, rebalance, state-change,
+  and AWS Health events for graceful node draining
+- Explicit EKS addons: `vpc-cni`, `kube-proxy`, `aws-ebs-csi-driver` (Pod Identity-backed),
+  `coredns`, `metrics-server`, `eks-pod-identity-agent`, `aws-secrets-store-csi-driver-provider`
 
-- **Multi-AZ NAT Deployment**: One NAT Gateway per availability zone eliminates single points of failure
-- **Per-AZ Route Tables**: Traffic distribution across availability zones for fault isolation
-- **Improved Resilience**: AZ outages don't impact other zones' external connectivity
+See [Karpenter Node Provisioning ADR](../../../docs/design/karpenter-node-provisioning.md) for
+architecture rationale.
+
+### EKS Auto Mode (`enable_karpenter = false`)
+
+- `compute_config.node_pools = ["system"]` retains the built-in system pool for CoreDNS and
+  metrics-server, while `general-purpose` is excluded so workload pods land on the FIPS NodePool
+- Auto Mode manages storage and load balancing via `storage_config` and `kubernetes_network_config`
+
+See [FIPS-Only EKS Compute ADR](../../../docs/design/fips-eks-compute.md) for the Auto Mode
+strategy (superseded by OSS Karpenter as of this module version).
 
 ## Naming Convention
 
-All resources are named using the `cluster_id` variable passed to the module (e.g., `regional`, `mc01`, or `xg4y-regional` in CI).
+All resources are named using the `cluster_id` variable (e.g., `regional`, `mc01`, or `xg4y-regional`
+in CI). Resource names are deterministic — no random suffixes.
 
 **Examples:**
 
 - EKS Cluster: `mc01`
 - VPC: `mc01-vpc`
-- IAM Roles: `mc01-cluster-role`
-- KMS Alias: `alias/mc01-eks-secrets`
-
-Resource names are deterministic — no random suffixes. An optional CI prefix (e.g., `xg4y-`) provides isolation when multiple clusters share the same AWS account. Environment is applied as a tag, not embedded in resource names.
+- IAM Roles: `mc01-cluster-role`, `mc01-karpenter-node-role`, `mc01-karpenter-controller`, `mc01-ebs-csi-role`
+- SQS Queue: `mc01-karpenter`
 
 ## Required Provider Configuration
-
-**IMPORTANT**: You must configure the required tags in your AWS provider's `default_tags`:
 
 ```hcl
 provider "aws" {
@@ -49,9 +62,9 @@ provider "aws" {
 
   default_tags {
     tags = {
-      app-code      = "APP001"        # CMDB Application ID (required)
-      service-phase = "development"   # development, staging, or production (required)
-      cost-center   = "123"          # 3-digit cost center code (required)
+      app-code      = "APP001"      # CMDB Application ID (required)
+      service-phase = "development" # development, staging, or production (required)
+      cost-center   = "123"         # 3-digit cost center code (required)
     }
   }
 }
@@ -65,11 +78,13 @@ provider "aws" {
 module "management_cluster" {
   source = "./terraform/modules/eks-cluster"
 
-  cluster_id   = var.management_id
-  cluster_type = "management-cluster"
-
-  # Optional cluster configuration
-  cluster_version = "1.34"
+  cluster_id    = var.management_id
+  cluster_type  = "management-cluster"
+  vpc_id        = module.vpc.vpc_id
+  vpc_cidr      = module.vpc.vpc_cidr
+  private_subnet_ids              = module.vpc.private_subnet_ids
+  cluster_security_group_id       = module.vpc.cluster_security_group_id
+  vpc_endpoints_security_group_id = module.vpc.vpc_endpoints_security_group_id
 }
 ```
 
@@ -79,67 +94,67 @@ module "management_cluster" {
 module "regional_cluster" {
   source = "./terraform/modules/eks-cluster"
 
-  cluster_id   = var.regional_id
-  cluster_type = "regional-cluster"
-
+  cluster_id    = var.regional_id
+  cluster_type  = "regional-cluster"
+  vpc_id        = module.vpc.vpc_id
+  vpc_cidr      = module.vpc.vpc_cidr
+  private_subnet_ids              = module.vpc.private_subnet_ids
+  cluster_security_group_id       = module.vpc.cluster_security_group_id
+  vpc_endpoints_security_group_id = module.vpc.vpc_endpoints_security_group_id
 }
 ```
 
 ## Variables
 
-| Name                            | Description                                                                     | Type           | Default                                                 | Required |
-| ------------------------------- | ------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------- | -------- |
-| `cluster_id`                    | Deterministic cluster identifier for resource naming (e.g., `regional`, `mc01`) | `string`       | n/a                                                     | yes      |
-| `cluster_type`                  | Type of cluster: `regional-cluster` or `management-cluster`                     | `string`       | n/a                                                     | yes      |
-| `cluster_version`               | Kubernetes version                                                              | `string`       | `"1.34"`                                                | no       |
-| `vpc_cidr`                      | VPC CIDR block                                                                  | `string`       | `"10.0.0.0/16"`                                         | no       |
-| `availability_zones`            | List of availability zones (auto-detected if empty)                             | `list(string)` | `[]`                                                    | no       |
-| `private_subnet_cidrs`          | CIDR blocks for private subnets                                                 | `list(string)` | `["10.0.0.0/18", "10.0.64.0/18", "10.0.128.0/18"]`      | no       |
-| `public_subnet_cidrs`           | CIDR blocks for public subnets                                                  | `list(string)` | `["10.0.192.0/22", "10.0.196.0/22", "10.0.200.0/22"]`   | no       |
-| `enable_pod_security_standards` | Enable Pod Security Standards                                                   | `bool`         | `true`                                                  | no       |
-| `bootstrap_enabled`             | Enable ArgoCD bootstrap for GitOps management                                   | `bool`         | `true`                                                  | no       |
-| `argocd_namespace`              | Kubernetes namespace for ArgoCD installation                                    | `string`       | `"argocd"`                                              | no       |
-| `argocd_chart_version`          | ArgoCD Helm chart version                                                       | `string`       | `"9.3.0"`                                               | no       |
-| `bootstrap_repository_url`      | Git repository URL for ArgoCD configuration                                     | `string`       | `"https://github.com/openshift-online/rosa-hyperfleet"` | no       |
-| `bootstrap_repository_branch`   | Git branch to track                                                             | `string`       | `"main"`                                                | no       |
+| Name                              | Description                                                                                                    | Type           | Default  | Required |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------- | -------- | -------- |
+| `cluster_id`                      | Deterministic cluster identifier for resource naming (e.g., `regional`, `mc01`)                                | `string`       | n/a      | yes      |
+| `cluster_type`                    | Type of cluster: `regional-cluster` or `management-cluster`                                                    | `string`       | n/a      | yes      |
+| `vpc_id`                          | VPC ID where the EKS cluster will be deployed                                                                  | `string`       | n/a      | yes      |
+| `vpc_cidr`                        | VPC CIDR block (used for security group rules)                                                                 | `string`       | n/a      | yes      |
+| `private_subnet_ids`              | Private subnet IDs for EKS worker nodes                                                                        | `list(string)` | n/a      | yes      |
+| `cluster_security_group_id`       | Pre-created security group ID for EKS cluster control plane                                                    | `string`       | n/a      | yes      |
+| `vpc_endpoints_security_group_id` | Pre-created security group ID for VPC endpoints                                                                | `string`       | n/a      | yes      |
+| `cluster_version`                 | Kubernetes version                                                                                             | `string`       | `"1.34"` | no       |
+| `enable_pod_security_standards`   | Enable Kubernetes Pod Security Standards                                                                       | `bool`         | `true`   | no       |
+| `enable_karpenter`                | Enable OSS Karpenter instead of EKS Auto Mode. Mutually exclusive with Auto Mode.                              | `bool`         | `true`   | no       |
+| `ami_kms_key_arn`                 | ARN of the Red Hat KMS key for RHEL FIPS AMI EBS snapshot decryption. Leave empty to skip KMS policy creation. | `string`       | `""`     | no       |
 
 ## Outputs
 
-| Name                                 | Description                                        |
-| ------------------------------------ | -------------------------------------------------- |
-| `cluster_name`                       | EKS cluster name (same as `cluster_id`)            |
-| `cluster_endpoint`                   | EKS cluster API endpoint                           |
-| `cluster_certificate_authority_data` | Base64 encoded certificate data                    |
-| `vpc_id`                             | VPC ID where cluster is deployed                   |
-| `private_subnets`                    | Private subnet IDs where worker nodes are deployed |
-| `cluster_security_group_id`          | EKS cluster security group ID                      |
-| `bootstrap_report`                   | Bootstrap process information and status           |
+| Name                                   | Description                                                                                                               |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `cluster_name`                         | EKS cluster name (same as `cluster_id`)                                                                                   |
+| `cluster_arn`                          | ARN of the EKS cluster                                                                                                    |
+| `cluster_endpoint`                     | EKS cluster API endpoint                                                                                                  |
+| `cluster_version`                      | Kubernetes version of the EKS cluster                                                                                     |
+| `cluster_certificate_authority_data`   | Base64 encoded certificate data for kubectl (sensitive)                                                                   |
+| `cluster_security_group_id`            | Security group ID attached to the EKS cluster (pass-through)                                                              |
+| `vpc_endpoints_security_group_id`      | Security group ID for VPC endpoints (pass-through)                                                                        |
+| `node_security_group_id`               | EKS-managed node security group ID                                                                                        |
+| `kms_key_arn`                          | ARN of the KMS key used for EKS secrets encryption                                                                        |
+| `kms_key_alias`                        | Alias of the KMS key used for EKS secrets encryption                                                                      |
+| `vpc_id`                               | VPC ID (pass-through)                                                                                                     |
+| `private_subnet_ids`                   | Private subnet IDs (pass-through)                                                                                         |
+| `cluster_iam_role_arn`                 | IAM role ARN of the EKS cluster service role                                                                              |
+| `node_iam_role_arn`                    | IAM role ARN for cluster nodes (Karpenter node role or Auto Mode node role, depending on `enable_karpenter`)              |
+| `karpenter_controller_role_arn`        | IAM role ARN for the Karpenter controller (IRSA). `null` when `enable_karpenter = false`.                                 |
+| `karpenter_queue_url`                  | SQS queue URL for Karpenter interruption handling. `null` when `enable_karpenter = false`.                                |
+| `karpenter_node_instance_profile_name` | EC2 instance profile name for Karpenter nodes (matches `EC2NodeClass.spec.role`). `null` when `enable_karpenter = false`. |
 
 ## Bootstrap Functionality
 
-When `bootstrap_enabled` is `true`, the module automatically installs ArgoCD for GitOps management:
+The ECS bootstrap task (managed by the `ecs-bootstrap` module) runs inside the cluster VPC and:
 
-1. **ECS Fargate Task**: Executes within cluster VPC for secure bootstrap operations
-2. **Tool Installation**: Downloads kubectl, helm, and AWS CLI at runtime
-3. **FIPS Node Setup**: Applies FIPS NodeClass and cluster-type-specific workloads NodePool
-4. **Addon Wait**: Waits for CoreDNS and metrics-server addons to become Active
-5. **ArgoCD Installation**: Installs ArgoCD via Helm with cluster-only access
-6. **GitOps Configuration**: Creates Application of Applications for self-management
-7. **Synchronous Execution**: Bootstrap completes during `terraform apply` with visible logs
+1. Waits for CoreDNS and metrics-server addons to become Active (using the AL2023 bootstrap node group)
+2. Installs Karpenter via Helm from `public.ecr.aws/karpenter/karpenter`
+3. Applies the `EC2NodeClass` and `NodePool` from `argocd/config/<cluster-type>/eks-nodepool/`
+4. Runs a prewarm pod to validate Karpenter can provision a node before proceeding
+5. Installs ArgoCD via Helm and creates the root Application of Applications
 
-### Bootstrap Process
-
-The ECS bootstrap task:
-
-- Runs in the cluster's private subnets for network access
-- Updates kubeconfig using EKS access entries and Pod Identity
-- Applies a FIPS-validated Bottlerocket NodeClass (`fips`) and a workloads NodePool
-- Waits for CoreDNS and metrics-server to be Active (scheduled on the built-in `system` pool)
-- Installs ArgoCD using Helm from the official repository
-- Creates bootstrap application pointing to your repository
-- Enables ArgoCD to take over cluster management
-
-For the FIPS node strategy, including why the built-in `system` pool is retained and `general-purpose` is disabled, see [FIPS-Only EKS Compute](../../../docs/design/fips-eks-compute.md).
+See [ECS Fargate Bootstrap ADR](../../../docs/design/fully-private-eks-bootstrap.md) for the
+bootstrap architecture and [Karpenter Node Provisioning ADR](../../../docs/design/karpenter-node-provisioning.md)
+for the node provisioning strategy.
 
 ## Requirements
 
