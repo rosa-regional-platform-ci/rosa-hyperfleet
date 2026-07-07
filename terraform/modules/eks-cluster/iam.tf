@@ -215,7 +215,6 @@ resource "aws_iam_role_policy" "karpenter_controller" {
           "ec2:CreateFleet",
           "ec2:CreateLaunchTemplate",
           "ec2:CreateTags",
-          "ec2:RunInstances",
         ]
         Resource = "*"
         Condition = {
@@ -223,6 +222,24 @@ resource "aws_iam_role_policy" "karpenter_controller" {
             "aws:RequestTag/kubernetes.io/cluster/${local.cluster_id}" = "owned"
           }
         }
+      },
+      {
+        # ec2:RunInstances is scoped by resource ARN rather than a RequestTag condition
+        # because Karpenter's EC2NodeClass validation performs a dry-run IAM check that
+        # does not include request tags. A RequestTag condition would cause the validation
+        # check to fail (RunInstancesAuthCheckFailed) even though actual provisioning via
+        # CreateFleet succeeds. Resource ARN scoping matches the upstream Karpenter policy.
+        Sid    = "EC2RunInstances"
+        Effect = "Allow"
+        Action = ["ec2:RunInstances"]
+        Resource = [
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:fleet/*",
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:instance/*",
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:volume/*",
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:network-interface/*",
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:launch-template/*",
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:spot-instances-request/*",
+        ]
       },
       {
         Sid    = "EC2FleetDelete"
