@@ -143,12 +143,6 @@ applying these manifests; ArgoCD sync will fail with a CRD not found error other
 > `nodeadm` userData) is the target state and will be enabled once RHEL FIPS AMI IDs are
 > configured in cluster config. The `userData` example below documents the target configuration.
 
-> **Implementation note**: The current `EC2NodeClass` in `argocd/config/*/eks-nodepool/templates/00-nodeclass.yaml`
-> uses `amiSelectorTerms: [{alias: bottlerocket@latest}]` as an interim placeholder. The RHEL FIPS
-> AMI migration described in this ADR (with `amiFamily: Custom`, cross-account KMS grants, and
-> `nodeadm` userData) is the target state and will be enabled once RHEL FIPS AMI IDs are
-> configured in the cluster config. The `userData` example below documents the target configuration.
-
 ```yaml
 apiVersion: karpenter.k8s.aws/v1
 kind: EC2NodeClass

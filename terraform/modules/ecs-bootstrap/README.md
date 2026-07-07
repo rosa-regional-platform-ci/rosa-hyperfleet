@@ -51,23 +51,23 @@ module "ecs_bootstrap" {
 
 ## Inputs
 
-| Name                            | Description                                                                                     | Type           | Default                                                 | Required |
-| ------------------------------- | ----------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------- | :------: |
-| `cluster_id`                    | Cluster identifier for resource naming (e.g., `regional`, `mc01`)                               | `string`       | n/a                                                     |   yes    |
-| `vpc_id`                        | VPC ID for ECS task execution                                                                   | `string`       | n/a                                                     |   yes    |
-| `private_subnets`               | Private subnet IDs for task execution                                                           | `list(string)` | n/a                                                     |   yes    |
-| `eks_cluster_arn`               | EKS cluster ARN for bootstrap configuration                                                     | `string`       | n/a                                                     |   yes    |
-| `eks_cluster_name`              | EKS cluster name for bootstrap configuration                                                    | `string`       | n/a                                                     |   yes    |
-| `eks_cluster_security_group_id` | EKS cluster security group ID                                                                   | `string`       | n/a                                                     |   yes    |
-| `container_image`               | Container image for the bootstrap task (must have aws, kubectl, helm, git, jq)                  | `string`       | n/a                                                     |   yes    |
-| `repository_url`                | Git repository URL for cluster configuration                                                    | `string`       | `"https://github.com/openshift-online/rosa-hyperfleet"` |    no    |
-| `repository_branch`             | Git branch to use for cluster configuration                                                     | `string`       | `"main"`                                                |    no    |
-| `thanos_kms_key_arn`            | KMS key ARN for Thanos S3 encryption                                                            | `string`       | `""`                                                    |    no    |
-| `loki_kms_key_arn`              | KMS key ARN for Loki S3 encryption                                                              | `string`       | `""`                                                    |    no    |
-| `management_clusters`           | Comma-separated colon-delimited MC entries (e.g. `mc01:123456789012`)                           | `string`       | `""`                                                    |    no    |
-| `karpenter_controller_role_arn` | IAM role ARN for the Karpenter controller (IRSA). Required when the cluster uses OSS Karpenter. | `string`       | `""`                                                    |    no    |
-| `karpenter_queue_url`           | SQS queue URL for Karpenter interruption handling                                               | `string`       | `""`                                                    |    no    |
-| `karpenter_version`             | Karpenter Helm chart version to install during bootstrap                                        | `string`       | `"1.13.0"`                                              |    no    |
+| Name                            | Description                                                                                         | Type           | Default                                                 | Required |
+| ------------------------------- | --------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------- | :------: |
+| `cluster_id`                    | Cluster identifier for resource naming (e.g., `regional`, `mc01`)                                   | `string`       | n/a                                                     |   yes    |
+| `vpc_id`                        | VPC ID for ECS task execution                                                                       | `string`       | n/a                                                     |   yes    |
+| `private_subnets`               | Private subnet IDs for task execution                                                               | `list(string)` | n/a                                                     |   yes    |
+| `eks_cluster_arn`               | EKS cluster ARN for bootstrap configuration                                                         | `string`       | n/a                                                     |   yes    |
+| `eks_cluster_name`              | EKS cluster name for bootstrap configuration                                                        | `string`       | n/a                                                     |   yes    |
+| `eks_cluster_security_group_id` | EKS cluster security group ID                                                                       | `string`       | n/a                                                     |   yes    |
+| `container_image`               | Container image for the bootstrap task (must have aws, kubectl, helm, git, jq)                      | `string`       | n/a                                                     |   yes    |
+| `repository_url`                | Git repository URL for cluster configuration                                                        | `string`       | `"https://github.com/openshift-online/rosa-hyperfleet"` |    no    |
+| `repository_branch`             | Git branch to use for cluster configuration                                                         | `string`       | `"main"`                                                |    no    |
+| `thanos_kms_key_arn`            | KMS key ARN for Thanos S3 encryption                                                                | `string`       | `""`                                                    |    no    |
+| `loki_kms_key_arn`              | KMS key ARN for Loki S3 encryption                                                                  | `string`       | `""`                                                    |    no    |
+| `management_clusters`           | MC entries as `name:account_id` pairs, comma-separated (e.g. `mc01:123456789012,mc02:210987654321`) | `string`       | `""`                                                    |    no    |
+| `karpenter_controller_role_arn` | IAM role ARN for the Karpenter controller (IRSA). Required when the cluster uses OSS Karpenter.     | `string`       | `""`                                                    |    no    |
+| `karpenter_queue_url`           | SQS queue URL for Karpenter interruption handling                                                   | `string`       | `""`                                                    |    no    |
+| `karpenter_version`             | Karpenter Helm chart version to install during bootstrap                                            | `string`       | `"1.13.0"`                                              |    no    |
 
 ## Outputs
 
