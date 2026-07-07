@@ -9,7 +9,7 @@ hyperfleet-operator-chart:
 
   source:
     repoURL: https://github.com/typeid/hyperfleet-operator.git
-    targetRevision: single_dynamodb
+    targetRevision: pgruntime
     path: charts/hyperfleet-operator
 
   syncPolicy:
