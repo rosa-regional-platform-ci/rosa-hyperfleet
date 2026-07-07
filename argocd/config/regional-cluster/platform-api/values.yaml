@@ -42,9 +42,10 @@ platformApi:
         cpu: 500m
         memory: 512Mi
 
-  # FleetStore database connection
-  fleetstore:
-    secretName: fleetstore-dsn
+  # HyperfleetDB connection (pgruntime-backed Postgres)
+  hyperfleetdb:
+    bucketCount: 32
+    secretName: postgres-dsn
     secretKey: dsn
 
   # Envoy sidecar configuration

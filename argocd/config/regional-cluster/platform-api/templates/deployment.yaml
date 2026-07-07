@@ -50,11 +50,13 @@ spec:
             - --oidc-issuer-base-url={{ .Values.platformApi.app.args.oidcIssuerBaseURL }}
             {{- end }}
           env:
-            - name: FLEETSTORE_DSN
+            - name: POSTGRES_DSN
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.platformApi.fleetstore.secretName | default "fleetstore-dsn" }}
-                  key: {{ .Values.platformApi.fleetstore.secretKey | default "dsn" }}
+                  name: {{ .Values.platformApi.hyperfleetdb.secretName | default "postgres-dsn" }}
+                  key: {{ .Values.platformApi.hyperfleetdb.secretKey | default "dsn" }}
+            - name: BUCKET_COUNT
+              value: {{ .Values.platformApi.hyperfleetdb.bucketCount | default 1 | quote }}
             {{- if .Values.platformApi.zoa.enabled }}
             - name: ZOA_ENABLED
               value: "true"

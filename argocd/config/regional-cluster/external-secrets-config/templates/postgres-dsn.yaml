@@ -1,7 +1,7 @@
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: fleetstore-dsn
+  name: postgres-dsn
   namespace: hyperfleet-system
 spec:
   refreshInterval: 1h
@@ -9,9 +9,9 @@ spec:
     name: aws-secrets-manager
     kind: ClusterSecretStore
   target:
-    name: fleetstore-dsn
+    name: postgres-dsn
     creationPolicy: Owner
   data:
     - secretKey: dsn
       remoteRef:
-        key: {{ .Values.global.cluster_name }}-fleetstore-dsn
+        key: {{ .Values.global.cluster_name }}-postgres-dsn

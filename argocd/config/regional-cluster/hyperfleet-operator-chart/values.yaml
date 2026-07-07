@@ -23,10 +23,10 @@ hyperfleet-operator-chart:
       tag: "single_dynamodb_a"
       pullPolicy: Always
 
-    replicaCount: 1
+    replicaCount: 2
 
-    leaderElection:
-      enabled: true
+    hyperfleetdb:
+      bucketCount: 32
 
     serviceAccount:
       create: true

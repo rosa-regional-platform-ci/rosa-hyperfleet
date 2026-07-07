@@ -19,9 +19,9 @@ spec:
         {{- end }}
         awsRegion: {{ .Values.global.aws_region }}
         baseDomain: {{ .Values.baseDomain }}
-        fleetstore:
-          secretName: {{ .Values.global.fleetstore_secret_name | default "fleetstore-dsn" }}
-          secretKey: {{ .Values.global.fleetstore_secret_key | default "dsn" }}
+        postgres:
+          secretName: {{ .Values.global.postgres_secret_name | default "postgres-dsn" }}
+          secretKey: {{ .Values.global.postgres_secret_key | default "dsn" }}
 
   destination:
     server: https://kubernetes.default.svc
