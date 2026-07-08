@@ -105,6 +105,8 @@ spec:
                   bucketNames:
                     chunks: '{{ .metadata.labels.cluster_name }}-loki-logs-{{ .metadata.annotations.aws_account_id }}'
                     ruler: '{{ .metadata.labels.cluster_name }}-loki-logs-{{ .metadata.annotations.aws_account_id }}'
+            aws-load-balancer-controller:
+              clusterName: '{{ .metadata.labels.cluster_name }}'
             hyperfleetApi:
               aws:
                 region: '{{ .metadata.labels.aws_region }}'
