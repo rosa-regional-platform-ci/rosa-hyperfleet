@@ -99,11 +99,31 @@ if kubectl get namespace hypershift &>/dev/null; then
         pass "HyperShift operator Running (${count} pod(s))"
     elif [[ $rc -eq 2 ]]; then
         fail "HyperShift operator: namespace exists but no operator pods found"
+        echo "  [diag] hypershift-install Job:"
+        kubectl get job hypershift-install -n hypershift-install --no-headers 2>/dev/null \
+            | sed 's/^/    /' || echo "    job not found in namespace hypershift-install"
+        echo "  [diag] Installer pod logs (last 40 lines):"
+        kubectl logs -n hypershift-install -l "job-name=hypershift-install" \
+            --tail=40 2>/dev/null | sed 's/^/    /' \
+            || echo "    no logs — pod may have been evicted or namespace missing"
+        echo "  [diag] Resources in hypershift namespace:"
+        kubectl get all -n hypershift 2>/dev/null | sed 's/^/    /' || true
+        echo "  [diag] Events in hypershift namespace:"
+        kubectl get events -n hypershift --sort-by='.lastTimestamp' 2>/dev/null \
+            | tail -10 | sed 's/^/    /' || true
     else
         fail "HyperShift operator pods not all Running"
+        kubectl get pods -n hypershift -l "app=operator" --no-headers 2>/dev/null \
+            | sed 's/^/    /' || true
+        echo "  [diag] Events:"
+        kubectl get events -n hypershift --sort-by='.lastTimestamp' 2>/dev/null \
+            | tail -10 | sed 's/^/    /' || true
     fi
 else
     fail "Namespace 'hypershift' does not exist — HyperShift not installed"
+    echo "  [diag] Installer job:"
+    kubectl get job hypershift-install -n hypershift-install 2>/dev/null \
+        | sed 's/^/    /' || echo "    namespace hypershift-install not found"
 fi
 
 # ---------------------------------------------------------------------------
@@ -234,7 +254,7 @@ section "ArgoCD (if present)"
 
 if kubectl get namespace argocd &>/dev/null; then
     not_synced=$(kubectl get applications -n argocd --no-headers 2>/dev/null \
-        | awk '{print $2, $3}' | grep -v "Synced.*Healthy" | grep -v "Synced.*Progressing" || true)
+        | awk '{print $1, $2, $3}' | grep -v "Synced.*Healthy" | grep -v "Synced.*Progressing" || true)
     if [[ -z "$not_synced" ]]; then
         total=$(kubectl get applications -n argocd --no-headers 2>/dev/null | wc -l | tr -d ' ')
         pass "All ${total} ArgoCD applications Synced"
@@ -242,6 +262,27 @@ if kubectl get namespace argocd &>/dev/null; then
         count=$(echo "$not_synced" | wc -l | tr -d ' ')
         fail "${count} ArgoCD application(s) not Synced/Healthy"
         echo "$not_synced" | sed 's/^/       /'
+        while IFS= read -r _line; do
+            _app=$(echo "$_line" | awk '{print $1}')
+            _sync=$(echo "$_line" | awk '{print $2}')
+            _health=$(echo "$_line" | awk '{print $3}')
+            echo "  [diag] ${_app} (${_sync}/${_health}):"
+            if [[ "$_sync" == "OutOfSync" ]]; then
+                kubectl get application "$_app" -n argocd \
+                    -o jsonpath='{.status.resources}' 2>/dev/null \
+                    | jq -r '.[] | select(.status != "Synced") | "    \(.kind)/\(.name): \(.status) \(.health.status // "")"' \
+                    2>/dev/null | head -10 || true
+            fi
+            if [[ "$_health" == "Degraded" ]]; then
+                kubectl get application "$_app" -n argocd \
+                    -o jsonpath='{.status.conditions}' 2>/dev/null \
+                    | jq -r '.[]? | "    condition: \(.type): \(.message)"' 2>/dev/null || true
+                kubectl get application "$_app" -n argocd \
+                    -o jsonpath='{.status.resources}' 2>/dev/null \
+                    | jq -r '.[]? | select(.health.status == "Degraded") | "    \(.kind)/\(.name): \(.health.status) — \(.health.message // "-")"' \
+                    2>/dev/null | head -10 || true
+            fi
+        done <<< "$not_synced"
     fi
 else
     warn "ArgoCD not installed on this MC (namespace 'argocd' absent)"

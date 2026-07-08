@@ -138,12 +138,29 @@ else
     fail "EC2NodeClass 'fips' Ready=${ec2nc_ready:-Unknown} — ${val_reason:-no detail}"
 fi
 
-np_ready=$(kubectl get nodepool default \
-    -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
-if [[ "$np_ready" == "True" ]]; then
-    pass "NodePool 'default' Ready=True"
+# The RC NodePool is named 'regional-workloads'; check all NodePools so this
+# doesn't break if the name changes.
+_np_names=$(kubectl get nodepool --no-headers 2>/dev/null | awk '{print $1}' || true)
+if [[ -z "$_np_names" ]]; then
+    fail "No NodePools found"
 else
-    fail "NodePool 'default' Ready=${np_ready:-Unknown}"
+    while IFS= read -r _np; do
+        np_ready=$(kubectl get nodepool "$_np" \
+            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
+        if [[ "$np_ready" == "True" ]]; then
+            pass "NodePool '${_np}' Ready=True"
+        else
+            fail "NodePool '${_np}' Ready=${np_ready:-Unknown}"
+            echo "  [diag] NodePool conditions:"
+            kubectl get nodepool "$_np" -o jsonpath='{.status.conditions}' 2>/dev/null \
+                | jq -r '.[] | "    \(.type)=\(.status): \(.message // "-")"' 2>/dev/null || true
+            echo "  [diag] nodeClassRef: $(kubectl get nodepool "$_np" \
+                -o jsonpath='{.spec.template.spec.nodeClassRef.name}' 2>/dev/null || echo 'unknown')"
+            echo "  [diag] Recent Karpenter logs (errors):"
+            kubectl logs -n kube-system -l "app.kubernetes.io/name=karpenter" --tail=50 2>/dev/null \
+                | grep -iE "nodepool|error|failed" | tail -10 | sed 's/^/    /' || true
+        fi
+    done <<< "$_np_names"
 fi
 
 nc_count=$(kubectl get nodeclaims --no-headers 2>/dev/null | wc -l | tr -d ' ')
@@ -185,7 +202,6 @@ declare -A CORE_SELECTORS=(
     ["kube-proxy"]="k8s-app=kube-proxy"
     ["ebs-csi-node"]="app=ebs-csi-node"
     ["ebs-csi-controller"]="app=ebs-csi-controller"
-    ["pod-identity-agent"]="app.kubernetes.io/name=eks-pod-identity-agent"
     ["secrets-store-csi"]="app=secrets-store-csi-driver"
 )
 
@@ -207,6 +223,31 @@ if pods_running kube-system "app=csi-secrets-store-provider-aws"; then
     pass "AWS Secrets Store CSI provider Running"
 else
     warn "AWS Secrets Store CSI provider: not found"
+fi
+
+# pod-identity-agent is installed as an EKS addon (Terraform-managed). The addon
+# DaemonSet may not carry the standard app label, so check by DaemonSet name first.
+_pia_rc=0
+pods_running kube-system "app.kubernetes.io/name=eks-pod-identity-agent" || _pia_rc=$?
+if [[ $_pia_rc -eq 0 ]]; then
+    pass "pod-identity-agent Running"
+elif kubectl get daemonset eks-pod-identity-agent -n kube-system &>/dev/null; then
+    _pia_desired=$(kubectl get daemonset eks-pod-identity-agent -n kube-system \
+        -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || echo 0)
+    _pia_ready=$(kubectl get daemonset eks-pod-identity-agent -n kube-system \
+        -o jsonpath='{.status.numberReady}' 2>/dev/null || echo 0)
+    if [[ "$_pia_ready" -ge 1 ]]; then
+        pass "pod-identity-agent Running (${_pia_ready}/${_pia_desired} ready, EKS addon)"
+    else
+        fail "pod-identity-agent DaemonSet exists but ${_pia_ready}/${_pia_desired} pods ready"
+        kubectl get pods -n kube-system -l "app.kubernetes.io/name=eks-pod-identity-agent" \
+            --no-headers 2>/dev/null | sed 's/^/    /' || true
+        kubectl get events -n kube-system \
+            --field-selector "involvedObject.name=eks-pod-identity-agent" \
+            --sort-by='.lastTimestamp' 2>/dev/null | tail -5 | sed 's/^/    /' || true
+    fi
+else
+    warn "pod-identity-agent: DaemonSet not found — EKS addon may not be installed"
 fi
 
 # ---------------------------------------------------------------------------
@@ -255,6 +296,27 @@ else
     count=$(echo "$not_synced" | wc -l | tr -d ' ')
     fail "${count} ArgoCD application(s) not Synced/Healthy:"
     echo "$not_synced" | sed 's/^/       /'
+    while IFS= read -r _line; do
+        _app=$(echo "$_line" | awk '{print $1}')
+        _sync=$(echo "$_line" | awk '{print $2}')
+        _health=$(echo "$_line" | awk '{print $3}')
+        echo "  [diag] ${_app} (${_sync}/${_health}):"
+        if [[ "$_sync" == "OutOfSync" ]]; then
+            kubectl get application "$_app" -n argocd \
+                -o jsonpath='{.status.resources}' 2>/dev/null \
+                | jq -r '.[] | select(.status != "Synced") | "    \(.kind)/\(.name): \(.status) \(.health.status // "")"' \
+                2>/dev/null | head -10 || true
+        fi
+        if [[ "$_health" == "Degraded" ]]; then
+            kubectl get application "$_app" -n argocd \
+                -o jsonpath='{.status.conditions}' 2>/dev/null \
+                | jq -r '.[]? | "    condition: \(.type): \(.message)"' 2>/dev/null || true
+            kubectl get application "$_app" -n argocd \
+                -o jsonpath='{.status.resources}' 2>/dev/null \
+                | jq -r '.[]? | select(.health.status == "Degraded") | "    \(.kind)/\(.name): \(.health.status) — \(.health.message // "-")"' \
+                2>/dev/null | head -10 || true
+        fi
+    done <<< "$not_synced"
 fi
 
 progressing=$(kubectl get applications -n argocd --no-headers 2>/dev/null \
