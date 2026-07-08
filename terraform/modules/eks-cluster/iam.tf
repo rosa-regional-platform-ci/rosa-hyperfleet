@@ -225,6 +225,24 @@ resource "aws_iam_role_policy" "karpenter_controller" {
         }
       },
       {
+        # Unconditional RunInstances on specific ARNs covers the EC2NodeClass dry-run
+        # validation check (which omits request tags, so the RequestTag condition in
+        # EC2FleetCreate would block it). EC2FleetCreate handles actual provisioning via
+        # CreateFleet (which includes the cluster tag). Two statements are required; moving
+        # RunInstances out of EC2FleetCreate breaks actual node provisioning.
+        Sid    = "EC2RunInstancesValidation"
+        Effect = "Allow"
+        Action = ["ec2:RunInstances"]
+        Resource = [
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:fleet/*",
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:instance/*",
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:volume/*",
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:network-interface/*",
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:launch-template/*",
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:spot-instances-request/*",
+        ]
+      },
+      {
         Sid    = "EC2FleetDelete"
         Effect = "Allow"
         Action = [
