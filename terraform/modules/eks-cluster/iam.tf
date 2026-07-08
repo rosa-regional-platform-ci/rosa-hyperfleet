@@ -225,6 +225,25 @@ resource "aws_iam_role_policy" "karpenter_controller" {
         }
       },
       {
+        # The nodeclaim.tagging controller calls CreateTags on already-running instances
+        # to apply karpenter.sh/* labels post-creation. aws:RequestTag only applies to
+        # tags set during resource creation, so a separate statement scoped by
+        # aws:ResourceTag is required for post-creation tagging.
+        Sid    = "EC2NodeClaimTagging"
+        Effect = "Allow"
+        Action = ["ec2:CreateTags"]
+        Resource = [
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:instance/*",
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:volume/*",
+          "arn:${data.aws_partition.current.partition}:ec2:*:*:network-interface/*",
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/kubernetes.io/cluster/${local.cluster_id}" = "owned"
+          }
+        }
+      },
+      {
         # RunInstances on pre-existing resources (AMI, security-group, subnet) must be
         # unconditional: these resources don't receive aws:RequestTag during RunInstances,
         # so the RequestTag condition in EC2FleetCreate always denies them. This is the
