@@ -215,6 +215,7 @@ resource "aws_iam_role_policy" "karpenter_controller" {
           "ec2:CreateFleet",
           "ec2:CreateLaunchTemplate",
           "ec2:CreateTags",
+          "ec2:RunInstances",
         ]
         Resource = "*"
         Condition = {
@@ -224,12 +225,12 @@ resource "aws_iam_role_policy" "karpenter_controller" {
         }
       },
       {
-        # ec2:RunInstances is scoped by resource ARN rather than a RequestTag condition
-        # because Karpenter's EC2NodeClass validation performs a dry-run IAM check that
-        # does not include request tags. A RequestTag condition would cause the validation
-        # check to fail (RunInstancesAuthCheckFailed) even though actual provisioning via
-        # CreateFleet succeeds. Resource ARN scoping matches the upstream Karpenter policy.
-        Sid    = "EC2RunInstances"
+        # Unconditional RunInstances on specific ARNs covers the EC2NodeClass dry-run
+        # validation check (which omits request tags, so the RequestTag condition in
+        # EC2FleetCreate would block it). EC2FleetCreate handles actual provisioning via
+        # CreateFleet (which includes the cluster tag). Two statements are required; moving
+        # RunInstances out of EC2FleetCreate breaks actual node provisioning.
+        Sid    = "EC2RunInstancesValidation"
         Effect = "Allow"
         Action = ["ec2:RunInstances"]
         Resource = [
