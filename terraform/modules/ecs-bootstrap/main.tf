@@ -180,7 +180,22 @@ resource "aws_ecs_task_definition" "bootstrap" {
                     memory: 128Mi
               terminationGracePeriodSeconds: 0
           PREWARM_EOF
-            kubectl wait pod karpenter-prewarm -n kube-system --for=condition=Ready --timeout=8m
+            if ! kubectl wait pod karpenter-prewarm -n kube-system --for=condition=Ready --timeout=8m; then
+              echo "=== PREWARM TIMEOUT — diagnostic dump ==="
+              echo "--- EC2NodeClass fips ---"
+              kubectl get ec2nodeclass fips -o yaml 2>/dev/null || true
+              echo "--- NodePool management-workloads ---"
+              kubectl get nodepool management-workloads -o yaml 2>/dev/null || true
+              echo "--- NodeClaims ---"
+              kubectl get nodeclaims -o yaml 2>/dev/null || true
+              echo "--- Karpenter controller logs (last 200 lines) ---"
+              kubectl logs -n kube-system -l app.kubernetes.io/name=karpenter --tail=200 --since=15m 2>/dev/null || true
+              echo "--- Prewarm pod events ---"
+              kubectl describe pod karpenter-prewarm -n kube-system 2>/dev/null || true
+              echo "--- All nodes ---"
+              kubectl get nodes -o wide 2>/dev/null || true
+              exit 1
+            fi
             kubectl delete pod karpenter-prewarm -n kube-system --wait=false
             echo "✓ Karpenter node provisioned, proceeding with ArgoCD install"
           fi
