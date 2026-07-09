@@ -53,7 +53,8 @@ pods_running() {
 
     local not_running
     not_running=$(kubectl get pods "${args[@]}" 2>/dev/null \
-        | awk '{print $3}' | grep -v "Running\|Completed" || true)
+        | awk '$3 ~ /^(Running|Completed)$/ { if ($3 == "Running") { split($2, r, "/"); if (r[1]+0 < r[2]+0) print }; next } { print }' \
+        || true)
     [[ -z "$not_running" ]]
 }
 
@@ -71,12 +72,16 @@ pod_count() {
 
 section "Nodes"
 
-not_ready=$(kubectl get nodes --no-headers 2>/dev/null | awk '{print $2}' | grep -v "^Ready$" || true)
-if [[ -z "$not_ready" ]]; then
-    node_count=$(kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')
-    pass "All ${node_count} nodes are Ready"
+if ! _nodes_raw=$(kubectl get nodes --no-headers 2>/dev/null); then
+    fail "Cannot list nodes — check kubeconfig and RBAC"
 else
-    fail "Nodes not Ready: $(echo "$not_ready" | wc -l | tr -d ' ') node(s)"
+    not_ready=$(echo "$_nodes_raw" | awk '{print $2}' | grep -v "^Ready$" || true)
+    if [[ -z "$not_ready" ]]; then
+        node_count=$(echo "$_nodes_raw" | wc -l | tr -d ' ')
+        pass "All ${node_count} nodes are Ready"
+    else
+        fail "Nodes not Ready: $(echo "$not_ready" | wc -l | tr -d ' ') node(s)"
+    fi
 fi
 
 bootstrap_nodes=$(kubectl get nodes -l "eks.amazonaws.com/nodegroup=${CLUSTER_ID}-karpenter-bootstrap" \
@@ -89,7 +94,7 @@ fi
 
 taint_count=$(kubectl get nodes -l "eks.amazonaws.com/nodegroup=${CLUSTER_ID}-karpenter-bootstrap" \
     -o json 2>/dev/null \
-    | jq '[.items[].spec.taints // [] | .[] | select(.key == "CriticalAddonsOnly")] | length')
+    | jq '[.items[] | select((.spec.taints // []) | any(.key == "CriticalAddonsOnly"))] | length')
 if [[ "$taint_count" -ge 2 ]]; then
     pass "Bootstrap nodes have CriticalAddonsOnly taint"
 else
@@ -112,19 +117,22 @@ fi
 # Verify Karpenter controller runs on bootstrap nodes (not on nodes it would provision)
 kp_nodes=$(kubectl get pods -n kube-system -l "app.kubernetes.io/name=karpenter" \
     -o jsonpath='{.items[*].spec.nodeName}' 2>/dev/null || true)
-bootstrap_prefix="${CLUSTER_ID}-karpenter-bootstrap"
-off_bootstrap=0
-for node in $kp_nodes; do
-    ng=$(kubectl get node "$node" \
-        -o jsonpath='{.metadata.labels.eks\.amazonaws\.com/nodegroup}' 2>/dev/null || true)
-    if [[ "$ng" != "${CLUSTER_ID}-karpenter-bootstrap" ]]; then
-        ((off_bootstrap++))
-    fi
-done
-if [[ "$off_bootstrap" -eq 0 ]]; then
-    pass "Karpenter pods scheduled on bootstrap node group"
+if [[ -z "$kp_nodes" ]]; then
+    warn "Karpenter pods have no nodeName assigned yet — still scheduling?"
 else
-    warn "${off_bootstrap} Karpenter pod(s) NOT on bootstrap node group"
+    off_bootstrap=0
+    for node in $kp_nodes; do
+        ng=$(kubectl get node "$node" \
+            -o jsonpath='{.metadata.labels.eks\.amazonaws\.com/nodegroup}' 2>/dev/null || true)
+        if [[ "$ng" != "${CLUSTER_ID}-karpenter-bootstrap" ]]; then
+            ((off_bootstrap++))
+        fi
+    done
+    if [[ "$off_bootstrap" -eq 0 ]]; then
+        pass "Karpenter pods scheduled on bootstrap node group"
+    else
+        warn "${off_bootstrap} Karpenter pod(s) NOT on bootstrap node group"
+    fi
 fi
 
 ec2nc_ready=$(kubectl get ec2nodeclass fips \
@@ -287,46 +295,50 @@ else
     fail "ArgoCD server not Running"
 fi
 
-not_synced=$(kubectl get applications -n argocd --no-headers 2>/dev/null \
-    | awk '{print $1, $2, $3}' | grep -v "Synced.*Healthy" | grep -v "Synced.*Progressing" || true)
-if [[ -z "$not_synced" ]]; then
-    total=$(kubectl get applications -n argocd --no-headers 2>/dev/null | wc -l | tr -d ' ')
-    pass "All ${total} ArgoCD applications Synced"
+if ! _apps_raw=$(kubectl get applications -n argocd --no-headers 2>/dev/null); then
+    fail "ArgoCD: cannot list applications — check RBAC and ArgoCD CRD availability"
 else
-    count=$(echo "$not_synced" | wc -l | tr -d ' ')
-    fail "${count} ArgoCD application(s) not Synced/Healthy:"
-    echo "$not_synced" | sed 's/^/       /'
-    while IFS= read -r _line; do
-        _app=$(echo "$_line" | awk '{print $1}')
-        _sync=$(echo "$_line" | awk '{print $2}')
-        _health=$(echo "$_line" | awk '{print $3}')
-        echo "  [diag] ${_app} (${_sync}/${_health}):"
-        if [[ "$_sync" == "OutOfSync" ]]; then
-            kubectl get application "$_app" -n argocd \
-                -o jsonpath='{.status.resources}' 2>/dev/null \
-                | jq -r '.[] | select(.status != "Synced") | "    \(.kind)/\(.name): \(.status) \(.health.status // "")"' \
-                2>/dev/null | head -10 || true
-        fi
-        if [[ "$_health" == "Degraded" ]]; then
-            _app_health_msg=$(kubectl get application "$_app" -n argocd \
-                -o jsonpath='{.status.health.message}' 2>/dev/null || true)
-            [[ -n "$_app_health_msg" ]] && echo "    health: ${_app_health_msg}"
-            kubectl get application "$_app" -n argocd \
-                -o jsonpath='{.status.conditions}' 2>/dev/null \
-                | jq -r '.[]? | "    condition: \(.type): \(.message)"' 2>/dev/null || true
-            kubectl get application "$_app" -n argocd \
-                -o jsonpath='{.status.resources}' 2>/dev/null \
-                | jq -r '.[]? | select(.health.status == "Degraded" or .health.status == "Missing" or .health.status == "Unknown") | "    \(.kind)/\(.name): \(.health.status) — \(.health.message // "-")"' \
-                2>/dev/null | head -10 || true
-        fi
-    done <<< "$not_synced"
-fi
+    not_synced=$(echo "$_apps_raw" \
+        | awk '{print $1, $2, $3}' | grep -v "Synced.*Healthy" | grep -v "Synced.*Progressing" || true)
+    if [[ -z "$not_synced" ]]; then
+        total=$(echo "$_apps_raw" | wc -l | tr -d ' ')
+        pass "All ${total} ArgoCD applications Synced"
+    else
+        count=$(echo "$not_synced" | wc -l | tr -d ' ')
+        fail "${count} ArgoCD application(s) not Synced/Healthy:"
+        echo "$not_synced" | sed 's/^/       /'
+        while IFS= read -r _line; do
+            _app=$(echo "$_line" | awk '{print $1}')
+            _sync=$(echo "$_line" | awk '{print $2}')
+            _health=$(echo "$_line" | awk '{print $3}')
+            echo "  [diag] ${_app} (${_sync}/${_health}):"
+            if [[ "$_sync" == "OutOfSync" ]]; then
+                kubectl get application "$_app" -n argocd \
+                    -o jsonpath='{.status.resources}' 2>/dev/null \
+                    | jq -r '.[] | select(.status != "Synced") | "    \(.kind)/\(.name): \(.status) \(.health.status // "")"' \
+                    2>/dev/null | head -10 || true
+            fi
+            if [[ "$_health" == "Degraded" ]]; then
+                _app_health_msg=$(kubectl get application "$_app" -n argocd \
+                    -o jsonpath='{.status.health.message}' 2>/dev/null || true)
+                [[ -n "$_app_health_msg" ]] && echo "    health: ${_app_health_msg}"
+                kubectl get application "$_app" -n argocd \
+                    -o jsonpath='{.status.conditions}' 2>/dev/null \
+                    | jq -r '.[]? | "    condition: \(.type): \(.message // "-")"' 2>/dev/null || true
+                kubectl get application "$_app" -n argocd \
+                    -o jsonpath='{.status.resources}' 2>/dev/null \
+                    | jq -r '.[]? | select(.health.status == "Degraded" or .health.status == "Missing" or .health.status == "Unknown") | "    \(.kind)/\(.name): \(.health.status) — \(.health.message // "-")"' \
+                    2>/dev/null | head -10 || true
+            fi
+        done <<< "$not_synced"
+    fi
 
-progressing=$(kubectl get applications -n argocd --no-headers 2>/dev/null \
-    | awk '{print $1, $2, $3}' | grep "Progressing" || true)
-if [[ -n "$progressing" ]]; then
-    warn "Applications still progressing:"
-    echo "$progressing" | sed 's/^/       /'
+    progressing=$(echo "$_apps_raw" \
+        | awk '{print $1, $2, $3}' | grep "Progressing" || true)
+    if [[ -n "$progressing" ]]; then
+        warn "Applications still progressing:"
+        echo "$progressing" | sed 's/^/       /'
+    fi
 fi
 
 # ---------------------------------------------------------------------------

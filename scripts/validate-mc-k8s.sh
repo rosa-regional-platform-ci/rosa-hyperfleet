@@ -51,7 +51,8 @@ pods_running() {
 
     local not_running
     not_running=$(kubectl get pods "${args[@]}" 2>/dev/null \
-        | awk '{print $3}' | grep -v "Running\|Completed" || true)
+        | awk '$3 ~ /^(Running|Completed)$/ { if ($3 == "Running") { split($2, r, "/"); if (r[1]+0 < r[2]+0) print }; next } { print }' \
+        || true)
     [[ -z "$not_running" ]]
 }
 
@@ -68,13 +69,17 @@ pod_count() {
 
 section "Nodes"
 
-not_ready=$(kubectl get nodes --no-headers 2>/dev/null | awk '{print $2}' | grep -v "^Ready$" || true)
-if [[ -z "$not_ready" ]]; then
-    node_count=$(kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')
-    pass "All ${node_count} nodes are Ready"
+if ! _nodes_raw=$(kubectl get nodes --no-headers 2>/dev/null); then
+    fail "Cannot list nodes — check kubeconfig and RBAC"
 else
-    bad=$(echo "$not_ready" | wc -l | tr -d ' ')
-    fail "${bad} node(s) not Ready"
+    not_ready=$(echo "$_nodes_raw" | awk '{print $2}' | grep -v "^Ready$" || true)
+    if [[ -z "$not_ready" ]]; then
+        node_count=$(echo "$_nodes_raw" | wc -l | tr -d ' ')
+        pass "All ${node_count} nodes are Ready"
+    else
+        bad=$(echo "$not_ready" | wc -l | tr -d ' ')
+        fail "${bad} node(s) not Ready"
+    fi
 fi
 
 # Karpenter-provisioned nodes carry karpenter.sh/nodepool label
@@ -168,6 +173,7 @@ else
                 -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "?")
             ready=$(kubectl get nodepool "$np_name" -n "$np_ns" \
                 -o jsonpath='{.status.replicas}' 2>/dev/null || echo "0")
+            ready="${ready:-0}"
             if [[ "$ready" -ge 1 ]]; then
                 pass "NodePool ${np_ns}/${np_name}: ${ready}/${desired} replicas Ready"
             else
@@ -253,39 +259,43 @@ fi
 section "ArgoCD (if present)"
 
 if kubectl get namespace argocd &>/dev/null; then
-    not_synced=$(kubectl get applications -n argocd --no-headers 2>/dev/null \
-        | awk '{print $1, $2, $3}' | grep -v "Synced.*Healthy" | grep -v "Synced.*Progressing" || true)
-    if [[ -z "$not_synced" ]]; then
-        total=$(kubectl get applications -n argocd --no-headers 2>/dev/null | wc -l | tr -d ' ')
-        pass "All ${total} ArgoCD applications Synced"
+    if ! _apps_raw=$(kubectl get applications -n argocd --no-headers 2>/dev/null); then
+        fail "ArgoCD: cannot list applications — check RBAC and ArgoCD CRD availability"
     else
-        count=$(echo "$not_synced" | wc -l | tr -d ' ')
-        fail "${count} ArgoCD application(s) not Synced/Healthy"
-        echo "$not_synced" | sed 's/^/       /'
-        while IFS= read -r _line; do
-            _app=$(echo "$_line" | awk '{print $1}')
-            _sync=$(echo "$_line" | awk '{print $2}')
-            _health=$(echo "$_line" | awk '{print $3}')
-            echo "  [diag] ${_app} (${_sync}/${_health}):"
-            if [[ "$_sync" == "OutOfSync" ]]; then
-                kubectl get application "$_app" -n argocd \
-                    -o jsonpath='{.status.resources}' 2>/dev/null \
-                    | jq -r '.[] | select(.status != "Synced") | "    \(.kind)/\(.name): \(.status) \(.health.status // "")"' \
-                    2>/dev/null | head -10 || true
-            fi
-            if [[ "$_health" == "Degraded" ]]; then
-                _app_health_msg=$(kubectl get application "$_app" -n argocd \
-                    -o jsonpath='{.status.health.message}' 2>/dev/null || true)
-                [[ -n "$_app_health_msg" ]] && echo "    health: ${_app_health_msg}"
-                kubectl get application "$_app" -n argocd \
-                    -o jsonpath='{.status.conditions}' 2>/dev/null \
-                    | jq -r '.[]? | "    condition: \(.type): \(.message)"' 2>/dev/null || true
-                kubectl get application "$_app" -n argocd \
-                    -o jsonpath='{.status.resources}' 2>/dev/null \
-                    | jq -r '.[]? | select(.health.status == "Degraded" or .health.status == "Missing" or .health.status == "Unknown") | "    \(.kind)/\(.name): \(.health.status) — \(.health.message // "-")"' \
-                    2>/dev/null | head -10 || true
-            fi
-        done <<< "$not_synced"
+        not_synced=$(echo "$_apps_raw" \
+            | awk '{print $1, $2, $3}' | grep -v "Synced.*Healthy" | grep -v "Synced.*Progressing" || true)
+        if [[ -z "$not_synced" ]]; then
+            total=$(echo "$_apps_raw" | wc -l | tr -d ' ')
+            pass "All ${total} ArgoCD applications Synced"
+        else
+            count=$(echo "$not_synced" | wc -l | tr -d ' ')
+            fail "${count} ArgoCD application(s) not Synced/Healthy"
+            echo "$not_synced" | sed 's/^/       /'
+            while IFS= read -r _line; do
+                _app=$(echo "$_line" | awk '{print $1}')
+                _sync=$(echo "$_line" | awk '{print $2}')
+                _health=$(echo "$_line" | awk '{print $3}')
+                echo "  [diag] ${_app} (${_sync}/${_health}):"
+                if [[ "$_sync" == "OutOfSync" ]]; then
+                    kubectl get application "$_app" -n argocd \
+                        -o jsonpath='{.status.resources}' 2>/dev/null \
+                        | jq -r '.[] | select(.status != "Synced") | "    \(.kind)/\(.name): \(.status) \(.health.status // "")"' \
+                        2>/dev/null | head -10 || true
+                fi
+                if [[ "$_health" == "Degraded" ]]; then
+                    _app_health_msg=$(kubectl get application "$_app" -n argocd \
+                        -o jsonpath='{.status.health.message}' 2>/dev/null || true)
+                    [[ -n "$_app_health_msg" ]] && echo "    health: ${_app_health_msg}"
+                    kubectl get application "$_app" -n argocd \
+                        -o jsonpath='{.status.conditions}' 2>/dev/null \
+                        | jq -r '.[]? | "    condition: \(.type): \(.message // "-")"' 2>/dev/null || true
+                    kubectl get application "$_app" -n argocd \
+                        -o jsonpath='{.status.resources}' 2>/dev/null \
+                        | jq -r '.[]? | select(.health.status == "Degraded" or .health.status == "Missing" or .health.status == "Unknown") | "    \(.kind)/\(.name): \(.health.status) — \(.health.message // "-")"' \
+                        2>/dev/null | head -10 || true
+                fi
+            done <<< "$not_synced"
+        fi
     fi
 else
     warn "ArgoCD not installed on this MC (namespace 'argocd' absent)"
