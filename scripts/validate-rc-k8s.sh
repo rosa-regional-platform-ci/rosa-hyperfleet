@@ -95,10 +95,10 @@ fi
 taint_count=$(kubectl get nodes -l "eks.amazonaws.com/nodegroup=${CLUSTER_ID}-karpenter-bootstrap" \
     -o json 2>/dev/null \
     | jq '[.items[] | select((.spec.taints // []) | any(.key == "CriticalAddonsOnly"))] | length')
-if [[ "$taint_count" -ge 2 ]]; then
-    pass "Bootstrap nodes have CriticalAddonsOnly taint"
+if [[ "$taint_count" -eq "$bootstrap_nodes" && "$bootstrap_nodes" -ge 1 ]]; then
+    pass "Bootstrap nodes have CriticalAddonsOnly taint (${taint_count}/${bootstrap_nodes})"
 else
-    warn "CriticalAddonsOnly taint missing on ${taint_count}/2 bootstrap nodes"
+    warn "CriticalAddonsOnly taint missing on some bootstrap nodes (${taint_count}/${bootstrap_nodes} tainted)"
 fi
 
 # ---------------------------------------------------------------------------
