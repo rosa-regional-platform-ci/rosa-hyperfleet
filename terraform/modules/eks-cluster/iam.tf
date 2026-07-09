@@ -3,11 +3,11 @@
 #
 # Supports two compute modes, selected by var.enable_karpenter:
 #
-#   false (default) — EKS Auto Mode
+#   false — EKS Auto Mode
 #     - eks_cluster role: AmazonEKSClusterPolicy + all four Auto Mode policies
 #     - eks_auto_mode_node role: AmazonEKSWorkerNodeMinimalPolicy + ECR pull-only
 #
-#   true — OSS Karpenter
+#   true (default) — OSS Karpenter
 #     - eks_cluster role: AmazonEKSClusterPolicy only (Auto Mode policies removed)
 #     - eks_auto_mode_node role: exists but has no policy attachments (unused)
 #     - karpenter_node role: full AmazonEKSWorkerNodePolicy + CNI + ECR + SSM
