@@ -158,7 +158,6 @@ class EphemeralEnvOrchestrator:
 
         self.central_monitor = PipelineMonitor(self.aws.session)
         self.target_monitor = PipelineMonitor(self.aws.target_session)
-        self._drain_karpenter_nodes(git)
         self._run_teardown(git, fire_and_forget=fire_and_forget)
 
     def resync(self):
@@ -685,69 +684,6 @@ class EphemeralEnvOrchestrator:
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError, RuntimeError) as e:
             log.warning("Failed to fetch API URL from terraform state: %s", e)
             return None
-
-    def _drain_karpenter_nodes(self, git: GitManager):
-        """Terminate Karpenter-provisioned EC2 nodes before infrastructure teardown.
-
-        Karpenter nodes are not in Terraform state. Without this step, terraform
-        destroy fails on subnet deletion with DependencyViolation because orphaned
-        instances still hold ENIs in the VPC.
-
-        Runs after _purge_clusters (controller is gone, can't reprovision new nodes)
-        and before _run_teardown (before terraform destroy touches the VPC).
-        """
-        log.info("")
-        log.info("==========================================")
-        log.info("Teardown: Drain Karpenter Nodes")
-        log.info("==========================================")
-
-        # RC + all MCs defined in the region config
-        cluster_names = [f"{self.eph_prefix}-regional"]
-        env_config_dir = git.work_dir / "config" / TARGET_ENVIRONMENT
-        region_file = env_config_dir / f"{self.region}.yaml"
-        try:
-            with open(region_file) as f:
-                region_config = yaml.safe_load(f) or {}
-            for mc_name in region_config.get("provision_mcs", {}).keys():
-                cluster_names.append(f"{self.eph_prefix}-{mc_name}")
-        except OSError as e:
-            log.warning("Could not read region config (%s) — draining RC cluster only", e)
-
-        log.info("Draining Karpenter nodes for: %s", cluster_names)
-
-        ec2 = self.aws.target_session.client("ec2", region_name=self.region)
-
-        instance_ids = []
-        for cluster_name in cluster_names:
-            resp = ec2.describe_instances(
-                Filters=[
-                    {"Name": "tag:karpenter.sh/managed-by", "Values": [cluster_name]},
-                    {"Name": "instance-state-name", "Values": ["pending", "running", "stopping", "stopped"]},
-                ]
-            )
-            ids = [
-                i["InstanceId"]
-                for r in resp["Reservations"]
-                for i in r["Instances"]
-            ]
-            if ids:
-                log.info("  %s: %d instance(s) — %s", cluster_name, len(ids), ids)
-            instance_ids.extend(ids)
-
-        if not instance_ids:
-            log.info("No Karpenter-managed instances found — nothing to drain.")
-            return
-
-        log.info("Terminating %d instance(s)...", len(instance_ids))
-        ec2.terminate_instances(InstanceIds=instance_ids)
-
-        log.info("Waiting for termination (up to 10 minutes)...")
-        waiter = ec2.get_waiter("instance_terminated")
-        waiter.wait(
-            InstanceIds=instance_ids,
-            WaiterConfig={"Delay": 15, "MaxAttempts": 40},
-        )
-        log.info("All Karpenter instances terminated.")
 
     def _run_teardown(self, git: GitManager, fire_and_forget: bool = False):
         """Tear down infrastructure via GitOps and destroy the pipeline-provisioner."""
