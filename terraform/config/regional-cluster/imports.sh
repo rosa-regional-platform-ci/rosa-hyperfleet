@@ -87,6 +87,10 @@ else
     echo "  [skip] AmazonMQ log groups — broker not yet provisioned"
 fi
 
+import_if_needed \
+    'module.rhobs_api_gateway.aws_cloudwatch_log_group.api_gateway_access' \
+    "/aws/api-gateway/${TF_VAR_regional_id}-rhobs/${TF_VAR_stage_name:-prod}/access"
+
 API_ID=$(tf_state_value \
     'module.api_gateway.aws_api_gateway_rest_api.main' '.values.id')
 STAGE_NAME=$(tf_state_value \
