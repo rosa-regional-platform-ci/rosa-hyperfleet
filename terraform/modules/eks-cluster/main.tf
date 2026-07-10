@@ -145,6 +145,37 @@ resource "aws_eks_cluster" "main" {
     aws_cloudwatch_log_group.eks_cluster,
     aws_kms_key.eks_secrets
   ]
+
+  # Terminate Karpenter-provisioned EC2 instances before the cluster is deleted.
+  # Karpenter nodes are not in Terraform state, so they survive EKS deletion and
+  # block VPC/subnet teardown with DependencyViolation due to lingering ENIs.
+  # on_failure = continue so a missing AWS CLI or zero instances doesn't abort destroy.
+  provisioner "local-exec" {
+    when       = destroy
+    on_failure = continue
+    environment = {
+      CLUSTER_NAME = self.name
+      REGION       = data.aws_region.current.name
+    }
+    command = <<-EOT
+      echo "Terminating Karpenter EC2 instances for cluster: $CLUSTER_NAME"
+      INSTANCE_IDS=$(aws ec2 describe-instances \
+        --region "$REGION" \
+        --filters \
+          "Name=tag:karpenter.sh/managed-by,Values=$CLUSTER_NAME" \
+          "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+        --query 'Reservations[].Instances[].InstanceId' \
+        --output text)
+      if [ -z "$INSTANCE_IDS" ]; then
+        echo "No Karpenter-managed instances found."
+        exit 0
+      fi
+      echo "Terminating: $INSTANCE_IDS"
+      aws ec2 terminate-instances --region "$REGION" --instance-ids $INSTANCE_IDS
+      aws ec2 wait instance-terminated --region "$REGION" --instance-ids $INSTANCE_IDS
+      echo "Done."
+    EOT
+  }
 }
 
 # -----------------------------------------------------------------------------
