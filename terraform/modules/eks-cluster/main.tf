@@ -153,11 +153,9 @@ resource "aws_eks_cluster" "main" {
   provisioner "local-exec" {
     when       = destroy
     on_failure = continue
-    environment = {
-      CLUSTER_NAME = self.name
-      REGION       = data.aws_region.current.name
-    }
-    command = <<-EOT
+    command    = <<-EOT
+      CLUSTER_NAME="${self.name}"
+      REGION=$(echo "${self.arn}" | cut -d: -f4)
       echo "Terminating Karpenter EC2 instances for cluster: $CLUSTER_NAME"
       INSTANCE_IDS=$(aws ec2 describe-instances \
         --region "$REGION" \
