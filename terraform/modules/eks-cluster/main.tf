@@ -274,6 +274,8 @@ resource "aws_eks_addon" "kube_proxy" {
   count        = var.enable_karpenter ? 1 : 0
   cluster_name = aws_eks_cluster.main.name
   addon_name   = "kube-proxy"
+
+  depends_on = [aws_eks_node_group.karpenter_bootstrap]
 }
 
 resource "aws_eks_addon" "ebs_csi" {
@@ -281,7 +283,7 @@ resource "aws_eks_addon" "ebs_csi" {
   cluster_name = aws_eks_cluster.main.name
   addon_name   = "aws-ebs-csi-driver"
 
-  depends_on = [aws_eks_pod_identity_association.ebs_csi]
+  depends_on = [aws_eks_node_group.karpenter_bootstrap, aws_eks_pod_identity_association.ebs_csi]
 }
 
 # AWS Secrets Store CSI Driver Provider (e.g. for Maestro agent secret mounting)
@@ -296,4 +298,6 @@ resource "aws_eks_addon" "aws_secrets_store_csi_driver_provider" {
       }
     }
   })
+
+  depends_on = [aws_eks_node_group.karpenter_bootstrap]
 }
