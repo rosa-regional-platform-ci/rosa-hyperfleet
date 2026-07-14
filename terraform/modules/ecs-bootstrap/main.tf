@@ -376,6 +376,35 @@ resource "aws_ecs_task_definition" "bootstrap" {
                 - CreateNamespace=true
           APP_EOF
 
+          if [ "$CLUSTER_TYPE" = "management-cluster" ]; then
+            echo "Waiting for hypershift ArgoCD application to become Synced+Healthy..."
+            _HS_TIMEOUT=1800
+            _HS_START=$(date +%s)
+            until kubectl get application hypershift -n argocd &>/dev/null; do
+              _ELAPSED=$(( $(date +%s) - _HS_START ))
+              if [ "$_ELAPSED" -ge "$_HS_TIMEOUT" ]; then
+                echo "ERROR: hypershift application did not appear after $((_ELAPSED/60))m" >&2
+                exit 1
+              fi
+              echo "[$((_ELAPSED/60))m] waiting for hypershift application to appear..."
+              sleep 15
+            done
+            until [ "$(kubectl get application hypershift -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null)" = "Synced" ] && \
+                  [ "$(kubectl get application hypershift -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null)" = "Healthy" ]; do
+              _ELAPSED=$(( $(date +%s) - _HS_START ))
+              if [ "$_ELAPSED" -ge "$_HS_TIMEOUT" ]; then
+                echo "ERROR: hypershift application did not become Synced+Healthy after $((_ELAPSED/60))m" >&2
+                kubectl get application hypershift -n argocd -o jsonpath='{.status}' 2>/dev/null >&2 || true
+                exit 1
+              fi
+              _SYNC=$(kubectl get application hypershift -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+              _HEALTH=$(kubectl get application hypershift -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+              echo "[$((_ELAPSED/60))m] hypershift sync=$_SYNC health=$_HEALTH"
+              sleep 15
+            done
+            echo "hypershift application is Synced+Healthy"
+          fi
+
           echo "=== Bootstrap completed successfully ==="
         EOF
       ]
