@@ -74,14 +74,12 @@ CLOUDFRONT_URL="https://${CLOUDFRONT_DOMAIN}"
 # ~15 min) and initial ArgoCD sync (~10 min) have completed. Allow 40 minutes
 # so the Platform API has time to be deployed and reach a healthy state.
 set +e
-MAX_RETRIES=80
+LIVE_DEADLINE=2400
+LIVE_START=$SECONDS
 RETRY_DELAY=30
-RETRY_COUNT=0
 LIVE_OK=false
 
-while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-
+while [ $((SECONDS - LIVE_START)) -lt $LIVE_DEADLINE ]; do
     SECURITY_TOKEN_HEADER=()
     if [ -n "${AWS_SESSION_TOKEN:-}" ]; then
         SECURITY_TOKEN_HEADER=(-H "x-amz-security-token: ${AWS_SESSION_TOKEN}")
@@ -99,13 +97,13 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
         LIVE_OK=true
         break
     fi
-    echo "/live returned $HTTP_CODE (attempt $RETRY_COUNT/$MAX_RETRIES), retrying in ${RETRY_DELAY}s..."
+    echo "/live returned $HTTP_CODE ($((SECONDS - LIVE_START))s elapsed), retrying in ${RETRY_DELAY}s..."
     sleep $RETRY_DELAY
 done
 set -e
 
 if [ "$LIVE_OK" != "true" ]; then
-    echo "ERROR: /live did not return 200 after $((MAX_RETRIES * RETRY_DELAY / 60)) minutes" >&2
+    echo "ERROR: /live did not return 200 after $((LIVE_DEADLINE / 60)) minutes" >&2
     exit 1
 fi
 

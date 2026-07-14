@@ -62,7 +62,7 @@ graph LR
 - **Managed policies**: `AmazonEKSWorkerNodePolicy`, `AmazonEKS_CNI_Policy`, ECR pull-only
 - **Optional inline policy**: `kms:Decrypt` and `kms:CreateGrant` on the FIPS AMI KMS key when
   `ami_kms_key_arn` is set
-- **Referenced in**: `EC2NodeClass.spec.role` (instance profile name)
+- **Referenced in**: `EC2NodeClass.spec.role`
 
 ### SQS Queue and EventBridge Rules
 
