@@ -378,7 +378,7 @@ resource "aws_ecs_task_definition" "bootstrap" {
 
           if [ "$CLUSTER_TYPE" = "management-cluster" ]; then
             echo "Waiting for hypershift ArgoCD application to become Synced+Healthy..."
-            _HS_TIMEOUT=1800
+            _HS_TIMEOUT=3600
             _HS_START=$(date +%s)
             until kubectl get application hypershift -n argocd &>/dev/null; do
               _ELAPSED=$(( $(date +%s) - _HS_START ))
