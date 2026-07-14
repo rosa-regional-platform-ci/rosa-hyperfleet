@@ -16,6 +16,10 @@ kube-prometheus-stack:
     enabled: false
 
   prometheusOperator:
+    tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+        effect: NoSchedule
     admissionWebhooks:
       # During bootstrap, ArgoCD syncs itself and restarts its controllers
       # while other app syncs are in flight. If a PreSync hook Job completes
