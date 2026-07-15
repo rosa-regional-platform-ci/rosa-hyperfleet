@@ -121,5 +121,9 @@ spec:
               -o /dev/null -w "  HTTP %{http_code}\n"
           fi
           {{- end }}
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+          effect: NoSchedule
       restartPolicy: Never
       serviceAccountName: hypershift-installer
