@@ -7,10 +7,10 @@
 
 eksNodePool:
   instanceFamilies:
-  - m8i-flex
-  - m7i-flex
+  - m8i
+  - m7i
 hyperfleetAdapter1Chart:
-  baseDomain: 0.us-east-1.dev0.rosa.devshift.net
+  baseDomain: ''
 maestro:
   mqttEndpoint: xxx.iot.us-east-1.amazonaws.com
   iotLogLevel: WARN
@@ -19,13 +19,13 @@ pagerduty:
 grafana:
   grafana.ini:
     auth.anonymous:
-      org_role: Admin
+      org_role: Viewer
     users:
-      auto_assign_org_role: Admin
+      auto_assign_org_role: Viewer
 argo-cd:
   configs:
     cm:
-      admin.enabled: 'true'
-      users.anonymous.enabled: 'false'
+      admin.enabled: 'false'
+      users.anonymous.enabled: 'true'
     rbac:
-      policy.default: ''
+      policy.default: role:readonly
