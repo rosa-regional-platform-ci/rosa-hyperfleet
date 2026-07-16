@@ -2,7 +2,7 @@
 # AWS Load Balancer Controller IAM Role and Policies
 #
 # IAM policy derived from the upstream recommended policy:
-# https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.13.3/docs/install/iam_policy.json
+# https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.17.1/docs/install/iam_policy.json
 # =============================================================================
 
 resource "aws_iam_role" "aws_lbc" {
@@ -278,6 +278,7 @@ resource "aws_iam_role_policy" "aws_lbc" {
           "elasticloadbalancing:DeleteTargetGroup",
           "elasticloadbalancing:ModifyListenerAttributes",
           "elasticloadbalancing:ModifyCapacityReservation",
+          "elasticloadbalancing:ModifyIpPools",
         ]
         Resource = "*"
         Condition = {
@@ -293,6 +294,7 @@ resource "aws_iam_role_policy" "aws_lbc" {
           "elasticloadbalancing:AddListenerCertificates",
           "elasticloadbalancing:RemoveListenerCertificates",
           "elasticloadbalancing:ModifyRule",
+          "elasticloadbalancing:SetRulePriorities",
         ]
         Resource = "*"
       },

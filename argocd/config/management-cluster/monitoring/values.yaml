@@ -32,6 +32,10 @@ kube-prometheus-stack:
         ttlSecondsAfterFinished: 600
       patch:
         ttlSecondsAfterFinished: 600
+        tolerations:
+          - key: CriticalAddonsOnly
+            operator: Exists
+            effect: NoSchedule
     resources:
       requests:
         cpu: 50m

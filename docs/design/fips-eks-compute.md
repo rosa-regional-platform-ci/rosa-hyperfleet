@@ -64,7 +64,7 @@ operating system — specifically Bottlerocket with FIPS mode enabled.
   surfaces EC2 API rate limiting and IAM role sequencing issues as early ECS task failures
   (retried automatically by ECS) rather than silent cascades post-ArgoCD.
 
-- **Tradeoff**: The `karpenter-bootstrap` node group runs non-FIPS standard Amazon Linux 2 nodes.
+- **Tradeoff**: The `karpenter-bootstrap` node group runs non-FIPS standard Amazon Linux 2023 (AL2023) nodes.
   These nodes host only Karpenter controller, CoreDNS, and metrics-server — EKS system
   infrastructure, not customer-bearing workloads. Platform and application workloads run
   exclusively on FIPS Karpenter-provisioned nodes. This scope boundary is an accepted tradeoff
