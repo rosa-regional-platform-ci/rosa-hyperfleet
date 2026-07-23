@@ -4,9 +4,9 @@
   "service_phase": "dev",
   "cost_center": "000",
   "environment": "ephemeral",
-  "account_id": "ssm:///infra/ephemeral/us-east-1/account_id",
+  "account_id": "720644165472",
   "region": "us-east-1",
-  "deployment_name": "us-east-1",
+  "deployment_name": "us-east-1-eph-ba1f51",
   "alias": "regional-us-east-1",
   "enable_bastion": true,
   "enable_cloudtrail": false,
@@ -15,12 +15,12 @@
   "enable_api_custom_domain": false,
   "zone_shard_count": 1,
   "enable_sns_alerting": true,
-  "regional_id": "regional",
-  "eph_prefix": "",
+  "regional_id": "eph-ba1f51-regional",
+  "eph_prefix": "eph-ba1f51",
   "hyperfleet_db_instance_class": "db.t4g.medium",
   "hyperfleet_db_deletion_protection": false,
   "hyperfleet_db_skip_final_snapshot": true,
   "hyperfleet_db_performance_insights_enabled": false,
   "hyperfleet_db_monitoring_interval": 0,
-  "management_clusters_info": [{"account_id": "ssm:///infra/ephemeral/us-east-1/mc01/account_id", "id": "mc01"}]
+  "management_clusters_info": [{"account_id": "129678139271", "id": "eph-ba1f51-mc01"}]
 }
