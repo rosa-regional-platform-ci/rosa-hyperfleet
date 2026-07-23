@@ -33,5 +33,6 @@
   "hyperfleet_db_skip_final_snapshot": false,
   "hyperfleet_db_performance_insights_enabled": true,
   "hyperfleet_db_monitoring_interval": 60,
-  "management_clusters_info": [{"account_id": "855246887846", "id": "eph-956c5e1e-mc01"}]
+  "management_clusters_info": [{"account_id": "855246887846", "id": "eph-956c5e1e-mc01"}],
+  "delete": true
 }
