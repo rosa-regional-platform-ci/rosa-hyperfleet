@@ -85,6 +85,24 @@ else
 
     # ZOA KMS key ARN (optional — for S3 SSE-KMS cross-account access)
     export TF_VAR_zoa_kms_key_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_kms_key_arn 2>/dev/null || echo "")
+
+    # ── Read specs SNS topic ARN from RC kube-applier-dynamodb state ─────────
+    # The rc-messaging module creates the specs SNS topic in the per-MC
+    # kube-applier-dynamodb state, not in regional-cluster state. Read it here
+    # so it can be passed as rc_specs_sns_topic_arn to the MC terraform run,
+    # enabling the mc-messaging module to configure the SQS queue policy.
+    _KA_DDB_STATE_KEY="kube-applier-dynamodb/${CLUSTER_ID}.tfstate"
+    _KA_DDB_TF_DIR="terraform/config/kube-applier-dynamodb-provisioning"
+    (cd "$_KA_DDB_TF_DIR" && terraform init -reconfigure \
+        -backend-config="bucket=${_RC_STATE_BUCKET}" \
+        -backend-config="key=${_KA_DDB_STATE_KEY}" \
+        -backend-config="region=${TARGET_REGION}" \
+        -backend-config="use_lockfile=true" >/dev/null 2>&1) || true
+
+    export TF_VAR_rc_specs_sns_topic_arn=$(cd "$_KA_DDB_TF_DIR" && terraform output -raw specs_sns_topic_arn 2>/dev/null || echo "")
+    if [ -z "${TF_VAR_rc_specs_sns_topic_arn}" ]; then
+        echo "INFO: RC specs SNS topic not yet provisioned for ${CLUSTER_ID} — kube-applier messaging will be skipped until next MC apply."
+    fi
 fi
 
 # ── Phase 2: Apply/Destroy MC infrastructure ─────────────────────────────────
