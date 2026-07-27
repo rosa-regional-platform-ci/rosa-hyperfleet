@@ -19,8 +19,8 @@ hyperfleet:
 
   helmValues:
     image:
-      repository: quay.io/cbusse_openshift/hyperfleet-operator
-      tag: "pgruntimev2"
+      repository: quay.io/psav/hyperfleet-operator
+      tag: "6d51902"
       pullPolicy: Always
 
     replicaCount: 2
