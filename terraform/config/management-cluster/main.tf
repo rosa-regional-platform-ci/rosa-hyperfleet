@@ -189,6 +189,27 @@ module "kube_applier" {
 }
 
 # =============================================================================
+# RC kube-applier-dynamodb remote state
+#
+# Reads the specs SNS topic ARN directly from the RC Terraform state rather
+# than relying on the buildspec to scrape it via `terraform output`. The state
+# bucket follows the same naming convention as all other RC state buckets.
+# =============================================================================
+
+data "terraform_remote_state" "kube_applier_dynamodb" {
+  backend = "s3"
+  config = {
+    bucket = "terraform-state-${var.regional_aws_account_id}-${var.region}"
+    key    = "kube-applier-dynamodb/${var.management_id}.tfstate"
+    region = var.region
+  }
+}
+
+locals {
+  rc_specs_sns_topic_arn = try(data.terraform_remote_state.kube_applier_dynamodb.outputs.specs_sns_topic_arn, "")
+}
+
+# =============================================================================
 # kube-applier MC-side Messaging (SNS/SQS cross-account notifications)
 #
 # Creates the specs SQS queue (receives notifications from the RC specs SNS
@@ -196,19 +217,18 @@ module "kube_applier" {
 # topic (kube-applier publishes here after writing a status document so the
 # RC-side operator queues are notified immediately).
 #
-# rc_specs_sns_topic_arn is read from the RC kube-applier-dynamodb terraform
-# state by the buildspec script and passed in as TF_VAR_rc_specs_sns_topic_arn.
-# When empty (e.g. during initial bootstrap before the RC run completes) the
+# rc_specs_sns_topic_arn is read directly from the RC kube-applier-dynamodb
+# Terraform remote state. When empty (RC messaging not yet provisioned) the
 # module is skipped and messaging falls back to 5-minute safety polling.
 # =============================================================================
 
 module "kube_applier_mc_messaging" {
-  count  = var.rc_specs_sns_topic_arn != "" ? 1 : 0
+  count  = local.rc_specs_sns_topic_arn != "" ? 1 : 0
   source = "../../modules/kube-applier-mc-messaging"
 
   mc_name                = var.management_id
   rc_aws_account_id      = var.regional_aws_account_id
-  rc_specs_sns_topic_arn = var.rc_specs_sns_topic_arn
+  rc_specs_sns_topic_arn = local.rc_specs_sns_topic_arn
   eks_cluster_name       = module.management_cluster.cluster_name
   aws_region             = var.region
 }
