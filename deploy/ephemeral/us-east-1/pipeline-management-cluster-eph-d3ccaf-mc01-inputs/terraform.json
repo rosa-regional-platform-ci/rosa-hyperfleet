@@ -9,5 +9,6 @@
   "alias": "eph-d3ccaf-mc01",
   "management_id": "eph-d3ccaf-mc01",
   "regional_aws_account_id": "720644165472",
-  "enable_bastion": true
+  "enable_bastion": true,
+  "delete": true
 }
