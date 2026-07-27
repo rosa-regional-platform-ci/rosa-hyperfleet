@@ -1,39 +1,27 @@
-# Default values for platform-api
-
 global:
-  git_revision: "unknown"
-
+  git_revision: unknown
 platformApi:
-  # Namespace to deploy into
   namespace: platform-api
-
-  # Service Account configuration
   serviceAccount:
     create: true
     name: platform-api-sa
     annotations: {}
-
-  # Application configuration
   app:
     name: platform-api
     image:
-      repository: quay.io/cbusse_openshift/rosa-regional-platform-api
-      tag: "pgruntime"
+      repository: quay.io/rrp-dev-ci/rosa-regional-platform-api
+      tag: ci-121-2081671102270017536
       pullPolicy: Always
-
-    # Application arguments
     args:
       logLevel: info
       logFormat: json
-      allowedAccounts: "123456789012"
+      allowedAccounts: '123456789012'
       dynamodbRegion: us-east-2
       dynamodbPrefix: rosa
-      oidcIssuerBaseURL: ""
+      oidcIssuerBaseURL: ''
       apiPort: 8000
       healthPort: 8081
       metricsPort: 9090
-
-    # Resources for the main app container
     resources:
       requests:
         cpu: 100m
@@ -41,19 +29,13 @@ platformApi:
       limits:
         cpu: 500m
         memory: 512Mi
-
-  # HyperfleetDB connection (pgruntime-backed Postgres)
   hyperfleetdb:
     secretName: hyperfleet-db-dsn
     secretKey: dsn
-
-  # Envoy sidecar configuration
   envoy:
     image:
       repository: envoyproxy/envoy
       tag: v1.31-latest
-
-    # Resources for the Envoy sidecar
     resources:
       requests:
         cpu: 50m
@@ -61,12 +43,8 @@ platformApi:
       limits:
         cpu: 200m
         memory: 256Mi
-
-  # Deployment configuration
   deployment:
     replicas: 2
-
-  # Service configuration
   service:
     type: ClusterIP
     ports:
@@ -74,33 +52,27 @@ platformApi:
       api: 8000
       health: 8081
       metrics: 9090
-
-  # Target Group configuration
   targetGroup:
-    arn: "PLACEHOLDER"
+    arn: PLACEHOLDER
     targetType: ip
-
-  # ZOA (Zero Operator Access) configuration
   zoa:
     enabled: true
-    tableName: ""
-    auditTableName: ""
-    bucketName: ""
-    jobImage: "quay.io/slopezz/zoa-tools:e777d69"
-    ttlSeconds: "3600"
-    executionTimeoutSeconds: "1800"
-    writeCooldownSeconds: "300"
-    maxConcurrentPerTarget: "10"
-    dynamodbTTLDays: "365"
+    tableName: ''
+    auditTableName: ''
+    bucketName: ''
+    jobImage: quay.io/slopezz/zoa-tools:e777d69
+    ttlSeconds: '3600'
+    executionTimeoutSeconds: '1800'
+    writeCooldownSeconds: '300'
+    maxConcurrentPerTarget: '10'
+    dynamodbTTLDays: '365'
     jobResources:
       requests:
-        cpu: "25m"
-        memory: "64Mi"
+        cpu: 25m
+        memory: 64Mi
       limits:
-        cpu: "250m"
-        memory: "256Mi"
-
-  # Health probe configuration
+        cpu: 250m
+        memory: 256Mi
   probes:
     liveness:
       initialDelaySeconds: 10
