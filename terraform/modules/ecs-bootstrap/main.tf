@@ -225,6 +225,8 @@ resource "aws_ecs_task_definition" "bootstrap" {
               sre_thanos_target_group_arn: "$SRE_THANOS_TARGET_GROUP_ARN"
               sre_alb_dns_name: "$SRE_ALB_DNS_NAME"
               sre_domain: "$SRE_DOMAIN"
+              kube_applier_specs_queue_url: "$KUBE_APPLIER_SQS_QUEUE_URL"
+              kube_applier_status_topic_arn: "$KUBE_APPLIER_SNS_STATUS_TOPIC_ARN"
           type: Opaque
           stringData:
             name: in-cluster
@@ -293,6 +295,14 @@ resource "aws_ecs_task_definition" "bootstrap" {
         {
           name  = "RC_AWS_ACCOUNT_ID"
           value = var.rc_aws_account_id
+        },
+        {
+          name  = "KUBE_APPLIER_SQS_QUEUE_URL"
+          value = var.kube_applier_specs_queue_url
+        },
+        {
+          name  = "KUBE_APPLIER_SNS_STATUS_TOPIC_ARN"
+          value = var.kube_applier_status_topic_arn
         }
       ]
 
