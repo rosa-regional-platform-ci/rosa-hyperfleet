@@ -117,7 +117,7 @@ resource "aws_iam_role_policy" "eso_secretsmanager" {
   role = aws_iam_role.external_secrets_operator.id
 
   policy = jsonencode({
-    Version = "2012-10-17"
+     Version = "2012-10-17"
     Statement = [
       {
         Effect = "Allow"
@@ -126,14 +126,6 @@ resource "aws_iam_role_policy" "eso_secretsmanager" {
           "secretsmanager:DescribeSecret"
         ]
         Resource = "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.regional_id}-*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "kms:Decrypt",
-          "kms:DescribeKey"
-        ]
-        Resource = module.hyperfleet_db.kms_key_arn
       }
     ]
   })
@@ -439,38 +431,29 @@ module "zoa" {
 }
 
 # =============================================================================
-# HyperFleet DB (PostgreSQL)
+# HyperFleet CRD DynamoDB Tables
 #
-# Replaces fleet-db (workerless EKS). Multi-AZ PostgreSQL instance storing
-# hyperfleet CRs in a single `resources` table with jsonb spec/status.
-# The DSN is written to Secrets Manager for ESO to sync into the
-# hyperfleet-db-dsn Kubernetes Secret consumed by the operator and platform-api.
+# Replaces the Aurora PostgreSQL hyperfleet-db cluster. The operator and
+# platform-api use these tables directly via the hyperfleet-db DynamoDB client.
+# The table prefix is exposed to pods via HYPERFLEET_DB_TABLE_PREFIX.
 # =============================================================================
 
-module "hyperfleet_db" {
-  source = "../../modules/hyperfleet-db"
+module "hyperfleet_crd" {
+  source = "../../modules/hyperfleet-crd-dynamodb"
 
-  cluster_id         = var.regional_id
-  vpc_id             = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
-  vpc_cidr           = module.vpc.vpc_cidr
+  table_prefix = "${var.regional_id}-"
+  enable_pitr  = var.hyperfleet_db_enable_pitr
 
-  instance_class = var.hyperfleet_db_instance_class
-  engine_version = var.hyperfleet_db_engine_version
-
-  backup_retention_period      = var.hyperfleet_db_backup_retention_period
-  deletion_protection          = var.hyperfleet_db_deletion_protection
-  skip_final_snapshot          = var.hyperfleet_db_skip_final_snapshot
-  performance_insights_enabled = var.hyperfleet_db_performance_insights_enabled
-  monitoring_interval          = var.hyperfleet_db_monitoring_interval
+  tags = {
+    Component = "hyperfleet-db"
+  }
 }
 
 # =============================================================================
 # Hyperfleet Operator IAM (Pod Identity)
 #
-# The hyperfleet-operator runs on the RC, reads/writes CRs in hyperfleet-db
-# (Postgres via DSN from Secrets Manager), and writes/reads DynamoDB
-# desire tables for MC communication.
+# The hyperfleet-operator runs on the RC, reads/writes CRs in the DynamoDB CRD
+# tables, and writes/reads DynamoDB desire tables for MC communication.
 # =============================================================================
 
 resource "aws_iam_role" "hyperfleet_operator" {
@@ -509,6 +492,32 @@ resource "aws_eks_pod_identity_association" "hyperfleet_operator" {
     Component = "hyperfleet-operator"
     ManagedBy = "terraform"
   }
+}
+
+resource "aws_iam_role_policy" "hyperfleet_operator_crd_dynamodb" {
+  name = "${var.regional_id}-hyperfleet-operator-crd-dynamodb"
+  role = aws_iam_role.hyperfleet_operator.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid    = "HyperfleetCRDDynamoDB"
+      Effect = "Allow"
+      Action = [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Scan",
+        "dynamodb:Query",
+        "dynamodb:DescribeTable",
+      ]
+      Resource = concat(
+        values(module.hyperfleet_crd.table_arns),
+        [for arn in values(module.hyperfleet_crd.table_arns) : "${arn}/index/*"],
+      )
+    }]
+  })
 }
 
 # =============================================================================

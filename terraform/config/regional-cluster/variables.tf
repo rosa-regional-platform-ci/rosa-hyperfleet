@@ -210,46 +210,10 @@ variable "enable_sns_alerting" {
 # HyperFleet DB Variables
 # =============================================================================
 
-variable "hyperfleet_db_instance_class" {
-  description = "Aurora instance class for HyperFleet DB"
-  type        = string
-  default     = "db.r6g.large"
-}
-
-variable "hyperfleet_db_engine_version" {
-  description = "Aurora PostgreSQL engine version for HyperFleet DB"
-  type        = string
-  default     = "16.13"
-}
-
-variable "hyperfleet_db_backup_retention_period" {
-  description = "Days to retain automated backups (PITR window)"
-  type        = number
-  default     = 14
-}
-
-variable "hyperfleet_db_deletion_protection" {
-  description = "Enable deletion protection for HyperFleet DB Aurora"
+variable "hyperfleet_db_enable_pitr" {
+  description = "Enable DynamoDB Point-in-Time Recovery on all hyperfleet CRD tables"
   type        = bool
   default     = true
-}
-
-variable "hyperfleet_db_skip_final_snapshot" {
-  description = "Skip final snapshot when destroying (ephemeral only)"
-  type        = bool
-  default     = false
-}
-
-variable "hyperfleet_db_performance_insights_enabled" {
-  description = "Enable Performance Insights for HyperFleet DB Aurora"
-  type        = bool
-  default     = true
-}
-
-variable "hyperfleet_db_monitoring_interval" {
-  description = "Enhanced Monitoring interval in seconds for HyperFleet DB Aurora (0 to disable)"
-  type        = number
-  default     = 60
 }
 
 # =============================================================================
