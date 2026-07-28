@@ -1,8 +1,10 @@
 #!/bin/bash
-# Collect RC and MC kubernetes logs via the log-collector ECS task.
+# Must-gather for the regional platform: collects Kubernetes logs from RC and
+# MC clusters plus the PostgreSQL database state from the RC, all via the
+# log-collector ECS Fargate task.
 #
-# This script is the single implementation for log collection, used by both
-# the local dev CLI (ephemeral-env.sh, int-env.sh) and CI (ci/e2e-tests.sh).
+# This script is the single implementation used by both the local dev CLI
+# (ephemeral-env.sh, int-env.sh) and CI (ci/e2e-tests.sh).
 #
 # Callers set CLUSTER_PREFIX to control cluster name resolution:
 #   - Ephemeral: CLUSTER_PREFIX="eph-a1b2c3-" → eph-a1b2c3-regional, eph-a1b2c3-mc01
@@ -12,7 +14,7 @@
 # ${CLUSTER_PREFIX}mc*-bastion, so mc01, mc02, etc. are all collected.
 #
 # Usage:
-#   collect-cluster-logs.sh [regional|management|all]
+#   dump-env.sh [regional|management|all]
 #
 # Required environment variables:
 #   CLUSTER_PREFIX  — Cluster name prefix (e.g. "ci-a1b2c3-" or "" for bare names)
@@ -27,6 +29,8 @@
 #   LEAKTK_GATE     — Defaults to "true": abort with non-zero exit when leaktk
 #                     detects secrets remaining after redaction. Set to "false"
 #                     to log findings as warnings without blocking.
+#   DB_NAMESPACE    — Kubernetes namespace for the DB DSN secret (default: hyperfleet)
+#   DB_SECRET_NAME  — Name of the secret containing the DSN (default: hyperfleet-db-dsn)
 #
 # All collection failures are logged but do not cause a non-zero exit, so
 # this script is safe to call from test failure handlers.
@@ -37,6 +41,8 @@ export AWS_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-$(aws configure get regio
 
 RC_NAMESPACES="all"
 MC_NAMESPACES="all"
+DB_NAMESPACE="${DB_NAMESPACE:-hyperfleet}"
+DB_SECRET_NAME="${DB_SECRET_NAME:-hyperfleet-db-dsn}"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -321,6 +327,237 @@ collect_logs_for_cluster() {
 }
 
 # ---------------------------------------------------------------------------
+# DB state collection: dump kubernetes_resources table from Aurora via psql
+# ---------------------------------------------------------------------------
+
+# Build the inline script that runs inside the ECS container.
+# Placeholder tokens are substituted by the caller before passing to ECS.
+build_db_state_command() {
+    local db_namespace="$1"
+    local db_secret_name="$2"
+
+    cat <<EOFCMD
+set -euo pipefail
+
+echo "=== DB State Collector ==="
+echo "Cluster:   \$CLUSTER_NAME"
+echo "Namespace: ${db_namespace}"
+echo "Secret:    ${db_secret_name}"
+echo "S3 dest:   s3://\$S3_BUCKET/\$S3_KEY"
+echo ""
+
+aws eks update-kubeconfig --name "\$CLUSTER_NAME" --region "\$AWS_REGION"
+
+echo "Reading DSN from secret..."
+DSN=\$(kubectl get secret ${db_secret_name} -n ${db_namespace} -o jsonpath='{.data.dsn}' | base64 -d)
+
+if [[ -z "\$DSN" ]]; then
+    echo "ERROR: DSN is empty — secret ${db_secret_name} in namespace ${db_namespace} may not exist or has no dsn key"
+    exit 1
+fi
+
+mkdir -p /tmp/db-state
+
+echo "Running resource summary query..."
+psql "\$DSN" --pset pager=off -c "
+SELECT gvk,
+       namespace,
+       name,
+       bucket_id,
+       deletion_timestamp IS NOT NULL AS deleted,
+       created_at
+FROM kubernetes_resources
+ORDER BY gvk, namespace, name;
+" > /tmp/db-state/resource-summary.txt 2>&1
+
+echo "Running full resource dump..."
+psql "\$DSN" --pset pager=off -At -c "
+SELECT jsonb_pretty(jsonb_build_object(
+  'apiVersion', split_part(gvk, '/', 1) || '/' || split_part(gvk, '/', 2),
+  'kind', split_part(gvk, '/', 3),
+  'metadata', jsonb_build_object(
+    'name', name,
+    'namespace', namespace,
+    'uid', uid,
+    'resourceVersion', object_version,
+    'creationTimestamp', created_at,
+    'deletionTimestamp', deletion_timestamp
+  ) || COALESCE(metadata, '{}'::jsonb),
+  'spec', COALESCE(spec, '{}'::jsonb),
+  'status', COALESCE(status, '{}'::jsonb)
+))
+FROM kubernetes_resources
+ORDER BY gvk, namespace, name;
+" > /tmp/db-state/resources-full-raw.txt 2>&1
+
+echo "[" > /tmp/db-state/resources-full.json
+first=true
+while IFS= read -r line; do
+    if [[ -z "\$line" ]]; then
+        continue
+    fi
+    if [[ "\$first" == "true" ]]; then
+        first=false
+    else
+        echo "," >> /tmp/db-state/resources-full.json
+    fi
+    echo "\$line" >> /tmp/db-state/resources-full.json
+done < /tmp/db-state/resources-full-raw.txt
+echo "]" >> /tmp/db-state/resources-full.json
+rm -f /tmp/db-state/resources-full-raw.txt
+
+echo ""
+echo "Summary:"
+wc -l < /tmp/db-state/resource-summary.txt | xargs -I{} echo "  resource-summary.txt: {} lines"
+wc -c < /tmp/db-state/resources-full.json | xargs -I{} echo "  resources-full.json:  {} bytes"
+
+echo ""
+echo "Uploading to S3..."
+tar czf /tmp/db-state.tar.gz -C /tmp db-state
+aws s3 cp /tmp/db-state.tar.gz "s3://\$S3_BUCKET/\$S3_KEY"
+
+echo "Done."
+EOFCMD
+}
+
+collect_db_state() {
+    local cluster_id="$1"
+    local out_dir="$2"
+
+    echo "==> Collecting DB state from ${cluster_id}..."
+
+    local task_def="${cluster_id}-log-collector"
+    local ecs_cluster="${cluster_id}-bastion"
+    local account_id region
+    account_id=$(aws sts get-caller-identity --query Account --output text) \
+        || { echo "  Could not determine account ID"; return 1; }
+    region="${AWS_REGION}"
+    local s3_bucket="bastion-log-collection-${account_id}-${region}-an"
+
+    ensure_logs_bucket "$account_id" "$region"
+    local s3_key="db-state-$(date +%s%N)-$$-${RANDOM}.tar.gz"
+
+    local sg_id subnets vpc_id
+    sg_id=$(aws ec2 describe-security-groups \
+        --filters "Name=group-name,Values=${cluster_id}-bastion" \
+        --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null) \
+        || { echo "  Could not find security group for ${cluster_id}"; return 1; }
+    [[ "$sg_id" != "None" && -n "$sg_id" ]] \
+        || { echo "  Security group '${cluster_id}-bastion' not found"; return 1; }
+
+    vpc_id=$(aws ec2 describe-security-groups \
+        --group-ids "$sg_id" \
+        --query 'SecurityGroups[0].VpcId' --output text)
+
+    subnets=$(aws ec2 describe-subnets \
+        --filters "Name=vpc-id,Values=${vpc_id}" "Name=tag:Name,Values=*private*" \
+        --query 'Subnets[].SubnetId' --output text \
+        | tr '\t' ',') \
+        || { echo "  Could not find private subnets for ${cluster_id}"; return 1; }
+
+    local ecs_command
+    ecs_command=$(build_db_state_command "$DB_NAMESPACE" "$DB_SECRET_NAME")
+
+    echo "  Launching DB state collector task..."
+    local run_task_output
+    run_task_output=$(AWS_PAGER="" aws ecs run-task \
+        --cluster "$ecs_cluster" \
+        --task-definition "$task_def" \
+        --launch-type FARGATE \
+        --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$sg_id],assignPublicIp=DISABLED}" \
+        --overrides "{
+            \"containerOverrides\": [{
+                \"name\": \"log-collector\",
+                \"command\": [\"$(echo "$ecs_command" | sed 's/"/\\"/g' | tr '\n' ' ')\"],
+                \"environment\": [
+                    {\"name\": \"S3_BUCKET\", \"value\": \"$s3_bucket\"},
+                    {\"name\": \"S3_KEY\", \"value\": \"$s3_key\"}
+                ]
+            }]
+        }") \
+        || { echo "  Failed to launch DB state collector task for ${cluster_id}"; return 1; }
+
+    local failures
+    failures=$(echo "$run_task_output" | jq -r '.failures[0].reason // empty')
+    if [[ -n "$failures" ]]; then
+        echo "  ECS run-task failed for ${cluster_id}: $failures"
+        return 1
+    fi
+
+    local task_arn task_id
+    task_arn=$(echo "$run_task_output" | jq -r '.tasks[0].taskArn // empty')
+    if [[ -z "$task_arn" ]]; then
+        echo "  ECS run-task returned no taskArn for ${cluster_id}"
+        return 1
+    fi
+
+    task_id=$(echo "$task_arn" | awk -F'/' '{print $NF}')
+    echo "  Task started: $task_id"
+
+    echo "  Waiting for DB state collector task to finish..."
+    if ! aws ecs wait tasks-stopped --cluster "$ecs_cluster" --tasks "$task_id"; then
+        echo "  Waiter timed out; polling task status..."
+        local poll_status
+        for _ in $(seq 1 6); do
+            poll_status=$(aws ecs describe-tasks \
+                --cluster "$ecs_cluster" --tasks "$task_id" \
+                --query 'tasks[0].lastStatus' --output text 2>/dev/null)
+            [[ "$poll_status" == "STOPPED" ]] && break
+            sleep 10
+        done
+        if [[ "$poll_status" != "STOPPED" ]]; then
+            echo "  Task ${task_id} still not stopped (status: ${poll_status}); giving up"
+            return 1
+        fi
+    fi
+
+    local describe_output exit_code
+    describe_output=$(aws ecs describe-tasks \
+        --cluster "$ecs_cluster" --tasks "$task_id")
+    exit_code=$(echo "$describe_output" | jq -r '.tasks[0].containers[0].exitCode // empty')
+
+    if [[ -z "$exit_code" ]]; then
+        local stop_reason
+        stop_reason=$(echo "$describe_output" | jq -r '.tasks[0].stoppedReason // "unknown"')
+        echo "  Warning: container never started for ${cluster_id} (reason: $stop_reason)"
+        echo "  Check CloudWatch logs: /ecs/${cluster_id}/bastion (log-collector stream)"
+        return 1
+    fi
+
+    if [[ "$exit_code" != "0" ]]; then
+        echo "  Warning: DB state collector exited with code $exit_code for ${cluster_id}"
+        echo "  Check CloudWatch logs: /ecs/${cluster_id}/bastion (log-collector stream)"
+        return 1
+    fi
+
+    if [[ "${S3_ONLY:-}" == "true" ]]; then
+        echo "  DB state uploaded to S3. To download and extract:"
+        echo ""
+        echo "    mkdir -p /tmp/${cluster_id}-db-state && aws s3 cp s3://${s3_bucket}/${s3_key} /tmp/${cluster_id}-db-state/${s3_key} && tar xzf /tmp/${cluster_id}-db-state/${s3_key} -C /tmp/${cluster_id}-db-state"
+        echo ""
+        return 0
+    fi
+
+    echo "  Downloading DB state from S3..."
+    local tmp_archive
+    tmp_archive="$(mktemp -t db-state-XXXXXX.tar.gz)"
+    aws s3 cp "s3://${s3_bucket}/${s3_key}" "$tmp_archive" --quiet \
+        || { echo "  Failed to download DB state from S3 for ${cluster_id}"; rm -f "$tmp_archive"; return 1; }
+
+    mkdir -p "$out_dir"
+    if ! tar xzf "$tmp_archive" -C "$out_dir" --strip-components=1; then
+        echo "  Failed to extract DB state archive for ${cluster_id}; leaving S3 object intact"
+        rm -f "$tmp_archive"
+        return 1
+    fi
+    rm -f "$tmp_archive"
+
+    aws s3 rm "s3://${s3_bucket}/${s3_key}" --quiet || true
+
+    echo "==> ${cluster_id} DB state collection complete: ${out_dir}"
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -344,7 +581,7 @@ TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 OUTPUT_DIR="${LOG_OUTPUT_DIR:-/tmp/${PREFIX:-cluster-}logs-${TIMESTAMP}}"
 
 echo ""
-echo "Collecting cluster logs..."
+echo "Collecting environment state..."
 
 failed=0
 
@@ -353,6 +590,7 @@ if [[ "$CLUSTER_SCOPE" == "all" || "$CLUSTER_SCOPE" == "regional" ]]; then
     echo ""
     if use_profile "regional"; then
         collect_logs_for_cluster "${PREFIX}regional" "$RC_NAMESPACES" "${OUTPUT_DIR}/rc" || failed=1
+        collect_db_state "${PREFIX}regional" "${OUTPUT_DIR}/rc/db-state" || failed=1
     else
         failed=1
     fi
@@ -389,9 +627,9 @@ fi
 
 echo ""
 if [[ $failed -eq 0 ]]; then
-    echo "Log collection complete."
+    echo "Environment dump complete."
 else
-    echo "Log collection finished with errors. Check output above for details."
+    echo "Environment dump finished with errors. Check output above for details."
 fi
 
 exit 0
