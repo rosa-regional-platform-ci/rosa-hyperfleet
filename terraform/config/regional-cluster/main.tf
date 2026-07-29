@@ -621,3 +621,37 @@ module "loki_infrastructure" {
   loki_namespace       = var.loki_namespace
   loki_service_account = var.loki_service_account
 }
+
+# =============================================================================
+# Platform API — HyperFleet CRD DynamoDB access
+#
+# platform-api reads and writes CRs in the same CRD tables as the operator.
+# The authz module's frontend_api role only covers authz tables; add a separate
+# policy here granting access to the hyperfleet CRD tables.
+# =============================================================================
+
+resource "aws_iam_role_policy" "platform_api_crd_dynamodb" {
+  name = "${var.regional_id}-platform-api-crd-dynamodb"
+  role = module.authz.frontend_api_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid    = "HyperfleetCRDDynamoDB"
+      Effect = "Allow"
+      Action = [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Scan",
+        "dynamodb:Query",
+        "dynamodb:DescribeTable",
+      ]
+      Resource = concat(
+        values(module.hyperfleet_crd.table_arns),
+        [for arn in values(module.hyperfleet_crd.table_arns) : "${arn}/index/*"],
+      )
+    }]
+  })
+}
