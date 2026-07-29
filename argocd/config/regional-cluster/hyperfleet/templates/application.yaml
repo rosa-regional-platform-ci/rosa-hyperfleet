@@ -19,9 +19,6 @@ spec:
         {{- end }}
         awsRegion: {{ .Values.global.aws_region }}
         baseDomain: {{ .Values.baseDomain }}
-        postgres:
-          secretName: {{ .Values.global.postgres_secret_name | default "hyperfleet-db-dsn" }}
-          secretKey: {{ .Values.global.postgres_secret_key | default "dsn" }}
 
   destination:
     server: https://kubernetes.default.svc
