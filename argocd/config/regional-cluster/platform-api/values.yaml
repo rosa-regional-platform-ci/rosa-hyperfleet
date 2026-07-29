@@ -17,8 +17,8 @@ platformApi:
   app:
     name: platform-api
     image:
-      repository: quay.io/cbusse_openshift/rosa-regional-platform-api
-      tag: "pgruntime"
+      repository: quay.io/psav/rosa-hyperfleet-api
+      tag: "4cc6e5f"
       pullPolicy: Always
 
     # Application arguments
