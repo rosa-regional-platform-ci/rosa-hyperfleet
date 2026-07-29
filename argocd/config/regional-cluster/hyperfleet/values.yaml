@@ -8,9 +8,9 @@ hyperfleet:
   project: default
 
   source:
-    repoURL: https://github.com/typeid/hyperfleet-operator.git
-    targetRevision: main
-    path: charts/hyperfleet-operator
+    repoURL: https://github.com/rrp-bot/rosa-hyperfleet-api.git
+    targetRevision: feature/dynamodb-ftw
+    path: hyperfleet-operator/charts
 
   syncPolicy:
     automated:
