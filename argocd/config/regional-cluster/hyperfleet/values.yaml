@@ -23,6 +23,11 @@ hyperfleet:
       tag: "4cc6e5f"
       pullPolicy: Always
 
+    # tablePrefix is set at deploy time via the ApplicationSet valuesObject
+    # using global.cluster_name (e.g. "eph-af848c21-rc01-"). Placeholder here
+    # so helm lint passes.
+    tablePrefix: ""
+
     replicaCount: 2
 
     serviceAccount:

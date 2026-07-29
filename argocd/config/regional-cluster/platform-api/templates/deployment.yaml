@@ -50,11 +50,8 @@ spec:
             - --oidc-issuer-base-url={{ .Values.platformApi.app.args.oidcIssuerBaseURL }}
             {{- end }}
           env:
-            - name: POSTGRES_DSN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.platformApi.hyperfleetdb.secretName | default "hyperfleet-db-dsn" }}
-                  key: {{ .Values.platformApi.hyperfleetdb.secretKey | default "dsn" }}
+            - name: HYPERFLEET_DB_TABLE_PREFIX
+              value: {{ required "platformApi.hyperfleetTablePrefix is required" .Values.platformApi.hyperfleetTablePrefix | quote }}
             {{- if .Values.platformApi.zoa.enabled }}
             - name: ZOA_ENABLED
               value: "true"

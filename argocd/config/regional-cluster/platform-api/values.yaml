@@ -42,10 +42,10 @@ platformApi:
         cpu: 500m
         memory: 512Mi
 
-  # HyperfleetDB connection (pgruntime-backed Postgres)
-  hyperfleetdb:
-    secretName: hyperfleet-db-dsn
-    secretKey: dsn
+  # Prefix for hyperfleet CRD DynamoDB table names (e.g. "rc01-").
+  # Set at deploy time via the ApplicationSet valuesObject using cluster_name.
+  # Placeholder here so helm lint passes.
+  hyperfleetTablePrefix: ""
 
   # Envoy sidecar configuration
   envoy:

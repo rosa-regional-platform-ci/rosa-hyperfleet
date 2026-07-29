@@ -80,10 +80,14 @@ spec:
                   dynamodbRegion: '{{ '{{ .metadata.annotations.dynamodb_region }}' }}'
                   dynamodbPrefix: '{{ '{{ .metadata.annotations.dynamodb_prefix }}' }}'
                   oidcIssuerBaseURL: 'https://{{ '{{ .metadata.annotations.oidc_cloudfront_domain }}' }}'
+              hyperfleetTablePrefix: '{{ '{{ .metadata.labels.cluster_name }}' }}-'
               zoa:
                 tableName: '{{ '{{ .metadata.annotations.zoa_table_name }}' }}'
                 auditTableName: '{{ '{{ .metadata.annotations.zoa_audit_table_name }}' }}'
                 bucketName: '{{ '{{ .metadata.annotations.zoa_bucket_name }}' }}'
+            hyperfleet:
+              helmValues:
+                tablePrefix: '{{ '{{ .metadata.labels.cluster_name }}' }}-'
             # Thanos Operator values (keys must match chart's values.yaml structure)
             thanos:
               kmsKeyArn: '{{ '{{ .metadata.annotations.thanos_kms_key_arn }}' }}'
