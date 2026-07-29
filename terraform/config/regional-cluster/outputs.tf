@@ -45,10 +45,6 @@ output "cluster_security_group_id" {
   value       = module.vpc.cluster_security_group_id
 }
 
-output "hyperfleet_db_security_group_id" {
-  description = "HyperFleet DB RDS security group ID"
-  value       = module.hyperfleet_db.security_group_id
-}
 
 output "node_security_group_id" {
   description = "EKS node/pod security group ID (Auto Mode primary SG)"
@@ -273,20 +269,8 @@ output "hyperfleet_operator_role_arn" {
   value       = aws_iam_role.hyperfleet_operator.arn
 }
 
-output "hyperfleet_db_endpoint" {
-  description = "HyperFleet DB RDS endpoint (host:port)"
-  value       = module.hyperfleet_db.endpoint
-}
 
-output "hyperfleet_db_dsn_secret_arn" {
-  description = "ARN of the Secrets Manager secret containing the PostgreSQL DSN"
-  value       = module.hyperfleet_db.dsn_secret_arn
-}
 
-output "hyperfleet_db_dsn_secret_name" {
-  description = "Name of the Secrets Manager secret containing the PostgreSQL DSN"
-  value       = module.hyperfleet_db.dsn_secret_name
-}
 
 # =============================================================================
 # CloudWatch Exporter Outputs
