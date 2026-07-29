@@ -26,8 +26,8 @@
   "sre_thanos_oidc_client_id": "rrp-thanos-sre-int-us-east-1",
   "sre_loki_oidc_client_id": "rrp-loki-sre-int-us-east-1",
   "environment_domain": "int0.rosa.devshift.net",
-  "regional_id": "regional",
-  "eph_prefix": "",
+  "regional_id": "eph-af848c21-regional",
+  "eph_prefix": "eph-af848c21",
   "hyperfleet_db_enable_pitr": true,
-  "management_clusters_info": [{"account_id": "ssm:///infra/integration/us-east-1/mc01/account_id", "id": "mc01"}]
+  "management_clusters_info": [{"account_id": "ssm:///infra/integration/us-east-1/mc01/account_id", "id": "eph-af848c21-mc01"}]
 }
