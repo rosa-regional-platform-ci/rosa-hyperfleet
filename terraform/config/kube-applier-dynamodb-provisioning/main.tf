@@ -57,7 +57,8 @@ resource "aws_iam_role_policy" "hyperfleet_operator_dynamodb" {
           "dynamodb:DeleteItem",
           "dynamodb:GetItem",
           "dynamodb:Query",
-          "dynamodb:Scan"
+          "dynamodb:Scan",
+          "dynamodb:DescribeTable",
         ]
         Resource = "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.mc_name}-specs-*"
       },
@@ -68,25 +69,10 @@ resource "aws_iam_role_policy" "hyperfleet_operator_dynamodb" {
           "dynamodb:GetItem",
           "dynamodb:Query",
           "dynamodb:Scan",
-          "dynamodb:DescribeTable"
+          "dynamodb:DescribeTable",
         ]
         Resource = "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.mc_name}-status-*"
       },
-      {
-        Sid    = "DynamoDBStatusStreams"
-        Effect = "Allow"
-        Action = [
-          "dynamodb:DescribeStream",
-          "dynamodb:GetRecords",
-          "dynamodb:GetShardIterator",
-          "dynamodb:ListStreams",
-          "dynamodbstreams:DescribeStream",
-          "dynamodbstreams:GetRecords",
-          "dynamodbstreams:GetShardIterator",
-          "dynamodbstreams:ListStreams"
-        ]
-        Resource = "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.mc_name}-status-*/stream/*"
-      }
     ]
   })
 }
