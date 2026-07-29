@@ -722,6 +722,7 @@ class EphemeralEnvOrchestrator:
         ]
 
         # Monitor all teardown pipelines concurrently
+        failed = []
         if teardown_pipelines:
             with ThreadPoolExecutor(max_workers=len(teardown_pipelines)) as executor:
                 future_to_pipeline = {
@@ -735,7 +736,19 @@ class EphemeralEnvOrchestrator:
                         future.result()
                     except (RuntimeError, TimeoutError) as e:
                         log.error("Teardown pipeline '%s' failed: %s", pipeline_name, e)
-                        # Continue with teardown even if infrastructure destroy fails
+                        failed.append(pipeline_name)
+
+        # Collect teardown-phase CodeBuild logs before Phase 2 destroys
+        # the pipelines (the pre-teardown call only captured provision logs).
+        try:
+            self.collect_codebuild_logs()
+        except Exception:
+            log.exception("Failed to collect teardown CodeBuild logs")
+
+        if failed:
+            raise RuntimeError(
+                f"{len(failed)} pipeline(s) failed during teardown: {', '.join(failed)}"
+            )
 
         # Phase 2: Pipeline teardown
         log.info("")
