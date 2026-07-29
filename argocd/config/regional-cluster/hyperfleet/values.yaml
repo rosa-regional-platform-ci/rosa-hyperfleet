@@ -20,7 +20,7 @@ hyperfleet:
   helmValues:
     image:
       repository: quay.io/psav/hyperfleet-operator
-      tag: "4cc6e5f"
+      tag: "bb7230e"
       pullPolicy: Always
 
     # tablePrefix is set at deploy time via the ApplicationSet valuesObject
