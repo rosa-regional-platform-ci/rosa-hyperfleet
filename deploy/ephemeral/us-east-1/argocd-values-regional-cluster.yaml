@@ -9,7 +9,7 @@ eksNodePool:
   instanceFamilies:
   - m8i-flex
   - m7i-flex
-baseDomain: us-east-1.dev0.rosa.devshift.net
+baseDomain: us-east-1-eph-45df5708.dev0.rosa.devshift.net
 pagerduty:
   enabled: false
 grafana:
