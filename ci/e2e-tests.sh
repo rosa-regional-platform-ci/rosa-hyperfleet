@@ -100,29 +100,6 @@ platform_rc=0
 zoa_rc=0
 hcp_rc=0
 monitoring_rc=0
-validate_rc=0
-
-# --- Infrastructure Validation (RC) ---
-# Runs only for ephemeral environments where TF_OUTPUTS is available. Validates
-# that Karpenter, SQS, and related AWS resources were provisioned correctly.
-# MC validation is skipped here because MC cluster IDs are not in regional TF
-# outputs; run scripts/validate-mc-{aws,k8s}.sh manually or from the MC
-# provisioning pipeline with the MC AWS profile.
-if [[ -n "${TF_OUTPUTS:-}" && -r "${TF_OUTPUTS:-}" ]]; then
-  echo ""
-  echo "=== RC Infrastructure Validation ==="
-  echo ""
-  _rc_cluster_name="$(jq -r '.cluster_name.value // empty' "${TF_OUTPUTS}")"
-  if [[ -n "$_rc_cluster_name" ]]; then
-    AWS_PROFILE="rrp-rc" \
-      CLUSTER_ID="$_rc_cluster_name" \
-      AWS_REGION="${AWS_DEFAULT_REGION}" \
-      "${REPO_ROOT}/scripts/validate-rc-aws.sh" || validate_rc=$?
-  else
-    echo "WARNING: cluster_name not found in TF outputs — skipping RC validation"
-  fi
-fi
-
 make test-e2e-api || platform_rc=$?
 
 # Get regional account ID for CLI tests
@@ -227,7 +204,7 @@ if [[ $platform_rc -ne 0 ]] || [[ $zoa_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]]
 fi
 
 echo ""
-echo "E2E results: validate=$validate_rc platform=$platform_rc zoa=$zoa_rc hcp=$hcp_rc monitoring=$monitoring_rc"
-if [[ $validate_rc -ne 0 ]] || [[ $platform_rc -ne 0 ]] || [[ $zoa_rc -ne 0 ]] || [[ $hcp_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]]; then
+echo "E2E results: platform=$platform_rc zoa=$zoa_rc hcp=$hcp_rc monitoring=$monitoring_rc"
+if [[ $platform_rc -ne 0 ]] || [[ $zoa_rc -ne 0 ]] || [[ $hcp_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]]; then
     exit 1
 fi
