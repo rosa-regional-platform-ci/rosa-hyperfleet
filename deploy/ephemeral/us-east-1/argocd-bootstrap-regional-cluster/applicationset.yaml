@@ -156,7 +156,9 @@ spec:
             aws-load-balancer-controller:
               clusterName: '{{ .metadata.labels.cluster_name }}'
             karpenter:
-              controllerRoleArn: '{{ .metadata.annotations.karpenter_controller_role_arn }}'
+              serviceAccount:
+                annotations:
+                  eks.amazonaws.com/role-arn: '{{ .metadata.annotations.karpenter_controller_role_arn }}'
             hyperfleetApi:
               aws:
                 region: '{{ .metadata.labels.aws_region }}'

@@ -1,29 +1,32 @@
-# Karpenter controller configuration
-# Values passed to the upstream Karpenter Helm chart
+# Karpenter subchart values
+# These values are passed to the upstream Karpenter Helm chart dependency.
+#
+# Values from ApplicationSet valuesObject are merged with this file:
+# - global.cluster_name → used in settings.clusterName
+# - karpenter.controllerRoleArn → needs to be mapped to serviceAccount.annotations
+#
+# Since Helm values merging doesn't support cross-key references, we need
+# the ApplicationSet to inject the role ARN at the correct path for the subchart.
+# See config/templates/argocd-bootstrap/applicationset.yaml.j2 for injection logic.
+
 karpenter:
   settings:
-    # Cluster name is provided via global.cluster_name from ApplicationSet
     clusterName: "{{ .Values.global.cluster_name }}"
-    # Interruption queue name is derived from cluster name
     interruptionQueue: "{{ .Values.global.cluster_name }}-karpenter"
 
-  # IRSA (IAM Roles for Service Accounts) for Karpenter controller
-  # The role ARN is provided via karpenter.controllerRoleArn from ApplicationSet
   serviceAccount:
     annotations:
-      eks.amazonaws.com/role-arn: "{{ .Values.karpenter.controllerRoleArn }}"
+      # This will be overridden by ApplicationSet valuesObject injection
+      # ApplicationSet must inject at: karpenter.serviceAccount.annotations.eks\.amazonaws\.com/role-arn
+      eks.amazonaws.com/role-arn: ""
 
-  # CriticalAddonsOnly toleration so Karpenter can schedule on the
-  # karpenter-bootstrap node group before it provisions any worker nodes
   tolerations:
     - key: CriticalAddonsOnly
       operator: Exists
       effect: NoSchedule
 
-  # Replicas for high availability
   replicas: 2
 
-  # Pod topology spread for multi-AZ resilience
   topologySpreadConstraints:
     - maxSkew: 1
       topologyKey: topology.kubernetes.io/zone
@@ -38,7 +41,6 @@ karpenter:
         matchLabels:
           app.kubernetes.io/name: karpenter
 
-  # Resource requests/limits
   controller:
     resources:
       requests:
@@ -48,6 +50,5 @@ karpenter:
         cpu: 1000m
         memory: 1Gi
 
-  # Prometheus metrics
   serviceMonitor:
     enabled: true
