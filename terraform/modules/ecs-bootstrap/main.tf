@@ -148,32 +148,30 @@ resource "aws_ecs_task_definition" "bootstrap" {
           done
 
           if [ -n "$${KARPENTER_CONTROLLER_ROLE_ARN:-}" ]; then
-            # Install Karpenter before seeding the NodePool: the NodePool and
-            # EC2NodeClass CRDs (karpenter.sh/v1, karpenter.k8s.aws/v1) don't
-            # exist until Karpenter is installed. ArgoCD adopts this release
-            # via its self-managed Karpenter Application after bootstrap.
-            if ! helm status karpenter -n kube-system 2>/dev/null | grep -q "^STATUS: deployed"; then
-              echo "Installing Karpenter $KARPENTER_VERSION..."
-              if [ -z "$${KARPENTER_QUEUE_URL:-}" ]; then
-                echo "ERROR: KARPENTER_QUEUE_URL is not set — required when KARPENTER_CONTROLLER_ROLE_ARN is provided" >&2
+            # Wait for ArgoCD to install Karpenter. The Karpenter Application
+            # is created by the root ApplicationSet after ArgoCD bootstraps.
+            # We need Karpenter CRDs to exist before we can seed the NodePool.
+            echo "=== Waiting for Karpenter Application to be Healthy (up to 10m) ==="
+            _KARPENTER_DEADLINE=$((SECONDS + 600))
+            until _KARPENTER_HEALTH=$(kubectl get application karpenter -n argocd \
+                -o jsonpath='{.status.health.status}' 2>/tmp/karpenter-err) \
+                && [ "$${_KARPENTER_HEALTH}" = "Healthy" ]; do
+              if grep -qiE "unable to connect|connection refused|i/o timeout|no such host" /tmp/karpenter-err 2>/dev/null; then
+                echo "ERROR: kubectl cannot reach the API server — cannot wait for Karpenter:" >&2
+                cat /tmp/karpenter-err >&2
                 exit 1
               fi
-              _KARPENTER_QUEUE_NAME=$(basename "$KARPENTER_QUEUE_URL")
-              helm upgrade --install karpenter \
-                oci://public.ecr.aws/karpenter/karpenter \
-                --version "$KARPENTER_VERSION" \
-                --namespace kube-system \
-                --set "settings.clusterName=$CLUSTER_NAME" \
-                --set "settings.interruptionQueue=$_KARPENTER_QUEUE_NAME" \
-                --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=$KARPENTER_CONTROLLER_ROLE_ARN" \
-                --set 'tolerations[0].key=CriticalAddonsOnly' \
-                --set 'tolerations[0].operator=Exists' \
-                --set 'tolerations[0].effect=NoSchedule' \
-                --wait --timeout=5m
-              echo "✓ Karpenter installed"
-            else
-              echo "✓ Karpenter already deployed, skipping"
-            fi
+              if [ $SECONDS -ge $_KARPENTER_DEADLINE ]; then
+                echo "ERROR: Karpenter Application not Healthy after 10 minutes" >&2
+                kubectl get application karpenter -n argocd -o yaml 2>/dev/null || true
+                exit 1
+              fi
+              _KARPENTER_STATUS=$(kubectl get application karpenter -n argocd \
+                -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "NotFound")
+              echo "  Karpenter Application status: $_KARPENTER_STATUS (health: $_KARPENTER_HEALTH)"
+              sleep 10
+            done
+            echo "✓ Karpenter Application is Healthy"
 
             # Seed the FIPS NodePool only on first bootstrap. On subsequent
             # runs (resync), ArgoCD owns this resource via the eks-nodepool
@@ -286,6 +284,7 @@ resource "aws_ecs_task_definition" "bootstrap" {
               sre_alb_dns_name: "$SRE_ALB_DNS_NAME"
               sre_domain: "$SRE_DOMAIN"
               redis_endpoint: "$REDIS_ENDPOINT"
+              karpenter_controller_role_arn: "$KARPENTER_CONTROLLER_ROLE_ARN"
           type: Opaque
           stringData:
             name: in-cluster

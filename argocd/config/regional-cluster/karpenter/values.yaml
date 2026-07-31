@@ -1,0 +1,53 @@
+# Karpenter controller configuration
+# Values passed to the upstream Karpenter Helm chart
+karpenter:
+  settings:
+    # Cluster name is provided via global.cluster_name from ApplicationSet
+    clusterName: "{{ .Values.global.cluster_name }}"
+    # Interruption queue name is derived from cluster name
+    interruptionQueue: "{{ .Values.global.cluster_name }}-karpenter"
+
+  # IRSA (IAM Roles for Service Accounts) for Karpenter controller
+  # The role ARN is provided via karpenter.controllerRoleArn from ApplicationSet
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: "{{ .Values.karpenter.controllerRoleArn }}"
+
+  # CriticalAddonsOnly toleration so Karpenter can schedule on the
+  # karpenter-bootstrap node group before it provisions any worker nodes
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Exists
+      effect: NoSchedule
+
+  # Replicas for high availability
+  replicas: 2
+
+  # Pod topology spread for multi-AZ resilience
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: karpenter
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: karpenter
+
+  # Resource requests/limits
+  controller:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+  # Prometheus metrics
+  serviceMonitor:
+    enabled: true

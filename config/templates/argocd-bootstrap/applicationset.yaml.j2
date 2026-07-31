@@ -154,6 +154,8 @@ spec:
                   arn: '{{ '{{ .metadata.annotations.sre_prometheus_target_group_arn }}' }}'
             aws-load-balancer-controller:
               clusterName: '{{ '{{ .metadata.labels.cluster_name }}' }}'
+            karpenter:
+              controllerRoleArn: '{{ '{{ .metadata.annotations.karpenter_controller_role_arn }}' }}'
             hyperfleetApi:
               aws:
                 region: '{{ '{{ .metadata.labels.aws_region }}' }}'
