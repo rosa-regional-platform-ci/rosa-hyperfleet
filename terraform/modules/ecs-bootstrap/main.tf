@@ -137,7 +137,7 @@ resource "aws_ecs_task_definition" "bootstrap" {
           aws eks update-kubeconfig --name $CLUSTER_NAME
 
           # Wait for coredns and metrics-server (on the bootstrap node group)
-          # before installing Karpenter and ArgoCD.
+          # before installing ArgoCD.
           for ADDON in coredns metrics-server; do
             echo "Waiting for $ADDON to be active..."
             aws eks wait addon-active \
@@ -146,51 +146,6 @@ resource "aws_ecs_task_definition" "bootstrap" {
               --region "$AWS_REGION"
             echo "✓ $ADDON active"
           done
-
-          if [ -n "$${KARPENTER_CONTROLLER_ROLE_ARN:-}" ]; then
-            # Wait for ArgoCD to install Karpenter. The Karpenter Application
-            # is created by the root ApplicationSet after ArgoCD bootstraps.
-            # We need Karpenter CRDs to exist before we can seed the NodePool.
-            echo "=== Waiting for Karpenter Application to be Healthy (up to 10m) ==="
-            _KARPENTER_DEADLINE=$((SECONDS + 600))
-            until _KARPENTER_HEALTH=$(kubectl get application karpenter -n argocd \
-                -o jsonpath='{.status.health.status}' 2>/tmp/karpenter-err) \
-                && [ "$${_KARPENTER_HEALTH}" = "Healthy" ]; do
-              if grep -qiE "unable to connect|connection refused|i/o timeout|no such host" /tmp/karpenter-err 2>/dev/null; then
-                echo "ERROR: kubectl cannot reach the API server — cannot wait for Karpenter:" >&2
-                cat /tmp/karpenter-err >&2
-                exit 1
-              fi
-              if [ $SECONDS -ge $_KARPENTER_DEADLINE ]; then
-                echo "ERROR: Karpenter Application not Healthy after 10 minutes" >&2
-                kubectl get application karpenter -n argocd -o yaml 2>/dev/null || true
-                exit 1
-              fi
-              _KARPENTER_STATUS=$(kubectl get application karpenter -n argocd \
-                -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "NotFound")
-              echo "  Karpenter Application status: $_KARPENTER_STATUS (health: $_KARPENTER_HEALTH)"
-              sleep 10
-            done
-            echo "✓ Karpenter Application is Healthy"
-
-            # Seed the FIPS NodePool only on first bootstrap. On subsequent
-            # runs (resync), ArgoCD owns this resource via the eks-nodepool
-            # chart — re-applying it creates SSA ownership conflicts.
-            if ! kubectl get nodepool workloads 2>/dev/null; then
-              echo "Applying FIPS EC2NodeClass and workloads NodePool from chart..."
-              _NODEPOOL_VALUES="$REPO_DIR/deploy/$ENVIRONMENT/$REGION_DEPLOYMENT/argocd-values-$CLUSTER_TYPE.yaml"
-              _VALUES_FLAG=""
-              [ -f "$_NODEPOOL_VALUES" ] && _VALUES_FLAG="-f $_NODEPOOL_VALUES"
-              helm template eks-nodepool "$REPO_DIR/argocd/config/$CLUSTER_TYPE/eks-nodepool" \
-                --set global.cluster_name="$CLUSTER_NAME" \
-                $_VALUES_FLAG \
-                | kubectl apply --server-side -f -
-              echo "✓ FIPS EC2NodeClass and NodePool applied"
-            else
-              echo "✓ FIPS NodePool already exists, skipping (managed by ArgoCD)"
-            fi
-
-          fi
 
           if ! kubectl get deployment argocd-server -n argocd 2>/dev/null; then
           echo "Installing ArgoCD from repo chart..."
@@ -322,6 +277,50 @@ resource "aws_ecs_task_definition" "bootstrap" {
               syncOptions:
                 - CreateNamespace=true
           APP_EOF
+
+          # Wait for ArgoCD to install Karpenter before seeding NodePool.
+          # The Karpenter Application is created by the root ApplicationSet.
+          # We need Karpenter CRDs to exist before we can seed the NodePool.
+          if [ -n "$${KARPENTER_CONTROLLER_ROLE_ARN:-}" ]; then
+            echo "=== Waiting for Karpenter Application to be Healthy (up to 10m) ==="
+            _KARPENTER_DEADLINE=$((SECONDS + 600))
+            until _KARPENTER_HEALTH=$(kubectl get application karpenter -n argocd \
+                -o jsonpath='{.status.health.status}' 2>/tmp/karpenter-err) \
+                && [ "$${_KARPENTER_HEALTH}" = "Healthy" ]; do
+              if grep -qiE "unable to connect|connection refused|i/o timeout|no such host" /tmp/karpenter-err 2>/dev/null; then
+                echo "ERROR: kubectl cannot reach the API server — cannot wait for Karpenter:" >&2
+                cat /tmp/karpenter-err >&2
+                exit 1
+              fi
+              if [ $SECONDS -ge $_KARPENTER_DEADLINE ]; then
+                echo "ERROR: Karpenter Application not Healthy after 10 minutes" >&2
+                kubectl get application karpenter -n argocd -o yaml 2>/dev/null || true
+                exit 1
+              fi
+              _KARPENTER_STATUS=$(kubectl get application karpenter -n argocd \
+                -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "NotFound")
+              echo "  Karpenter Application status: $_KARPENTER_STATUS (health: $_KARPENTER_HEALTH)"
+              sleep 10
+            done
+            echo "✓ Karpenter Application is Healthy"
+
+            # Seed the FIPS NodePool only on first bootstrap. On subsequent
+            # runs (resync), ArgoCD owns this resource via the eks-nodepool
+            # chart — re-applying it creates SSA ownership conflicts.
+            if ! kubectl get nodepool workloads 2>/dev/null; then
+              echo "Applying FIPS EC2NodeClass and workloads NodePool from chart..."
+              _NODEPOOL_VALUES="$REPO_DIR/deploy/$ENVIRONMENT/$REGION_DEPLOYMENT/argocd-values-$CLUSTER_TYPE.yaml"
+              _VALUES_FLAG=""
+              [ -f "$_NODEPOOL_VALUES" ] && _VALUES_FLAG="-f $_NODEPOOL_VALUES"
+              helm template eks-nodepool "$REPO_DIR/argocd/config/$CLUSTER_TYPE/eks-nodepool" \
+                --set global.cluster_name="$CLUSTER_NAME" \
+                $_VALUES_FLAG \
+                | kubectl apply --server-side -f -
+              echo "✓ FIPS EC2NodeClass and NodePool applied"
+            else
+              echo "✓ FIPS NodePool already exists, skipping (managed by ArgoCD)"
+            fi
+          fi
 
           # CI: E2E test runner starts immediately after bootstrap exits, so
           # HyperShift must be fully installed before work agents apply
