@@ -11,8 +11,9 @@
 
 karpenter:
   settings:
-    clusterName: "{{ .Values.global.cluster_name }}"
-    interruptionQueue: "{{ .Values.global.cluster_name }}-karpenter"
+    # clusterName and interruptionQueue are injected by ApplicationSet valuesObject
+    clusterName: ""
+    interruptionQueue: ""
 
   serviceAccount:
     annotations:

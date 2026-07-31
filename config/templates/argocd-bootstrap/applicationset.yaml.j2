@@ -42,7 +42,8 @@ spec:
     spec:
       project: default
       destination:
-        namespace: '{{ '{{ .path.basename }}' }}'
+        # Karpenter must be installed in kube-system namespace
+        namespace: '{{ '{{ if eq .path.basename "karpenter" }}kube-system{{ else }}{{ .path.basename }}{{ end }}' }}'
         server: '{{ '{{ .server }}' }}'
       syncPolicy:
         automated:
@@ -159,6 +160,9 @@ spec:
             aws-load-balancer-controller:
               clusterName: '{{ '{{ .metadata.labels.cluster_name }}' }}'
             karpenter:
+              settings:
+                clusterName: '{{ '{{ .metadata.labels.cluster_name }}' }}'
+                interruptionQueue: '{{ '{{ .metadata.labels.cluster_name }}' }}-karpenter'
               serviceAccount:
                 annotations:
                   eks.amazonaws.com/role-arn: '{{ '{{ .metadata.annotations.karpenter_controller_role_arn }}' }}'
