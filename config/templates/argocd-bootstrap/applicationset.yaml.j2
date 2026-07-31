@@ -35,6 +35,10 @@ spec:
         environment: '{{ '{{ .metadata.labels.environment }}' }}'
         region_deployment: '{{ '{{ .metadata.labels.region_deployment }}' }}'
         aws_region: '{{ '{{ .metadata.labels.aws_region }}' }}'
+      annotations:
+        # Sync wave ordering: Karpenter must install before eks-nodepool
+        # (NodePool CRDs must exist before NodePool resources are created)
+        argocd.argoproj.io/sync-wave: '{{ '{{ if eq .path.basename "karpenter" }}0{{ else if eq .path.basename "eks-nodepool" }}10{{ else }}5{{ end }}' }}'
     spec:
       project: default
       destination:
