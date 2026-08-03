@@ -5,7 +5,7 @@ metadata:
   name: fips
 spec:
   amiSelectorTerms:
-    - alias: bottlerocket@latest
+    - id: ami-0b8e43c003201f43c
   instanceProfile: {{ $clusterName }}-karpenter-node-role
   subnetSelectorTerms:
     - tags:
