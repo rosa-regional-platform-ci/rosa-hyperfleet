@@ -128,8 +128,8 @@ check_kubernetes_objects() {
   header "Kubernetes: NodeClass / NodePool"
 
   local crd_check
-  crd_check=$(kubectl get crd nodeclasses.karpenter.k8s.aws 2>&1)
-  local crd_status=$?
+  local crd_status=0
+  crd_check=$(kubectl get crd ec2nodeclasses.karpenter.k8s.aws 2>&1) || crd_status=$?
   if [[ $crd_status -ne 0 ]]; then
     if echo "$crd_check" | grep -qiE 'not found|no resources found'; then
       skip "NodeClass CRD not found — skipping (Karpenter not installed)"

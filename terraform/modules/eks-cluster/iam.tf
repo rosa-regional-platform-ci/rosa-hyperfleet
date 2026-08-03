@@ -205,35 +205,6 @@ resource "aws_iam_role_policy" "karpenter_controller" {
         }
       },
       {
-        Sid    = "IAMInstanceProfileCreate"
-        Effect = "Allow"
-        Action = [
-          "iam:CreateInstanceProfile",
-          "iam:TagInstanceProfile",
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:RequestTag/kubernetes.io/cluster/${local.cluster_id}" = "owned"
-          }
-        }
-      },
-      {
-        Sid    = "IAMInstanceProfileModify"
-        Effect = "Allow"
-        Action = [
-          "iam:AddRoleToInstanceProfile",
-          "iam:DeleteInstanceProfile",
-          "iam:RemoveRoleFromInstanceProfile",
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/kubernetes.io/cluster/${local.cluster_id}" = "owned"
-          }
-        }
-      },
-      {
         # GetInstanceProfile and ListInstanceProfiles are read-only and must be
         # unconditional: Karpenter calls GetInstanceProfile before creating (and
         # tagging) a profile, so a ResourceTag condition always denies it.

@@ -22,7 +22,7 @@ sequenceDiagram
     TF->>ECS: Start bootstrap task
 
     ECS->>K8s: Wait for coredns + metrics-server addon-active
-    ECS->>K8s: helm install argocd (argocd/config/shared/argocd, --wait 10m)
+    ECS->>K8s: helm install argocd (argocd/config/shared/argocd, --wait --timeout 10m)
     ECS->>K8s: kubectl apply cluster identity secret (with karpenter_controller_role_arn annotation)
     ECS->>K8s: kubectl apply root Application (points to repo argocd/config/<cluster_type>)
     ECS-->>ECS: Exit
@@ -105,7 +105,7 @@ controller IAM role has permission to read from this queue.
 | ------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | **Node provisioning**     | AWS-managed; compute optimized by default           | Operator-defined `NodePool` and `EC2NodeClass` CRs                                                  |
 | **Instance selection**    | AWS selects instance family automatically           | Declared in `NodePool` requirements; engineers control family/arch/capacity type                    |
-| **Node images**           | AWS manages AMI selection and updates               | AL2023 EKS-optimized AMI, pinned by Karpenter version                                               |
+| **Node images**           | AWS manages AMI selection and updates               | Bottlerocket AMI alias `bottlerocket@latest`; configured on both MC and RC EC2NodeClass resources   |
 | **GitOps ownership**      | No Karpenter Application; AWS reconciles internally | `argocd/config/<cluster-type>/karpenter/` chart, ArgoCD-managed                                     |
 | **Lifecycle management**  | Auto Mode lifecycle controller (AWS)                | Karpenter `NodePool` disruption budget and expiry settings                                          |
 | **Interruption handling** | AWS-managed                                         | SQS queue + Karpenter interruption handler                                                          |
