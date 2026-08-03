@@ -144,14 +144,15 @@ spec:
 
                 # Upstream v0.21.0 needs discovery.k8s.io and networking.k8s.io API groups
                 # that HyperShift's generated ClusterRole doesn't include.
+                # Use JSON Patch (RFC 6902) to add rules without replacing HyperShift's existing rules.
                 _patch_http=$(curl -s --cacert "$_CA" -H "Authorization: Bearer $_TOKEN" \
-                  -H "Content-Type: application/merge-patch+json" -X PATCH \
+                  -H "Content-Type: application/json-patch+json" -X PATCH \
                   "${_API}/apis/rbac.authorization.k8s.io/v1/clusterroles/external-dns" \
-                  -d '{"rules":[
-                    {"apiGroups":["","discovery.k8s.io"],"resources":["services","endpoints","pods","nodes","endpointslices"],"verbs":["get","watch","list"]},
-                    {"apiGroups":["extensions","networking.k8s.io"],"resources":["ingresses","ingressroutes","ingressroutetcps","ingressrouteudps"],"verbs":["get","list","watch"]},
-                    {"apiGroups":["route.openshift.io"],"resources":["routes"],"verbs":["get","list","watch"]}
-                  ]}' \
+                  -d '[
+                    {"op":"add","path":"/rules/-","value":{"apiGroups":["","discovery.k8s.io"],"resources":["services","endpoints","pods","nodes","endpointslices"],"verbs":["get","watch","list"]}},
+                    {"op":"add","path":"/rules/-","value":{"apiGroups":["extensions","networking.k8s.io"],"resources":["ingresses","ingressroutes","ingressroutetcps","ingressrouteudps"],"verbs":["get","list","watch"]}},
+                    {"op":"add","path":"/rules/-","value":{"apiGroups":["route.openshift.io"],"resources":["routes"],"verbs":["get","list","watch"]}}
+                  ]' \
                   -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
                 echo "  external-dns clusterrole patch: HTTP ${_patch_http}"
                 if [ "$_patch_http" != "200" ] && [ "$_patch_http" != "201" ]; then
