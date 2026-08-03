@@ -129,6 +129,18 @@ resource "aws_eks_cluster" "main" {
     command    = <<-EOT
       CLUSTER_NAME="${self.name}"
       REGION=$(echo "${self.arn}" | cut -d: -f4)
+      echo "Stopping Karpenter provisioning for cluster: $CLUSTER_NAME"
+
+      # Stop Karpenter from creating new nodes by deleting the NodePool.
+      # This prevents Karpenter from racing to replace instances as we terminate them.
+      # Failures are ignored (cluster may already be degraded during destroy).
+      aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$REGION" 2>/dev/null || true
+      kubectl delete nodepools --all --timeout=30s 2>/dev/null || true
+
+      # Wait briefly for Karpenter to stop provisioning and for nodes to drain.
+      sleep 10
+
+      # Query for remaining Karpenter-managed instances.
       echo "Terminating Karpenter EC2 instances for cluster: $CLUSTER_NAME"
       INSTANCE_IDS=$(aws ec2 describe-instances \
         --region "$REGION" \
