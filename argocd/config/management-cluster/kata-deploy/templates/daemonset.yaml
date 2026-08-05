@@ -51,8 +51,33 @@ spec:
               mountPath: /opt/kata
             - name: host-etc-containerd
               mountPath: /etc/containerd
-              # TODO: Bottlerocket uses a different containerd config path
-              # Verify this works on the AMI we use
+            - name: host-etc-crio
+              mountPath: /etc/crio
+            - name: host-etc-systemd
+              mountPath: /etc/systemd/system
+            - name: systemd-private
+              mountPath: /run/systemd/private
+            - name: host-usr-bin
+              mountPath: /host-usr/bin
+              readOnly: true
+            - name: host-usr-sbin
+              mountPath: /host-usr/sbin
+              readOnly: true
+            - name: host-usr-local-bin
+              mountPath: /host-usr-local/bin
+              readOnly: true
+            - name: host-usr-local-sbin
+              mountPath: /host-usr-local/sbin
+              readOnly: true
+            - name: host-bin
+              mountPath: /host-bin
+              readOnly: true
+            - name: host-sbin
+              mountPath: /host-sbin
+              readOnly: true
+            - name: boot
+              mountPath: /boot
+              readOnly: true
       volumes:
         - name: host-opt-kata
           hostPath:
@@ -62,6 +87,36 @@ spec:
           hostPath:
             path: /etc/containerd
             type: DirectoryOrCreate
-  # TODO: add pre-delete hook to run kata-deploy.sh cleanup on removal
-  # TODO: verify kata-deploy works on Bottlerocket (the AMI used by Karpenter)
-  # Bottlerocket has a read-only root filesystem; kata-deploy may need adjustments
+        - name: host-etc-crio
+          hostPath:
+            path: /etc/crio
+            type: DirectoryOrCreate
+        - name: host-etc-systemd
+          hostPath:
+            path: /etc/systemd/system
+            type: DirectoryOrCreate
+        - name: systemd-private
+          hostPath:
+            path: /run/systemd/private
+            type: Socket
+        - name: host-usr-bin
+          hostPath:
+            path: /usr/bin
+        - name: host-usr-sbin
+          hostPath:
+            path: /usr/sbin
+        - name: host-usr-local-bin
+          hostPath:
+            path: /usr/local/bin
+        - name: host-usr-local-sbin
+          hostPath:
+            path: /usr/local/sbin
+        - name: host-bin
+          hostPath:
+            path: /bin
+        - name: host-sbin
+          hostPath:
+            path: /sbin
+        - name: boot
+          hostPath:
+            path: /boot
