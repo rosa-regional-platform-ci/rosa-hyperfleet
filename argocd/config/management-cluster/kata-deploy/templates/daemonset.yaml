@@ -63,12 +63,6 @@ spec:
             - name: host-usr-sbin
               mountPath: /host-usr/sbin
               readOnly: true
-            - name: host-usr-local-bin
-              mountPath: /host-usr-local/bin
-              readOnly: true
-            - name: host-usr-local-sbin
-              mountPath: /host-usr-local/sbin
-              readOnly: true
             - name: host-bin
               mountPath: /host-bin
               readOnly: true
@@ -105,12 +99,6 @@ spec:
         - name: host-usr-sbin
           hostPath:
             path: /usr/sbin
-        - name: host-usr-local-bin
-          hostPath:
-            path: /usr/local/bin
-        - name: host-usr-local-sbin
-          hostPath:
-            path: /usr/local/sbin
         - name: host-bin
           hostPath:
             path: /bin
