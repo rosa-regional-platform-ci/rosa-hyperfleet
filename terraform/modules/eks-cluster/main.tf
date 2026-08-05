@@ -237,7 +237,7 @@ resource "aws_eks_node_group" "karpenter_bootstrap" {
   subnet_ids      = var.private_subnet_ids
 
   ami_type       = "AL2023_x86_64_STANDARD"
-  instance_types = ["t3.medium"]
+  instance_types = ["t3.large"]
 
   scaling_config {
     desired_size = 2
