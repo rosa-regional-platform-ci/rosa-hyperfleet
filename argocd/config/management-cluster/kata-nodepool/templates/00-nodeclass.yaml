@@ -5,7 +5,7 @@ metadata:
   name: kata
 spec:
   amiSelectorTerms:
-    - alias: bottlerocket@latest
+    - alias: al2023@latest
   instanceProfile: {{ $clusterName }}-karpenter-node-role
   subnetSelectorTerms:
     - tags:
