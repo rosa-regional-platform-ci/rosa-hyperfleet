@@ -1,12 +1,15 @@
-kataDeploy:
-  # TODO: pin to a specific release tag before production
-  image: quay.io/kata-containers/kata-deploy:3.12.0
+kata-deploy:
   nodeSelector:
     katacontainers.io/kata-runtime: "true"
-
-runtimeClass:
-  name: kata-fc
-  handler: kata-fc
-  overhead:
-    cpu: 250m
-    memory: 160Mi
+  tolerations:
+    - key: hypershift.openshift.io/request-serving-component
+      operator: Exists
+      effect: NoSchedule
+  shims:
+    disableAll: true
+    fc:
+      enabled: true
+  runtimeClasses:
+    enabled: true
+    createDefault: false
+  k8sDistribution: "k8s"
