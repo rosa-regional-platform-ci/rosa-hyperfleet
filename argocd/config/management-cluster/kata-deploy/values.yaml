@@ -1,0 +1,12 @@
+kataDeploy:
+  # TODO: pin to a specific release tag before production
+  image: quay.io/kata-containers/kata-deploy:3.12.0
+  nodeSelector:
+    katacontainers.io/kata-runtime: "true"
+
+runtimeClass:
+  name: kata-fc
+  handler: kata-fc
+  overhead:
+    cpu: 250m
+    memory: 160Mi

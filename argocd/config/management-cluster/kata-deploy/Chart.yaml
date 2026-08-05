@@ -1,0 +1,5 @@
+apiVersion: v2
+name: kata-deploy
+description: Kata Containers runtime installation and RuntimeClass for Firecracker microVM isolation
+type: application
+version: 0.1.0

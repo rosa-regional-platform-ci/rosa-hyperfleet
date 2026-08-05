@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kata-deploy
+spec:
+  selector:
+    matchLabels:
+      app: kata-deploy
+  template:
+    metadata:
+      labels:
+        app: kata-deploy
+    spec:
+      nodeSelector:
+        {{- toYaml .Values.kataDeploy.nodeSelector | nindent 8 }}
+      tolerations:
+        - key: hypershift.openshift.io/request-serving-component
+          operator: Exists
+          effect: NoSchedule
+      serviceAccountName: kata-deploy
+      containers:
+        - name: kata-deploy
+          image: {{ .Values.kataDeploy.image }}
+          command:
+            - /opt/kata-artifacts/scripts/kata-deploy.sh
+          args:
+            - install
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: kata-artifacts
+              mountPath: /opt/kata-artifacts
+            - name: host-opt-kata
+              mountPath: /opt/kata
+            - name: host-etc-containerd
+              mountPath: /etc/containerd
+              # TODO: Bottlerocket uses a different containerd config path
+              # Verify this works on the AMI we use
+      volumes:
+        - name: kata-artifacts
+          emptyDir: {}
+        - name: host-opt-kata
+          hostPath:
+            path: /opt/kata
+            type: DirectoryOrCreate
+        - name: host-etc-containerd
+          hostPath:
+            path: /etc/containerd
+            type: DirectoryOrCreate
+  # TODO: add pre-delete hook to run kata-deploy.sh cleanup on removal
+  # TODO: verify kata-deploy works on Bottlerocket (the AMI used by Karpenter)
+  # Bottlerocket has a read-only root filesystem; kata-deploy may need adjustments
