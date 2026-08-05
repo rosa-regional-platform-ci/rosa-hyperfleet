@@ -25,9 +25,3 @@ fi
 use_mc_account
 terraform_init_backend regional-cluster "${TARGET_REGION}" "${REGIONAL_ID}"
 bootstrap_argocd regional-cluster "${TARGET_ACCOUNT_ID}"
-
-# Query Karpenter metrics from the newly provisioned RC
-echo ""
-echo "Querying Karpenter provisioning metrics..."
-chmod +x ./scripts/query-karpenter-metrics.sh
-./scripts/query-karpenter-metrics.sh regional-cluster "${REGIONAL_ID}" || echo "⚠️  Metrics query failed (non-fatal)"

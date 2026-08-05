@@ -182,10 +182,3 @@ if [ "$REG_OK" != "true" ]; then
     cat /tmp/register-response.json >&2
     exit 1
 fi
-
-# Query Karpenter metrics from the newly provisioned MC
-echo ""
-echo "Querying Karpenter provisioning metrics..."
-use_mc_account
-chmod +x ./scripts/query-karpenter-metrics.sh
-./scripts/query-karpenter-metrics.sh management-cluster "${CLUSTER_ID}" || echo "⚠️  Metrics query failed (non-fatal)"
