@@ -18,5 +18,75 @@ spec:
     httpPutResponseHopLimit: 2
   cpuOptions:
     nestedVirtualization: "enabled"
-  # TODO: evaluate whether FIPS + kernelLockdown is compatible with Kata/Firecracker
-  # The base fips NodeClass enables these, but nested virt may conflict.
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: {{ .Values.kataNodePool.rootVolumeSize | default "100Gi" }}
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="BOUNDARY"
+
+    --BOUNDARY
+    Content-Type: text/x-shellscript; charset="us-ascii"
+
+    #!/bin/bash
+    set -euo pipefail
+
+    # Set up devmapper thin-pool for Firecracker snapshotter.
+    # Firecracker needs block-level storage; overlayfs won't work.
+    DATA_DIR=/var/lib/containerd/io.containerd.snapshotter.v1.devmapper
+    POOL_NAME=devpool
+
+    mkdir -p "${DATA_DIR}"
+    truncate -s 100G "${DATA_DIR}/data"
+    truncate -s 10G "${DATA_DIR}/meta"
+
+    DATA_DEV=$(losetup --find --show "${DATA_DIR}/data")
+    META_DEV=$(losetup --find --show "${DATA_DIR}/meta")
+
+    SECTOR_SIZE=512
+    DATA_SIZE=$(blockdev --getsize64 -q "${DATA_DEV}")
+    LENGTH_IN_SECTORS=$((DATA_SIZE / SECTOR_SIZE))
+
+    dmsetup create "${POOL_NAME}" \
+      --table "0 ${LENGTH_IN_SECTORS} thin-pool ${META_DEV} ${DATA_DEV} 128 32768"
+
+    # Add devmapper snapshotter config to containerd
+    mkdir -p /etc/containerd/config.d
+    cat > /etc/containerd/config.d/devmapper.toml <<'TOML'
+    [plugins."io.containerd.snapshotter.v1.devmapper"]
+    pool_name = "devpool"
+    root_path = "/var/lib/containerd/io.containerd.snapshotter.v1.devmapper"
+    base_image_size = "10GB"
+    discard_blocks = true
+    TOML
+
+    # Create systemd service to recreate thin-pool after reboot
+    cat > /etc/systemd/system/devmapper-reload.service <<'UNIT'
+    [Unit]
+    Description=Reload devmapper thin-pool for containerd
+    Before=containerd.service
+    After=local-fs.target
+
+    [Service]
+    Type=oneshot
+    ExecStart=/bin/bash -c '\
+      DATA_DIR=/var/lib/containerd/io.containerd.snapshotter.v1.devmapper; \
+      DATA_DEV=$$(losetup --find --show "$${DATA_DIR}/data"); \
+      META_DEV=$$(losetup --find --show "$${DATA_DIR}/meta"); \
+      DATA_SIZE=$$(blockdev --getsize64 -q "$${DATA_DEV}"); \
+      LENGTH=$$(($${DATA_SIZE} / 512)); \
+      dmsetup create devpool --table "0 $${LENGTH} thin-pool $${META_DEV} $${DATA_DEV} 128 32768" || true'
+    RemainAfterExit=yes
+
+    [Install]
+    WantedBy=multi-user.target
+    UNIT
+
+    systemctl daemon-reload
+    systemctl enable devmapper-reload.service
+
+    --BOUNDARY--
