@@ -164,7 +164,7 @@ if [[ "$_have_customer_creds" == "true" ]]; then
     echo "Creating HCP cluster: ${HCP_CLUSTER_NAME}"
 
     # Collect cluster logs before HCP cleanup so the HCP namespace is captured.
-    if [[ -n "${CLUSTER_PREFIX+set}" ]]; then
+    if [[ -n "${CLUSTER_PREFIX+set}" ]] && [[ -z "${SKIP_COLLECT_LOGS:-}" ]]; then
         export PRE_CLEANUP_HOOK="S3_ONLY=true ${REPO_ROOT}/scripts/dev/dump-env.sh"
     fi
 
@@ -192,7 +192,7 @@ if [[ $platform_rc -ne 0 ]] || [[ $zoa_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]]
     # Logs are left in S3 rather than added to public CI artifacts because
     # they may contain sensitive data that cannot be reliably redacted.
     # The S3 URIs are printed below for manual retrieval.
-    if [[ -n "${CLUSTER_PREFIX+set}" ]]; then
+    if [[ -n "${CLUSTER_PREFIX+set}" ]] && [[ -z "${SKIP_COLLECT_LOGS:-}" ]]; then
         S3_ONLY=true \
             "${REPO_ROOT}/scripts/dev/dump-env.sh" || true
     fi

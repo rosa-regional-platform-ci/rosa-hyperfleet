@@ -23,7 +23,7 @@ platformApi:
 
     # Application arguments
     args:
-      logLevel: info
+      logLevel: debug
       logFormat: json
       allowedAccounts: "123456789012"
       dynamodbRegion: us-east-2
