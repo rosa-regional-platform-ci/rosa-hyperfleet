@@ -33,8 +33,6 @@ spec:
           securityContext:
             privileged: true
           volumeMounts:
-            - name: kata-artifacts
-              mountPath: /opt/kata-artifacts
             - name: host-opt-kata
               mountPath: /opt/kata
             - name: host-etc-containerd
@@ -42,8 +40,6 @@ spec:
               # TODO: Bottlerocket uses a different containerd config path
               # Verify this works on the AMI we use
       volumes:
-        - name: kata-artifacts
-          emptyDir: {}
         - name: host-opt-kata
           hostPath:
             path: /opt/kata
