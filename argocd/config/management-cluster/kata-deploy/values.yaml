@@ -12,4 +12,6 @@ kata-deploy:
   runtimeClasses:
     enabled: true
     createDefault: false
+  defaultShim:
+    amd64: fc
   k8sDistribution: "k8s"
