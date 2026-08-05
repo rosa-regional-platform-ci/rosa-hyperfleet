@@ -9,7 +9,7 @@ hyperfleet:
 
   source:
     repoURL: https://github.com/openshift-online/rosa-hyperfleet-api.git
-    targetRevision: request_serving_nodes
+    targetRevision: main
     path: hyperfleet-operator/charts
 
   syncPolicy:
