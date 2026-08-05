@@ -30,6 +30,14 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: SHIMS
+              value: "fc"
+            - name: DEFAULT_SHIM
+              value: "fc"
+            - name: CREATE_RUNTIMECLASSES
+              value: "false"
+            - name: CREATE_DEFAULT_RUNTIMECLASS
+              value: "false"
           securityContext:
             privileged: true
           volumeMounts:
