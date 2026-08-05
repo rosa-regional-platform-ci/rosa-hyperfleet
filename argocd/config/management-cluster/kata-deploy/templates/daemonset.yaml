@@ -38,6 +38,12 @@ spec:
               value: "false"
             - name: CREATE_DEFAULT_RUNTIMECLASS
               value: "false"
+            - name: DEBUG
+              value: "false"
+            - name: PULL_TYPE_MAPPING
+              value: ""
+            - name: ALLOWED_HYPERVISOR_ANNOTATIONS
+              value: ""
           securityContext:
             privileged: true
           volumeMounts:
