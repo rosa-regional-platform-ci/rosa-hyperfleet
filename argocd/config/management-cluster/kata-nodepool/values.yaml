@@ -8,7 +8,7 @@ kataNodePool:
     cpu: "64"
     memory: 256Gi
   disruption:
-    consolidationPolicy: WhenUnderutilized
+    consolidationPolicy: WhenEmptyOrUnderutilized
     consolidateAfter: 30s
 
 global:
