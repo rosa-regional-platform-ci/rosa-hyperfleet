@@ -92,19 +92,18 @@ resource "aws_iam_role_policy" "hyperfleet_operator_dynamodb" {
 }
 
 # =============================================================================
-# kube-applier RC-side Messaging (SNS/SQS cross-account notifications)
+# kube-applier RC-side Messaging (EventBridge Pipes + SQS)
 #
-# Creates the specs SNS topic in the RC account (the operator publishes here
-# after writing a desire document) and the per-replica status SQS queues
-# (the operator polls its own queue for status notifications from kube-applier).
+# Creates EventBridge Pipes in the RC account that deliver DynamoDB stream
+# change events directly to SQS queues — replacing the previous SNS topics.
 #
-# Both modules use predictable ARNs to reference cross-account resources, so
-# there is no dependency on MC Terraform outputs and no count gate. Both sides
-# can be provisioned independently in a single pipeline run.
+# Specs path (RC DynamoDB → MC SQS): two Pipes, one per specs table, deliver
+#   INSERT/MODIFY events to the MC-side specs SQS queue so kube-applier is
+#   woken immediately on new desire documents.
 #
-# Subscriptions (RC SNS → MC SQS and MC SNS → RC SQS × N) are created by
-# the Register buildspec step, after both modules have run and all four
-# resources are guaranteed to exist.
+# Status path (RC DynamoDB → RC SQS): 2×N Pipes (two tables × N replicas)
+#   deliver INSERT/MODIFY events to each operator replica's own SQS queue,
+#   replacing the previous MC SNS → RC SQS path.
 # =============================================================================
 
 module "kube_applier_rc_messaging" {
@@ -115,4 +114,9 @@ module "kube_applier_rc_messaging" {
   rc_id                  = var.rc_id
   aws_region             = var.region
   operator_replica_count = var.operator_replica_count
+
+  specs_applydesires_stream_arn  = module.kube_applier_dynamodb.specs_applydesires_stream_arn
+  specs_readdesires_stream_arn   = module.kube_applier_dynamodb.specs_readdesires_stream_arn
+  status_applydesires_stream_arn = module.kube_applier_dynamodb.status_applydesires_stream_arn
+  status_readdesires_stream_arn  = module.kube_applier_dynamodb.status_readdesires_stream_arn
 }

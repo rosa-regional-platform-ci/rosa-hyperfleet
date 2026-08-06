@@ -70,7 +70,6 @@ module "ecs_bootstrap" {
   repository_branch = var.repository_branch
 
   kube_applier_specs_queue_url  = module.kube_applier_mc_messaging.specs_queue_url
-  kube_applier_status_topic_arn = module.kube_applier_mc_messaging.status_topic_arn
 }
 
 # =============================================================================

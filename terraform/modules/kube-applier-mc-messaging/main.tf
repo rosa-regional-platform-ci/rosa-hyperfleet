@@ -1,22 +1,18 @@
 # =============================================================================
 # kube-applier-mc-messaging Module
 #
-# Provisions the MC-side messaging resources for the two-way SNS/SQS
-# notification system between the hyperfleet-operator (RC account) and
-# kube-applier-aws (MC account).
+# Provisions the MC-side messaging resources for kube-applier-aws.
 #
-# Specs path  (RC → MC): The RC account publishes to an SNS topic when it
-#   writes a new desire document. This module creates the SQS queue in the MC
-#   account that receives those notifications. kube-applier polls this queue
-#   instead of DynamoDB Streams.
+# Specs path  (RC → MC): The RC account EventBridge Pipes deliver DynamoDB
+#   stream events to the specs SQS queue in the MC account. kube-applier
+#   polls this queue for immediate reconciliation.
 #
-# Status path (MC → RC): kube-applier publishes to an SNS topic in the MC
-#   account after writing a status document. This module creates that topic.
-#   The RC account provisions the corresponding SQS queues and subscriptions.
+# Status path (RC → RC): Status notifications are now delivered via
+#   EventBridge Pipes directly to RC SQS queues — no MC-side SNS topic is
+#   needed. kube-applier no longer publishes to SNS.
 #
 # Resource naming:
 #   Specs SQS queue:   ${mc_name}-specs-notifications  (MC account)
-#   Status SNS topic:  ${mc_name}-status-notifications (MC account)
 #   KMS key alias:     alias/${mc_name}-kube-applier-messaging
 # =============================================================================
 
@@ -36,10 +32,10 @@ locals {
   # IAM role ARN for the kube-applier pod in this MC account
   kube_applier_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.mc_name}-kube-applier"
 
-  # RC specs SNS topic ARN — predictable, constructed from known values.
-  # Used in the SQS queue policy so delivery is authorised from day one,
-  # before the RC messaging module has run.
-  rc_specs_sns_topic_arn = "arn:aws:sns:${var.aws_region}:${var.rc_aws_account_id}:${var.mc_name}-specs-notifications"
+  # RC specs Pipe role ARN — predictable, constructed from known values.
+  # Used in the SQS queue policy and KMS key policy to allow the Pipe to
+  # deliver messages cross-account into this MC's specs SQS queue.
+  specs_pipe_role_arn = "arn:aws:iam::${var.rc_aws_account_id}:role/${var.mc_name}-specs-pipe"
 }
 
 # =============================================================================
@@ -47,7 +43,7 @@ locals {
 # =============================================================================
 
 resource "aws_kms_key" "messaging" {
-  description             = "KMS key for ${var.mc_name} kube-applier messaging (SQS + SNS)"
+  description             = "KMS key for ${var.mc_name} kube-applier messaging (SQS)"
   deletion_window_in_days = 7
   enable_key_rotation     = true
   rotation_period_in_days = 90
@@ -65,27 +61,18 @@ resource "aws_kms_key" "messaging" {
         Resource = "*"
       },
       {
-        # SNS must be able to encrypt/decrypt when delivering messages to SQS.
-        # For cross-account delivery (RC SNS → MC SQS), SNS acts on behalf of
-        # the RC account, so aws:SourceAccount will be the RC account ID.
-        Sid    = "AllowSNSDelivery"
+        # The RC-account specs EventBridge Pipe must be able to encrypt messages
+        # when delivering to this MC-account SQS queue.
+        Sid    = "AllowSpecsPipeDelivery"
         Effect = "Allow"
         Principal = {
-          Service = "sns.amazonaws.com"
+          AWS = local.specs_pipe_role_arn
         }
         Action = [
           "kms:Decrypt",
           "kms:GenerateDataKey*",
         ]
         Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = [
-              data.aws_caller_identity.current.account_id,
-              var.rc_aws_account_id,
-            ]
-          }
-        }
       },
       {
         Sid    = "AllowSQS"
@@ -118,7 +105,7 @@ resource "aws_kms_alias" "messaging" {
 }
 
 # =============================================================================
-# Specs SQS Queue (specs path receiver — RC SNS → MC SQS)
+# Specs SQS Queue (specs path receiver — RC EventBridge Pipe → MC SQS)
 #
 # kube-applier polls this queue for notifications that the operator has written
 # a new desire document. On receipt, it immediately re-queues the affected
@@ -138,84 +125,23 @@ resource "aws_sqs_queue" "specs" {
   })
 }
 
-# Allow the RC-account specs SNS topic to deliver messages to this queue.
-# AWS requires both an identity-based policy on the SNS topic AND a
-# resource-based policy on the SQS queue for cross-account delivery.
+# Allow the RC-account specs EventBridge Pipe role to deliver messages to this
+# queue cross-account. The Pipe role ARN is deterministic from the RC account ID
+# and MC name, so no Terraform output dependency is needed.
 resource "aws_sqs_queue_policy" "specs" {
   queue_url = aws_sqs_queue.specs.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Sid    = "AllowRCSpecsSNSDelivery"
+      Sid    = "AllowSpecsPipeDelivery"
       Effect = "Allow"
       Principal = {
-        Service = "sns.amazonaws.com"
+        AWS = local.specs_pipe_role_arn
       }
       Action   = "sqs:SendMessage"
       Resource = aws_sqs_queue.specs.arn
-      Condition = {
-        ArnEquals = {
-          "aws:SourceArn" = local.rc_specs_sns_topic_arn
-        }
-      }
     }]
-  })
-}
-
-# =============================================================================
-# Status SNS Topic (status path sender — MC SNS → RC SQS)
-#
-# kube-applier publishes a lightweight notification here after successfully
-# writing a status document. The RC account subscribes its per-replica operator
-# SQS queues to this topic for cross-account delivery.
-# =============================================================================
-
-resource "aws_sns_topic" "status" {
-  name              = "${var.mc_name}-status-notifications"
-  kms_master_key_id = aws_kms_key.messaging.id
-
-  tags = merge(local.common_tags, {
-    Name      = "${var.mc_name}-status-notifications"
-    Direction = "status-mc-to-rc"
-  })
-}
-
-# Allow the kube-applier pod role to publish status notifications.
-# The RC account (as subscriber) is also given sns:Subscribe so that the
-# subscription created in the RC account's kube-applier-rc-messaging module
-# can be confirmed without requiring manual approval.
-resource "aws_sns_topic_policy" "status" {
-  arn = aws_sns_topic.status.arn
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowKubeApplierPublish"
-        Effect = "Allow"
-        Principal = {
-          AWS = local.kube_applier_role_arn
-        }
-        Action   = "sns:Publish"
-        Resource = aws_sns_topic.status.arn
-      },
-      {
-        # Allow the RC account to create cross-account SQS subscriptions.
-        # Without this, aws_sns_topic_subscription from the RC module would
-        # fail with an AuthorizationError even if the SQS queue policy permits
-        # delivery.
-        Sid    = "AllowRCAccountSubscribe"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:${data.aws_partition.current.partition}:iam::${var.rc_aws_account_id}:root"
-        }
-        Action = [
-          "sns:Subscribe",
-        ]
-        Resource = aws_sns_topic.status.arn
-      },
-    ]
   })
 }
 
@@ -243,14 +169,6 @@ resource "aws_iam_role_policy" "kube_applier_messaging" {
           "sqs:GetQueueAttributes",
         ]
         Resource = aws_sqs_queue.specs.arn
-      },
-      {
-        Sid    = "StatusTopicPublish"
-        Effect = "Allow"
-        Action = [
-          "sns:Publish",
-        ]
-        Resource = aws_sns_topic.status.arn
       },
       {
         Sid    = "MessagingKMSAccess"

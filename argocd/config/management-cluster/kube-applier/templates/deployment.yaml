@@ -48,9 +48,6 @@ spec:
             {{- if .Values.kubeApplier.config.sqsQueueUrl }}
             - --sqs-queue-url={{ .Values.kubeApplier.config.sqsQueueUrl }}
             {{- end }}
-            {{- if .Values.kubeApplier.config.snsStatusTopicArn }}
-            - --sns-status-topic-arn={{ .Values.kubeApplier.config.snsStatusTopicArn }}
-            {{- end }}
             {{- if .Values.kubeApplier.config.awsEndpointUrl }}
             - --aws-endpoint-url={{ .Values.kubeApplier.config.awsEndpointUrl }}
             {{- end }}

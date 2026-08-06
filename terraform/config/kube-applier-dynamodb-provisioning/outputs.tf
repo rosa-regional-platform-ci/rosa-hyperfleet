@@ -8,24 +8,33 @@ output "status_table_arns" {
   value       = module.kube_applier_dynamodb.status_table_arns
 }
 
-output "status_readdesires_stream_arn" {
-  description = "Stream ARN for the status-readdesires table"
-  value       = module.kube_applier_dynamodb.status_readdesires_stream_arn
+# =============================================================================
+# DynamoDB Stream ARN Outputs
+# Consumed by the kube-applier-rc-messaging module to configure EventBridge
+# Pipes that deliver change notifications directly to SQS queues.
+# =============================================================================
+
+output "specs_applydesires_stream_arn" {
+  description = "Stream ARN for the specs-applydesires table (EventBridge Pipe source)"
+  value       = module.kube_applier_dynamodb.specs_applydesires_stream_arn
 }
 
-# =============================================================================
-# Messaging Outputs
-# Read by the MC management-cluster buildspec to pass rc_specs_sns_topic_arn
-# into the MC terraform run.
-# =============================================================================
+output "specs_readdesires_stream_arn" {
+  description = "Stream ARN for the specs-readdesires table (EventBridge Pipe source)"
+  value       = module.kube_applier_dynamodb.specs_readdesires_stream_arn
+}
 
-output "specs_sns_topic_arn" {
-  description = "ARN of the RC-account specs SNS topic for this MC (operator publishes here after writing a desire document)."
-  value       = module.kube_applier_rc_messaging.specs_topic_arn
+output "status_applydesires_stream_arn" {
+  description = "Stream ARN for the status-applydesires table (EventBridge Pipe source)"
+  value       = module.kube_applier_dynamodb.status_applydesires_stream_arn
+}
+
+output "status_readdesires_stream_arn" {
+  description = "Stream ARN for the status-readdesires table (EventBridge Pipe source)"
+  value       = module.kube_applier_dynamodb.status_readdesires_stream_arn
 }
 
 output "status_sqs_queue_urls" {
   description = "URLs of the RC-account operator status SQS queues (one per replica)."
   value       = module.kube_applier_rc_messaging.status_queue_urls
 }
-

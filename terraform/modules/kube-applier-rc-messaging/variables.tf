@@ -48,3 +48,23 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "specs_applydesires_stream_arn" {
+  description = "DynamoDB stream ARN for the specs-applydesires table. Used as the source for the EventBridge Pipe that notifies kube-applier of new desire documents."
+  type        = string
+}
+
+variable "specs_readdesires_stream_arn" {
+  description = "DynamoDB stream ARN for the specs-readdesires table. Used as the source for the EventBridge Pipe that notifies kube-applier of new desire documents."
+  type        = string
+}
+
+variable "status_applydesires_stream_arn" {
+  description = "DynamoDB stream ARN for the status-applydesires table. Used as the source for the EventBridge Pipes that notify the hyperfleet-operator of status changes."
+  type        = string
+}
+
+variable "status_readdesires_stream_arn" {
+  description = "DynamoDB stream ARN for the status-readdesires table. Used as the source for the EventBridge Pipes that notify the hyperfleet-operator of status changes."
+  type        = string
+}
