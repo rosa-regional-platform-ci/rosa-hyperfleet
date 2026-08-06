@@ -1,35 +1,26 @@
 hyperfleet:
   applicationName: hyperfleet-operator
-
   namespace: argocd
-
   targetNamespace: hyperfleet
-
   project: default
-
   source:
     repoURL: https://github.com/openshift-online/rosa-hyperfleet-api.git
     targetRevision: f7ec7d59ed8523bc66277cce3f4814e0dee5fa83
     path: hyperfleet-operator/charts
-
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-
   helmValues:
     image:
-      repository: quay.io/redhat-user-workloads/rosa-tenant/hyperfleet-operator
-      tag: "f7ec7d59ed8523bc66277cce3f4814e0dee5fa83"
+      repository: quay.io/rrp-dev-ci/hyperfleet-operator
+      tag: ci-284-2085212612139683840
       pullPolicy: Always
-
     replicaCount: 2
-
     serviceAccount:
       create: true
       name: hyperfleet-operator
       annotations: {}
-
     resources:
       limits:
         cpu: 500m
