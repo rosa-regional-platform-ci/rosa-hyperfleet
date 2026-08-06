@@ -63,16 +63,25 @@ resource "aws_kms_key" "messaging" {
       {
         # The RC-account specs EventBridge Pipe must be able to encrypt messages
         # when delivering to this MC-account SQS queue.
+        # We use the RC account root as the principal (always valid at key-creation
+        # time) and scope it to the Pipe role via aws:PrincipalArn. This avoids the
+        # MalformedPolicyDocumentException that occurs when referencing a
+        # cross-account role ARN that does not yet exist.
         Sid    = "AllowSpecsPipeDelivery"
         Effect = "Allow"
         Principal = {
-          AWS = local.specs_pipe_role_arn
+          AWS = "arn:${data.aws_partition.current.partition}:iam::${var.rc_aws_account_id}:root"
         }
         Action = [
           "kms:Decrypt",
           "kms:GenerateDataKey*",
         ]
         Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:PrincipalArn" = local.specs_pipe_role_arn
+          }
+        }
       },
       {
         Sid    = "AllowSQS"
@@ -137,10 +146,15 @@ resource "aws_sqs_queue_policy" "specs" {
       Sid    = "AllowSpecsPipeDelivery"
       Effect = "Allow"
       Principal = {
-        AWS = local.specs_pipe_role_arn
+        AWS = "arn:${data.aws_partition.current.partition}:iam::${var.rc_aws_account_id}:root"
       }
       Action   = "sqs:SendMessage"
       Resource = aws_sqs_queue.specs.arn
+      Condition = {
+        StringEquals = {
+          "aws:PrincipalArn" = local.specs_pipe_role_arn
+        }
+      }
     }]
   })
 }
