@@ -250,24 +250,24 @@ resource "aws_pipes_pipe" "specs_applydesires" {
     dynamodb_stream_parameters {
       starting_position = "LATEST"
       batch_size        = 10
+    }
 
-      filter_criteria {
-        filter {
-          pattern = jsonencode({
-            eventName = ["INSERT", "MODIFY"]
-          })
-        }
+    filter_criteria {
+      filter {
+        pattern = jsonencode({
+          eventName = ["INSERT", "MODIFY"]
+        })
       }
     }
   }
 
   target_parameters {
-    sqs_queue_parameters {
-      message_body = jsonencode({
-        documentID  = "<$.dynamodb.Keys.documentID.S>"
-        tableSuffix = "-applydesires"
-      })
-    }
+    input_template = jsonencode({
+      documentID  = "<$.dynamodb.Keys.documentID.S>"
+      tableSuffix = "-applydesires"
+    })
+
+    sqs_queue_parameters {}
   }
 
   tags = merge(local.common_tags, {
@@ -286,24 +286,24 @@ resource "aws_pipes_pipe" "specs_readdesires" {
     dynamodb_stream_parameters {
       starting_position = "LATEST"
       batch_size        = 10
+    }
 
-      filter_criteria {
-        filter {
-          pattern = jsonencode({
-            eventName = ["INSERT", "MODIFY"]
-          })
-        }
+    filter_criteria {
+      filter {
+        pattern = jsonencode({
+          eventName = ["INSERT", "MODIFY"]
+        })
       }
     }
   }
 
   target_parameters {
-    sqs_queue_parameters {
-      message_body = jsonencode({
-        documentID  = "<$.dynamodb.Keys.documentID.S>"
-        tableSuffix = "-readdesires"
-      })
-    }
+    input_template = jsonencode({
+      documentID  = "<$.dynamodb.Keys.documentID.S>"
+      tableSuffix = "-readdesires"
+    })
+
+    sqs_queue_parameters {}
   }
 
   tags = merge(local.common_tags, {
@@ -404,24 +404,24 @@ resource "aws_pipes_pipe" "status_applydesires" {
     dynamodb_stream_parameters {
       starting_position = "LATEST"
       batch_size        = 10
+    }
 
-      filter_criteria {
-        filter {
-          pattern = jsonencode({
-            eventName = ["INSERT", "MODIFY"]
-          })
-        }
+    filter_criteria {
+      filter {
+        pattern = jsonencode({
+          eventName = ["INSERT", "MODIFY"]
+        })
       }
     }
   }
 
   target_parameters {
-    sqs_queue_parameters {
-      message_body = jsonencode({
-        documentID  = "<$.dynamodb.Keys.documentID.S>"
-        tableSuffix = "-applydesires"
-      })
-    }
+    input_template = jsonencode({
+      documentID  = "<$.dynamodb.Keys.documentID.S>"
+      tableSuffix = "-applydesires"
+    })
+
+    sqs_queue_parameters {}
   }
 
   tags = merge(local.common_tags, {
@@ -442,24 +442,24 @@ resource "aws_pipes_pipe" "status_readdesires" {
     dynamodb_stream_parameters {
       starting_position = "LATEST"
       batch_size        = 10
+    }
 
-      filter_criteria {
-        filter {
-          pattern = jsonencode({
-            eventName = ["INSERT", "MODIFY"]
-          })
-        }
+    filter_criteria {
+      filter {
+        pattern = jsonencode({
+          eventName = ["INSERT", "MODIFY"]
+        })
       }
     }
   }
 
   target_parameters {
-    sqs_queue_parameters {
-      message_body = jsonencode({
-        documentID  = "<$.dynamodb.Keys.documentID.S>"
-        tableSuffix = "-readdesires"
-      })
-    }
+    input_template = jsonencode({
+      documentID  = "<$.dynamodb.Keys.documentID.S>"
+      tableSuffix = "-readdesires"
+    })
+
+    sqs_queue_parameters {}
   }
 
   tags = merge(local.common_tags, {
