@@ -7,7 +7,7 @@ kubeApplier:
   image:
     registry: "quay.io"
     repository: "psav/kube-applier-aws"
-    tag: "1f8498a"
+    tag: "461dce3"
     pullPolicy: IfNotPresent
 
   # Deployment configuration

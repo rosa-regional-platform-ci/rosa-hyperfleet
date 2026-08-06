@@ -11,7 +11,7 @@ hyperfleet:
 
   source:
     repoURL: https://github.com/rrp-bot/rosa-hyperfleet-api.git
-    targetRevision: feature/sns-sqs
+    targetRevision: feature/eventbridge-pipes
     path: hyperfleet-operator/charts
 
   syncPolicy:
@@ -22,7 +22,7 @@ hyperfleet:
   helmValues:
     image:
       repository: quay.io/psav/hyperfleet-operator
-      tag: "c756faf"
+      tag: "350b1f3"
       pullPolicy: Always
 
     replicaCount: 2
