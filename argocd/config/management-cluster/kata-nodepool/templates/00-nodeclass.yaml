@@ -37,6 +37,9 @@ spec:
     spec:
       containerd:
         config: |
+          [plugins."io.containerd.grpc.v1.cri".containerd]
+          discard_unpacked_layers = false
+
           [plugins."io.containerd.snapshotter.v1.devmapper"]
           pool_name = "devpool"
           root_path = "/var/lib/containerd/devmapper"
@@ -99,8 +102,33 @@ spec:
     WantedBy=multi-user.target
     UNIT
 
+    # kata-deploy 3.27.0's default kernel lacks CONFIG_VIRTIO_MMIO which Firecracker
+    # requires for all devices. The dragonball-experimental kernel has it enabled.
+    # This systemd path unit patches the kernel path after kata-deploy installs.
+    cat > /etc/systemd/system/kata-kernel-fix.path <<'PATHUNIT'
+    [Unit]
+    Description=Watch for kata-fc configuration
+
+    [Path]
+    PathExists=/opt/kata/share/defaults/kata-containers/runtimes/fc/configuration-fc.toml
+    PathChanged=/opt/kata/share/defaults/kata-containers/runtimes/fc/configuration-fc.toml
+
+    [Install]
+    WantedBy=multi-user.target
+    PATHUNIT
+
+    cat > /etc/systemd/system/kata-kernel-fix.service <<'SVCUNIT'
+    [Unit]
+    Description=Fix kata-fc kernel for Firecracker VIRTIO_MMIO support
+
+    [Service]
+    Type=oneshot
+    ExecStart=/bin/bash -c 'sed -i "s|vmlinux.container|vmlinux-dragonball-experimental.container|" /opt/kata/share/defaults/kata-containers/runtimes/fc/configuration-fc.toml'
+    SVCUNIT
+
     systemctl daemon-reload
     systemctl enable containerd-devmapper.service
+    systemctl enable --now kata-kernel-fix.path
 
     # If containerd started before the thin-pool was created (nodeadm race),
     # restart it so the devmapper snapshotter initializes against the live pool.
