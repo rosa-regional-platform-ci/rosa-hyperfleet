@@ -12,10 +12,6 @@ spec:
         group: karpenter.k8s.aws
         kind: EC2NodeClass
         name: kata
-      startupTaints:
-        - key: katacontainers.io/kata-runtime-initializing
-          value: "true"
-          effect: NoSchedule
       taints:
         - key: hypershift.openshift.io/request-serving-component
           value: "true"

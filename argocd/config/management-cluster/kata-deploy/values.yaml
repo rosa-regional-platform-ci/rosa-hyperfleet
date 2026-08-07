@@ -5,9 +5,6 @@ kata-deploy:
     - key: hypershift.openshift.io/request-serving-component
       operator: Exists
       effect: NoSchedule
-    - key: katacontainers.io/kata-runtime-initializing
-      value: "true"
-      effect: NoSchedule
   shims:
     disableAll: true
     fc:
