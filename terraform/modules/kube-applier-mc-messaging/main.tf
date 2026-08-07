@@ -33,8 +33,12 @@ locals {
   # RC-side specs SQS queue ARN — deterministic from known inputs.
   rc_specs_queue_arn = "arn:${data.aws_partition.current.partition}:sqs:${var.aws_region}:${var.rc_aws_account_id}:${var.mc_name}-specs-notifications"
 
-  # RC-side KMS key — referenced by alias ARN for the identity-based policy.
-  rc_kms_alias_arn = "arn:${data.aws_partition.current.partition}:kms:${var.aws_region}:${var.rc_aws_account_id}:alias/${var.mc_name}-kube-applier-messaging"
+  # RC-side KMS key ARN pattern for the identity-based policy.
+  # Alias ARNs cannot be used as Resource in identity-based policies for kms:Decrypt;
+  # only key ARNs are valid. Since we don't have the key ID without cross-stack output
+  # passing, we scope to all keys in the RC account/region — the KMS key resource policy
+  # is the actual access gate (it only allows this role via aws:PrincipalArn condition).
+  rc_kms_key_arn_pattern = "arn:${data.aws_partition.current.partition}:kms:${var.aws_region}:${var.rc_aws_account_id}:key/*"
 }
 
 # =============================================================================
@@ -69,7 +73,7 @@ resource "aws_iam_role_policy" "kube_applier_messaging" {
           "kms:Decrypt",
           "kms:GenerateDataKey*",
         ]
-        Resource = local.rc_kms_alias_arn
+        Resource = local.rc_kms_key_arn_pattern
       },
     ]
   })
