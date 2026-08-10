@@ -27,11 +27,10 @@ sequenceDiagram
     ECS->>K8s: kubectl apply root Application (points to repo argocd/config/<cluster_type>)
     ECS-->>ECS: Exit
 
-    ARGO->>K8s: Sync wave 0 — karpenter Application<br/>(helm chart from public.ecr.aws/karpenter)
-    Note over ARGO,K8s: Karpenter controller + CRDs installed<br/>onto karpenter-bootstrap nodes
-    ARGO->>K8s: Sync wave 5 — all other Applications
-    ARGO->>K8s: Sync wave 10 — eks-nodepool Application<br/>(EC2NodeClass + NodePool)
-    Note over ARGO,K8s: NodePool CRDs now exist;<br/>Karpenter begins provisioning workload nodes
+    ARGO->>K8s: Sync all Applications concurrently<br/>(karpenter, eks-nodepool, everything else)
+    Note over ARGO,K8s: eks-nodepool's EC2NodeClass/NodePool apply may fail<br/>until Karpenter's CRDs exist
+    ARGO->>K8s: retry with backoff (selfHeal, retry.limit=-1)
+    Note over ARGO,K8s: eks-nodepool succeeds once Karpenter CRDs are registered;<br/>Karpenter begins provisioning workload nodes
 ```
 
 ## Node groups
@@ -49,13 +48,12 @@ from landing on infrastructure nodes; ArgoCD and Karpenter explicitly tolerate i
 
 After bootstrap, ArgoCD fully owns Karpenter. There is no ongoing ECS involvement.
 
-**ApplicationSet sync waves** (`config/templates/argocd-bootstrap/applicationset.yaml.j2`):
-
-| Wave | Application            | Reason                                                             |
-| ---- | ---------------------- | ------------------------------------------------------------------ |
-| `0`  | `karpenter`            | Must install before any NodePool resources exist                   |
-| `5`  | All other applications | Default                                                            |
-| `10` | `eks-nodepool`         | Karpenter CRDs must exist before NodePool/EC2NodeClass are created |
+**Ordering**: all Applications sync concurrently — there is no sync-wave ordering between
+`karpenter` and `eks-nodepool`. Per the project's eventual-consistency model (see
+`config/templates/argocd-bootstrap/applicationset.yaml.j2`'s `syncPolicy`), `eks-nodepool`'s
+`EC2NodeClass`/`NodePool` apply may fail on first sync if Karpenter's CRDs aren't registered yet.
+`selfHeal: true` and `retry.limit: -1` with exponential backoff mean ArgoCD keeps retrying until
+the CRDs exist and the apply succeeds — no manual intervention or ordering annotation required.
 
 **Namespace override**: the `karpenter` Application deploys to `kube-system` (not a `karpenter`
 namespace). All other applications deploy to a namespace matching their directory basename.
@@ -112,5 +110,5 @@ controller IAM role has permission to read from this queue.
 | **Version upgrades**      | EKS console / API flag                              | Update `Chart.yaml` version → ArgoCD syncs                                                                                      |
 | **Drift detection**       | None (AWS owns config)                              | ArgoCD detects drift; selfHeal=true corrects it                                                                                 |
 | **Kubernetes API**        | Cluster API blocks Auto Mode specific operations    | Standard Karpenter CRs; no special API restrictions                                                                             |
-| **Bootstrap dependency**  | Auto Mode enabled at cluster creation; no ECS step  | ECS task installs ArgoCD; ArgoCD installs Karpenter at wave 0                                                                   |
+| **Bootstrap dependency**  | Auto Mode enabled at cluster creation; no ECS step  | ECS task installs ArgoCD; ArgoCD installs Karpenter, retries dependents until CRDs are ready                                    |
 | **Compute node taint**    | No bootstrap group required                         | `karpenter-bootstrap` node group required (ArgoCD + Karpenter must run before workload nodes exist)                             |

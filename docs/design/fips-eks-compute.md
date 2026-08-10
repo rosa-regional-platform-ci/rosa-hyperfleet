@@ -60,12 +60,14 @@ userData configuration once the RHEL AMI work is complete.
 - **Justification**: The `karpenter-bootstrap` managed node group (t3.medium, 2 nodes,
   `CriticalAddonsOnly` taint) provides stable, pre-provisioned capacity for Karpenter itself and
   EKS system addons. This eliminates the bootstrap chicken-and-egg problem: ECS bootstrap installs
-  ArgoCD, then ArgoCD installs Karpenter (sync wave 0) and creates the `EC2NodeClass` and
-  `NodePool` (sync wave 10) via GitOps Applications.
+  ArgoCD, then ArgoCD installs Karpenter and creates the `EC2NodeClass` and `NodePool` via GitOps
+  Applications.
 
-- **Evidence**: ArgoCD sync wave ordering ensures Karpenter controller and CRDs are installed
-  before the eks-nodepool Application syncs. The ApplicationSet injects cluster-specific values
-  (clusterName, interruptionQueue, IRSA role ARN) into the Karpenter Helm chart, and the
+- **Evidence**: Karpenter and eks-nodepool sync concurrently — there is no sync-wave ordering
+  between them, consistent with the project's eventual-consistency ArgoCD model (`selfHeal: true`,
+  `retry.limit: -1` with exponential backoff). If eks-nodepool's apply runs before Karpenter's CRDs
+  are registered, ArgoCD retries until it succeeds. The ApplicationSet injects cluster-specific
+  values (clusterName, interruptionQueue, IRSA role ARN) into the Karpenter Helm chart, and the
   eks-nodepool chart creates the `EC2NodeClass` and workloads `NodePool`.
 
 - **Tradeoff**: The `karpenter-bootstrap` node group runs standard Amazon Linux 2023 (AL2023) nodes.
@@ -83,7 +85,7 @@ userData configuration once the RHEL AMI work is complete.
   configured via `EC2NodeClass` userData once the RHEL AMI work is complete, satisfying FedRAMP
   High/Moderate cryptographic requirements for customer-bearing compute.
 - Bootstrap is reliable: the bootstrap node group provisions nodes immediately, ArgoCD installs
-  cleanly, and sync wave ordering guarantees Karpenter is ready before NodePool creation.
+  cleanly, and retry-with-backoff guarantees NodePool creation succeeds once Karpenter is ready.
 - OSS Karpenter can be independently upgraded via Helm chart version changes in the ArgoCD
   Application without waiting for AWS EKS Auto Mode support cycles.
 - The `EC2NodeClass` and `NodePool` are managed exclusively by ArgoCD via the eks-nodepool

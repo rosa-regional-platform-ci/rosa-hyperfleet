@@ -34,12 +34,6 @@ spec:
         environment: '{{ .metadata.labels.environment }}'
         region_deployment: '{{ .metadata.labels.region_deployment }}'
         aws_region: '{{ .metadata.labels.aws_region }}'
-      annotations:
-        # Sync wave ordering: CRD providers install first, then consumers
-        # - Wave 0: karpenter (NodePool/NodeClass CRDs), aws-load-balancer-controller (TargetGroupBinding CRDs)
-        # - Wave 5: Most applications
-        # - Wave 10: eks-nodepool (consumes Karpenter CRDs)
-        argocd.argoproj.io/sync-wave: '{{ if or (eq .path.basename "karpenter") (eq .path.basename "aws-load-balancer-controller") }}0{{ else if eq .path.basename "eks-nodepool" }}10{{ else }}5{{ end }}'
     spec:
       project: default
       destination:
