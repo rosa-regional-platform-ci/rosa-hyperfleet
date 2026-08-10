@@ -1,19 +1,23 @@
 # =============================================================================
 # ECS Bootstrap Module for ArgoCD
 #
-# IMPORTANT: This module provides the INSTALLATION MECHANISM for Karpenter and
-# ArgoCD in fully private EKS clusters. It does NOT host the runtime workloads.
+# IMPORTANT: This module provides the INSTALLATION MECHANISM for ArgoCD in
+# fully private EKS clusters. It does NOT host the runtime workloads, and it
+# does NOT install Karpenter — ArgoCD installs Karpenter via GitOps after
+# bootstrap completes (see the root Application created below).
 #
 # The Problem: Terraform can provision EKS clusters but cannot reach fully
 # private cluster APIs to install software via the helm provider.
 #
 # The Solution: ECS Fargate tasks run in the cluster's VPC with network access
 # to the private EKS API. A one-time bootstrap task performs `helm install` of
-# Karpenter and ArgoCD onto the karpenter-bootstrap managed node group (defined
-# in the eks-cluster module). After installation completes, the ECS task exits.
+# ArgoCD onto the karpenter-bootstrap managed node group (defined in the
+# eks-cluster module), then creates the root ArgoCD Application, which ArgoCD
+# uses to install Karpenter and everything else. After installation completes,
+# the ECS task exits.
 #
 # Runtime: Karpenter and ArgoCD run on the karpenter-bootstrap node group
-# (2× t3.medium with CriticalAddonsOnly taint) for the lifetime of the cluster.
+# (2× t3.large with CriticalAddonsOnly taint) for the lifetime of the cluster.
 #
 # See docs/design/fully-private-eks-bootstrap.md for the full architecture and
 # rationale for choosing ECS over alternatives (public→private transition, node
@@ -93,10 +97,10 @@ resource "aws_cloudwatch_log_group" "bootstrap" {
 #
 # This task definition runs a one-time container that:
 # 1. Connects to the private EKS cluster API (via VPC networking)
-# 2. Installs Karpenter controller (helm install) onto karpenter-bootstrap nodes
-# 3. Installs ArgoCD (helm install) onto karpenter-bootstrap nodes
-# 4. Creates the root ArgoCD Application for GitOps self-management
-# 5. Exits
+# 2. Installs ArgoCD (helm install) onto karpenter-bootstrap nodes
+# 3. Creates the root ArgoCD Application for GitOps self-management —
+#    ArgoCD then installs Karpenter (and everything else) via this Application
+# 4. Exits
 #
 # After this task completes, Karpenter and ArgoCD continue running on the
 # karpenter-bootstrap managed node group. This task is NOT the runtime - it's
@@ -279,8 +283,9 @@ resource "aws_ecs_task_definition" "bootstrap" {
           APP_EOF
 
           # ArgoCD will install Karpenter and create the NodePool via Applications.
-          # No ECS seeding needed - ApplicationSet sync waves ensure Karpenter
-          # installs before eks-nodepool Application syncs.
+          # No ECS seeding needed - Applications sync concurrently (no sync-wave
+          # ordering) and retry with backoff until eks-nodepool's NodePool/
+          # EC2NodeClass apply succeeds once Karpenter's CRDs are registered.
 
           # CI: E2E test runner starts immediately after bootstrap exits, so
           # HyperShift must be fully installed before work agents apply
