@@ -1,11 +1,13 @@
 # Karpenter Node Provisioning
 
-**Last Updated Date**: 2026-07-08
+**Last Updated Date**: 2026-08-10
 
 ## Summary
 
 All EKS clusters use OSS Karpenter v1 (1.13.0) for node provisioning. A dedicated
-`karpenter-bootstrap` managed node group provides stable capacity for the Karpenter controller.
+`karpenter-bootstrap` managed node group (2× t3.large) provides stable capacity for the Karpenter
+controller and ArgoCD (t3.large, upgraded from t3.medium, to give ArgoCD HA replicas room to
+schedule).
 The Karpenter controller IAM role uses IRSA (IAM Roles for Service Accounts). While EKS Pod
 Identity is the ZOA platform standard, IRSA was chosen for this repository as it is fully
 supported by AWS and simplifies the Karpenter Helm chart configuration.
@@ -31,7 +33,7 @@ platform standard and remains supported by AWS alongside IRSA. While AWS recomme
 Identity for new workloads, IRSA simplifies the Helm chart configuration for this repository by
 avoiding additional Pod Identity association resources in Terraform.
 
-All other platform workloads (Thanos, Loki, Maestro Agent, AWS Load Balancer Controller, ZOA
+All other platform workloads (Thanos, Loki, kube-applier, AWS Load Balancer Controller, ZOA
 jobs) use EKS Pod Identity exclusively.
 
 ## Architecture
@@ -43,7 +45,7 @@ graph LR
     KCR -->|"EC2: RunInstances, TerminateInstances"| EC2["EC2 API"]
     KCR -->|"iam:PassRole → instance profile"| KNR["karpenter-node-role\nInstance Profile"]
     KNR -->|"assumed by"| KN["Karpenter-provisioned\nnodes"]
-    BNG["karpenter-bootstrap\nManaged Node Group\n(2x t3.medium)"] -->|"tolerates CriticalAddonsOnly"| KC
+    BNG["karpenter-bootstrap\nManaged Node Group\n(2x t3.large)"] -->|"tolerates CriticalAddonsOnly"| KC
     EB["EventBridge Rules\n(EC2 lifecycle events)"] --> SQS
 ```
 
@@ -54,27 +56,32 @@ graph LR
 - **Name**: `${cluster_id}-karpenter-controller`
 - **Trust**: OIDC provider for the cluster; constrained to `system:serviceaccount:kube-system:karpenter`
 - **Permissions**: EC2 fleet operations (describe, run, terminate instances), IAM PassRole to the
-  node instance profile, SQS receive/delete on the interruption queue
+  node role, SQS receive/delete on the interruption queue, `eks:DescribeCluster`,
+  `ssm:GetParameter` (AMI alias resolution), `pricing:GetProducts`
+- **Optional inline policy**: `kms:CreateGrant` (scoped to AWS service principals via
+  `kms:GrantIsForAWSResource`) and `kms:DescribeKey` on the FIPS AMI KMS key when
+  `ami_kms_key_arn` is set — lets EC2 decrypt the RHEL FIPS AMI's encrypted EBS snapshot on
+  instance launch
 
 ### Karpenter Node Role
 
 - **Name**: `${cluster_id}-karpenter-node-role`
-- **Managed policies**: `AmazonEKSWorkerNodePolicy`, `AmazonEKS_CNI_Policy`, ECR pull-only
-- **Optional inline policy**: `kms:Decrypt` and `kms:CreateGrant` on the FIPS AMI KMS key when
-  `ami_kms_key_arn` is set
-- **Referenced in**: `EC2NodeClass.spec.role`
+- **Managed policies**: `AmazonEKSWorkerNodePolicy`, `AmazonEKS_CNI_Policy`,
+  `AmazonEC2ContainerRegistryPullOnly`, `AmazonSSMManagedInstanceCore`
+- **Referenced in**: `EC2NodeClass.spec.instanceProfile` (a pre-created instance profile ARN,
+  rather than `spec.role`, to avoid the Karpenter controller needing `iam:CreateInstanceProfile`)
 
 ### SQS Queue and EventBridge Rules
 
 The `eks-cluster` module provisions:
 
 - SQS queue (`${cluster_id}-karpenter`) with SQS-managed SSE, allowing `events.amazonaws.com`
-  and `sqs.amazonaws.com` to send messages
+  to send messages
 - Four EventBridge rules forwarding EC2 events to the queue:
-  - `scheduled-change` (AWS Health events)
-  - `spot-interruption` (EC2 Spot Instance interruption)
-  - `rebalance` (EC2 Instance Rebalance Recommendation)
-  - `instance-state-change` (EC2 Instance State-change Notification)
+  - `spot-interruption` (EC2 Spot Instance Interruption Warning)
+  - `instance-terminated` (EC2 Instance State-change Notification, filtered to `state=terminated`)
+  - `rebalance-recommendation` (EC2 Instance Rebalance Recommendation)
+  - `health-scheduled-change` (AWS Health scheduled-change events for EC2)
 
 ## Consequences
 
@@ -87,7 +94,7 @@ The `eks-cluster` module provisions:
 
 ### Negative
 
-- One OIDC provider resource (`aws_iam_openid_connect_provider`) is required per cluster when `enable_karpenter = true`
+- One OIDC provider resource (`aws_iam_openid_connect_provider`) is required per cluster
 - IRSA and Pod Identity coexist; operators must know which mechanism applies to which workload (Karpenter = IRSA, everything else = Pod Identity)
 
 ## Related
