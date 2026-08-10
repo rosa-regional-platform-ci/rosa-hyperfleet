@@ -79,7 +79,7 @@ bootstrap task (sourced from a Terraform output via an ECS environment variable)
 ```yaml
 dependencies:
   - name: karpenter
-    version: 1.13.0
+    version: 1.14.0
     repository: oci://public.ecr.aws/karpenter
 ```
 
