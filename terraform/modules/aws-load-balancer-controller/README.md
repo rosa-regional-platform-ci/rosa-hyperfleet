@@ -12,7 +12,7 @@ migrated to OSS Karpenter.
 This module provisions:
 
 - **IAM role** (`<cluster-name>-aws-load-balancer-controller`): IAM policy derived from the
-  [upstream recommended policy](https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.13.3/docs/install/iam_policy.json)
+  [upstream recommended policy](https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.17.1/docs/install/iam_policy.json)
 - **EKS Pod Identity association**: Binds the IAM role to the LBC Kubernetes ServiceAccount
 
 The LBC Helm chart itself is deployed via ArgoCD from
