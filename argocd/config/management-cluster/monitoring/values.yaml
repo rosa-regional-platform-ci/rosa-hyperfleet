@@ -16,14 +16,20 @@ kube-prometheus-stack:
     enabled: false
 
   prometheusOperator:
-    tolerations:
-      - key: CriticalAddonsOnly
-        operator: Exists
-        effect: NoSchedule
     admissionWebhooks:
       # Disabled: the kube-webhook-certgen PreSync hook Jobs stall monitoring
       # sync during bootstrap when ArgoCD controllers restart and miss the hook
-      # completion event (ArgoCD #21055).
+      # completion event (ArgoCD #21055). A ttlSecondsAfterFinished bump was
+      # tried first and was insufficient — the sync still stalled long enough
+      # to fail the hypershift-install Job's 30-minute CRD wait, failing
+      # bootstrap entirely (see b0afd99e).
+      #
+      # Known tradeoff: this also disables Prometheus Operator's admission-time
+      # promql validation for PrometheusRule (and Probe/AlertmanagerConfig)
+      # resources. Malformed rules are applied instead of rejected at admission
+      # and will only surface as evaluation errors at runtime. CRD schema
+      # validation (structural OpenAPI validation) is unaffected — it's
+      # enforced by the API server independent of this webhook.
       enabled: false
     tls:
       # Disabled alongside admissionWebhooks: the PrometheusOperator Deployment
@@ -39,10 +45,6 @@ kube-prometheus-stack:
         memory: 256Mi
 
   kube-state-metrics:
-    tolerations:
-      - key: CriticalAddonsOnly
-        operator: Exists
-        effect: NoSchedule
     rbac:
       extraRules:
         - apiGroups: ["hypershift.openshift.io"]
@@ -93,10 +95,6 @@ kube-prometheus-stack:
 
   prometheus:
     prometheusSpec:
-      tolerations:
-        - key: CriticalAddonsOnly
-          operator: Exists
-          effect: NoSchedule
       replicas: 2
       retention: "14d"
       retentionSize: "85GB"
