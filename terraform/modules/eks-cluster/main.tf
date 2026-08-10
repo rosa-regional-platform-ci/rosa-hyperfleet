@@ -212,7 +212,7 @@ resource "aws_eks_addon" "pod_identity" {
 # -----------------------------------------------------------------------------
 # Karpenter Bootstrap Node Group
 #
-# AL2023 managed node group (t3.medium × 2, CriticalAddonsOnly:NoSchedule) that
+# AL2023 managed node group (t3.large × 2, CriticalAddonsOnly:NoSchedule) that
 # provides fixed capacity for the Karpenter controller and VPC CNI daemonset
 # before any Karpenter-provisioned nodes exist. This breaks the bootstrap
 # deadlock: Karpenter cannot provision nodes for itself.
