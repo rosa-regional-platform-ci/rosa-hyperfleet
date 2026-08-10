@@ -11,8 +11,8 @@ provides stable capacity for Karpenter itself, CoreDNS, and metrics-server. All 
 land on Karpenter-provisioned nodes.
 
 **Note**: FIPS-validated compute (RHEL nodes with FIPS mode enabled) is planned for a future
-iteration. Current implementation uses standard Bottlerocket AMIs via the `bottlerocket@latest`
-alias. FIPS enablement will be delivered as part of the RHEL AMI work.
+iteration. Current implementation uses standard Bottlerocket AMIs pinned via the
+`bottlerocket@v1.64.0` alias. FIPS enablement will be delivered as part of the RHEL AMI work.
 
 ## Context
 
