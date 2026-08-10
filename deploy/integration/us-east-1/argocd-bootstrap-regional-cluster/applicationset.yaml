@@ -160,15 +160,6 @@ spec:
               serviceAccount:
                 annotations:
                   eks.amazonaws.com/role-arn: '{{ .metadata.annotations.karpenter_controller_role_arn }}'
-            hyperfleetApi:
-              aws:
-                region: '{{ .metadata.labels.aws_region }}'
-            hyperfleetSentinel:
-              aws:
-                region: '{{ .metadata.labels.aws_region }}'
-            hyperfleetAdapter:
-              aws:
-                region: '{{ .metadata.labels.aws_region }}'
         path: '{{ .path.path }}'
         repoURL: '{{ .metadata.annotations.git_repo }}'
         targetRevision: '{{ .metadata.annotations.git_revision }}'
