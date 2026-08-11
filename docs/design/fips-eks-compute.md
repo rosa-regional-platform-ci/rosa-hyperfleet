@@ -16,10 +16,12 @@ iteration. Current implementation uses standard Bottlerocket AMIs pinned via the
 
 ## Context
 
-FedRAMP High/Moderate authorization requires that all cryptographic operations use FIPS 140-2 or
-FIPS 140-3 validated modules. On EKS, this means workload compute must run a FIPS-validated
-operating system. The ROSA HyperFleet will use RHEL-based nodes with FIPS mode enabled via
-userData configuration once the RHEL AMI work is complete.
+FIPS-enabled RHEL nodes support FIPS 140-2/140-3 validated cryptographic modules for node-level
+compute. The ROSA HyperFleet will use RHEL-based nodes with FIPS mode enabled via userData
+configuration once the RHEL AMI work is complete. Node-level FIPS mode is one input to FedRAMP
+High/Moderate authorization; validated cryptography across cluster and workload operations
+(control plane, data in transit/at rest, application layer) requires additional controls beyond
+node OS configuration.
 
 - **Problem Statement**: EKS Auto Mode's built-in node pools (`system` and `general-purpose`)
   provision standard Bottlerocket AMIs and cannot be patched to use custom `EC2NodeClass`
@@ -82,8 +84,8 @@ userData configuration once the RHEL AMI work is complete.
 ### Positive
 
 - OSS Karpenter architecture enables future FIPS compliance: RHEL nodes with FIPS mode can be
-  configured via `EC2NodeClass` userData once the RHEL AMI work is complete, satisfying FedRAMP
-  High/Moderate cryptographic requirements for customer-bearing compute.
+  configured via `EC2NodeClass` userData once the RHEL AMI work is complete, providing
+  node-level FIPS-validated cryptographic modules for customer-bearing compute.
 - Bootstrap is reliable: the bootstrap node group provisions nodes immediately, ArgoCD installs
   cleanly, and retry-with-backoff guarantees NodePool creation succeeds once Karpenter is ready.
 - OSS Karpenter can be independently upgraded via Helm chart version changes in the ArgoCD
@@ -94,11 +96,13 @@ userData configuration once the RHEL AMI work is complete.
 ### Negative
 
 - Karpenter controller, CoreDNS, and metrics-server run on standard AL2023 t3.large nodes. These
-  are AWS-managed system addons, not customer-bearing workloads.
+  are platform system components, not customer-bearing workloads. CoreDNS and metrics-server are
+  AWS-managed EKS addons; Karpenter is OSS software installed and managed by ArgoCD.
 - Platform and application workloads currently run on standard Bottlerocket nodes. FIPS-validated
   compute (RHEL with FIPS mode enabled) will be delivered as part of the RHEL AMI work.
-- Two IAM roles are required: `karpenter-node-role` (for Karpenter-provisioned nodes) and a
-  lightweight role for the `karpenter-bootstrap` node group (not used directly by workloads).
+- Two IAM roles are required: the IRSA-backed Karpenter controller role, and
+  `karpenter-node-role`, shared by both the `karpenter-bootstrap` node group and
+  Karpenter-provisioned nodes.
 
 ## Cross-Cutting Concerns
 
@@ -120,8 +124,9 @@ userData configuration once the RHEL AMI work is complete.
 - Karpenter node IAM role (`${cluster_id}-karpenter-node-role`) is referenced directly in the
   `EC2NodeClass`, scoping node permissions to a cluster-specific role.
 - FIPS-validated cryptographic modules (RHEL with FIPS mode enabled) will be configured via
-  `EC2NodeClass` userData once the RHEL AMI work is complete, satisfying FIPS 140-2/140-3
-  requirements for SC-13.
+  `EC2NodeClass` userData once the RHEL AMI work is complete, satisfying the node-level portion
+  of FIPS 140-2/140-3 requirements for SC-13. Full SC-13 coverage requires validated cryptography
+  across the control plane and data paths as well.
 
 ### Performance
 

@@ -111,4 +111,4 @@ controller IAM role has permission to read from this queue.
 | **Drift detection**       | None (AWS owns config)                              | ArgoCD detects drift; selfHeal=true corrects it                                                                                  |
 | **Kubernetes API**        | Cluster API blocks Auto Mode specific operations    | Standard Karpenter CRs; no special API restrictions                                                                              |
 | **Bootstrap dependency**  | Auto Mode enabled at cluster creation; no ECS step  | ECS task installs ArgoCD; ArgoCD installs Karpenter, retries dependents until CRDs are ready                                     |
-| **Compute node taint**    | No bootstrap group required                         | `karpenter-bootstrap` node group required (ArgoCD + Karpenter must run before workload nodes exist)                              |
+| **Bootstrap node group**  | No bootstrap group required                         | `<cluster-id>-karpenter-bootstrap` node group required (ArgoCD + Karpenter must run before workload nodes exist)                 |
