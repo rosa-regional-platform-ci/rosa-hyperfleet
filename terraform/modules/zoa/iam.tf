@@ -220,3 +220,66 @@ resource "aws_eks_pod_identity_association" "job_rc_breakglass_write" {
 # NOTE: Pod Identity associations for ZOA jobs on MCs are created by the
 # zoa-job-pod-identity module in the management-cluster Terraform config,
 # because associations must be in the same AWS account as the EKS cluster.
+
+# =============================================================================
+# Uploader Role - Assumed by Lambda (via STS) for scoped S3 upload credentials
+# =============================================================================
+# The Lambda execution role assumes this role with a session policy that restricts
+# writes to a specific execution prefix: s3://bucket/executions/{execID}/*
+# This ensures compromised Job Pods can only write their own output.
+
+resource "aws_iam_role" "uploader" {
+  name        = "${var.regional_id}-zoa-uploader"
+  description = "STS-assumed role for ZOA async Job S3 uploads (scoped per-execution)"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+      }
+      Action = "sts:AssumeRole"
+      Condition = {
+        ArnLike = {
+          "aws:PrincipalArn" = "arn:aws:iam::*:role/*-zoa-lambda"
+        }
+      }
+    }]
+  })
+
+  tags = merge(local.common_tags, {
+    Name = "${var.regional_id}-zoa-uploader-role"
+  })
+}
+
+resource "aws_iam_role_policy" "uploader_s3" {
+  name = "${var.regional_id}-zoa-uploader-s3"
+  role = aws_iam_role.uploader.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "s3:PutObject",
+        "s3:PutObjectTagging",
+      ]
+      Resource = "${aws_s3_bucket.outputs.arn}/executions/*"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "uploader_kms" {
+  name = "${var.regional_id}-zoa-uploader-kms"
+  role = aws_iam_role.uploader.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "kms:GenerateDataKey"
+      Resource = aws_kms_key.zoa.arn
+    }]
+  })
+}

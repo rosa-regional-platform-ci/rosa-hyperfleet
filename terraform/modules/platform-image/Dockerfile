@@ -8,6 +8,7 @@ ARG STERN_VERSION=1.30.0
 ARG YQ_VERSION=v4.44.3
 ARG OC_VERSION=4.16.0
 ARG TERRAFORM_VERSION=1.14.3
+ARG CRANE_VERSION=0.20.3
 
 # Global curl retry and timeout settings for improved download reliability
 ARG CURL_RETRY=3
@@ -81,6 +82,14 @@ RUN set -euo pipefail && \
     mv /tmp/oc /usr/local/bin/oc && \
     chmod +x /usr/local/bin/oc && \
     rm -f /tmp/kubectl /tmp/README.md
+
+# Install crane (registry-to-registry image copy, no docker daemon needed)
+RUN set -euo pipefail && \
+    curl --retry ${CURL_RETRY} --retry-delay ${CURL_RETRY_DELAY} --max-time ${CURL_MAX_TIME} -sSfL \
+      "https://github.com/google/go-containerregistry/releases/download/v${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" | tar -xz -C /tmp && \
+    mv /tmp/crane /usr/local/bin/crane && \
+    chmod +x /usr/local/bin/crane && \
+    rm -f /tmp/gcrane /tmp/krane
 
 # Install Terraform (GPG-verified)
 RUN set -euo pipefail && \

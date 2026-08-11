@@ -32,6 +32,11 @@ variable "billing_mode" {
 variable "mc_ou_path" {
   description = "AWS Organizations OU path for Management Cluster accounts (used in cross-account S3/KMS policies)"
   type        = string
+
+  validation {
+    condition     = length(var.mc_ou_path) > 10 && startswith(var.mc_ou_path, "o-")
+    error_message = "mc_ou_path must be a valid AWS Organizations path starting with 'o-' (e.g., 'o-abc123/r-root/ou-xxxx-yyyy/')"
+  }
 }
 
 variable "output_retention_days" {
@@ -39,3 +44,24 @@ variable "output_retention_days" {
   type        = number
   default     = 365
 }
+
+# --- Container images (mirrored from Quay → ECR) ---
+
+variable "zoa_quay_repository" {
+  description = "Quay.io repository for ZOA Lambda image"
+  type        = string
+  default     = "quay.io/slopezz/zoa-lambda"
+}
+
+variable "zoa_runner_quay_repository" {
+  description = "Quay.io repository for ZOA Runner image (K8s pulls directly, no ECR needed)"
+  type        = string
+  default     = "quay.io/slopezz/zoa-runner"
+}
+
+variable "zoa_image_tag" {
+  description = "Immutable image tag (git SHA). Used for Quay→ECR mirroring and runner image ref."
+  type        = string
+  default     = "0c3ca66"
+}
+

@@ -109,6 +109,59 @@ variable "rhobs_api_url" {
   default     = ""
 }
 
+# =============================================================================
+# ZOA Lambda Configuration (per-VPC deployment for direct EKS access)
+# =============================================================================
+
+variable "zoa_lambda_ecr_url" {
+  description = "ECR repository URL for ZOA Lambda (RC output, cross-account pull via OU policy)"
+  type        = string
+  default     = ""
+}
+
+variable "zoa_image_tag" {
+  description = "ZOA image tag for Lambda and runner images."
+  type        = string
+  default     = "0c3ca66"
+}
+
+variable "zoa_runner_quay_repository" {
+  description = "Quay.io repository for ZOA Runner image (K8s pulls directly, no ECR needed)"
+  type        = string
+  default     = "quay.io/slopezz/zoa-runner"
+}
+
+variable "zoa_table_name" {
+  description = "DynamoDB executions table name (in RC account)"
+  type        = string
+  default     = ""
+}
+
+variable "zoa_table_arn" {
+  description = "DynamoDB executions table ARN (in RC account, for IAM policy)"
+  type        = string
+  default     = ""
+}
+
+variable "zoa_audit_table_name" {
+  description = "DynamoDB audit table name (in RC account)"
+  type        = string
+  default     = ""
+}
+
+variable "zoa_audit_table_arn" {
+  description = "DynamoDB audit table ARN (in RC account, for IAM policy)"
+  type        = string
+  default     = ""
+}
+
+variable "zoa_uploader_role_arn" {
+  description = "ARN of the ZOA uploader role (in RC account, for STS AssumeRole)"
+  type        = string
+  default     = ""
+}
+
+
 variable "oidc_bucket_name" {
   description = "S3 bucket name for regional OIDC discovery documents (read from RC terraform state)"
   type        = string
