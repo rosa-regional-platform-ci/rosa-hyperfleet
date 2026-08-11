@@ -212,9 +212,11 @@ class EphemeralEnvOrchestrator:
     def _inject_ephemeral_config(self, git: GitManager):
         """Inject the ephemeral environment config into the cloned repo.
 
-        If an override directory (.ephemeral-env/) is provided, it replaces the
-        config/ephemeral/ directory entirely. Otherwise the repo's default
-        config/ephemeral/ is used as-is.
+        If an override directory (.ephemeral-env/) is provided, region YAML
+        files in config/ephemeral/ are replaced with the override's, while
+        defaults.yaml is deep-merged with the override (not replaced) to
+        preserve existing environment settings the override omits. Otherwise
+        the repo's default config/ephemeral/ is used as-is.
 
         In both cases, AWS account IDs are injected into the region config from
         the runtime credentials (never from config files).
