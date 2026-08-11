@@ -297,7 +297,7 @@ resource "aws_ecs_task_definition" "bootstrap" {
           if [ "$${CLUSTER_TYPE:-}" = "management-cluster" ] && [ "$${WAIT_FOR_HYPERSHIFT_HEALTH:-false}" = "true" ]; then
             echo "=== Waiting for hypershift Application to be Synced and Healthy (up to 30m) ==="
             _HS_DEADLINE=$((SECONDS + 1800))
-            until _HS_STATE=$(kubectl get application hypershift -n argocd \
+            until _HS_STATE=$(kubectl get application hypershift -n argocd --request-timeout=10s \
                 -o jsonpath='{.status.sync.status}|{.status.health.status}' 2>/tmp/hs-err) \
                 && [ "$${_HS_STATE}" = "Synced|Healthy" ]; do
               if grep -qiE "unable to connect|connection refused|i/o timeout|no such host" /tmp/hs-err 2>/dev/null; then
@@ -307,14 +307,14 @@ resource "aws_ecs_task_definition" "bootstrap" {
               fi
               if [ $SECONDS -ge $_HS_DEADLINE ]; then
                 echo "ERROR: hypershift Application not Synced and Healthy after 30 minutes" >&2
-                kubectl get application hypershift -n argocd -o yaml 2>/dev/null || true
+                kubectl get application hypershift -n argocd --request-timeout=10s -o yaml 2>/dev/null || true
                 exit 1
               fi
-              _HS_SYNC=$(kubectl get application hypershift -n argocd \
+              _HS_SYNC=$(kubectl get application hypershift -n argocd --request-timeout=10s \
                 -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "NotFound")
-              _HS_HEALTH=$(kubectl get application hypershift -n argocd \
+              _HS_HEALTH=$(kubectl get application hypershift -n argocd --request-timeout=10s \
                 -o jsonpath='{.status.health.status}' 2>/dev/null || echo "NotFound")
-              _HS_MSG=$(kubectl get application hypershift -n argocd \
+              _HS_MSG=$(kubectl get application hypershift -n argocd --request-timeout=10s \
                 -o jsonpath='{.status.health.message}' 2>/dev/null || true)
               echo "  hypershift sync: $${_HS_SYNC}, health: $${_HS_HEALTH} ($(( _HS_DEADLINE - SECONDS ))s remaining)$${_HS_MSG:+ — $${_HS_MSG}}"
               sleep 15
