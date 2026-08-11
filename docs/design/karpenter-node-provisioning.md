@@ -4,7 +4,7 @@
 
 ## Summary
 
-All EKS clusters use OSS Karpenter v1 (1.14.0) for node provisioning. A dedicated
+All EKS clusters use self-managed Karpenter v1 (1.14.0) for node provisioning. A dedicated
 `karpenter-bootstrap` managed node group (2× t3.large) provides stable capacity for the Karpenter
 controller and ArgoCD (t3.large, upgraded from t3.medium, to give ArgoCD HA replicas room to
 schedule).
@@ -14,7 +14,7 @@ supported by AWS and simplifies the Karpenter Helm chart configuration.
 
 ## Context
 
-When clusters migrated from EKS Auto Mode to OSS Karpenter, two IAM authentication mechanisms
+When clusters migrated from EKS Auto Mode to self-managed Karpenter, two IAM authentication mechanisms
 were available for the Karpenter controller ServiceAccount:
 
 - **IRSA (IAM Roles for Service Accounts)**: ServiceAccount carries an annotation
@@ -90,7 +90,7 @@ The `eks-cluster` module provisions:
 - IRSA is fully supported by AWS and requires the cluster's OIDC provider; no EKS Pod Identity association resource is needed
 - Karpenter controller role trust policy is scoped to a single ServiceAccount — no broader cluster-level access
 - SQS interruption handling enables graceful draining before spot reclamation or instance retirement
-- OSS Karpenter can be upgraded independently via Helm without AWS EKS Auto Mode release cycles
+- Self-managed Karpenter can be upgraded independently via Helm without AWS EKS Auto Mode release cycles
 
 ### Negative
 

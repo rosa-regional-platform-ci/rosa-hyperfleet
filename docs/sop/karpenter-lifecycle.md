@@ -97,9 +97,9 @@ Each cluster has an SQS queue named `<cluster-name>-karpenter` that handles:
 The queue name is injected via ApplicationSet (`interruptionQueue` setting above). The Karpenter
 controller IAM role has permission to read from this queue.
 
-## Auto Mode vs OSS Karpenter
+## Auto Mode vs self-managed Karpenter
 
-| Behavior                  | EKS Auto Mode (removed)                             | OSS Karpenter (current)                                                                                                          |
+| Behavior                  | EKS Auto Mode (removed)                             | Self-managed Karpenter (current)                                                                                                 |
 | ------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | **Node provisioning**     | AWS-managed; compute optimized by default           | Operator-defined `NodePool` and `EC2NodeClass` CRs                                                                               |
 | **Instance selection**    | AWS selects instance family automatically           | Declared in `NodePool` requirements; engineers control family/arch/capacity type                                                 |

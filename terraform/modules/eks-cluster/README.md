@@ -10,7 +10,7 @@ Creates private EKS clusters with security-first configuration and standardized 
 - **GitOps Bootstrap**: Automated ArgoCD installation via ECS Fargate task for self-management
 - **Security Hardening**: KMS encryption, IMDSv2 enforcement, and network segmentation
 - **High Availability**: Multi-AZ NAT Gateways for fault-tolerant egress connectivity
-- **OSS Karpenter**: Node provisioning via Karpenter v1 with custom EC2NodeClass (FIPS support planned for RHEL AMI work)
+- **Self-managed Karpenter**: Node provisioning via Karpenter v1 with custom EC2NodeClass (FIPS support planned for RHEL AMI work)
 
 ## Security & Scalability Enhancements
 
@@ -143,7 +143,7 @@ The module provisions Karpenter-based compute:
 - **SQS queue**: Receives EC2 interruption events (spot reclamation, instance health, rebalance) for graceful node draining.
 - **EventBridge rules**: Four rules forward EC2 lifecycle events to the SQS queue.
 
-For the node provisioning strategy, including why Auto Mode was replaced with OSS Karpenter, see [FIPS-Only EKS Compute](../../../docs/design/fips-eks-compute.md). For Karpenter IAM role design, see [Karpenter Node Provisioning](../../../docs/design/karpenter-node-provisioning.md). FIPS-validated compute will be delivered as part of the RHEL AMI work.
+For the node provisioning strategy, including why Auto Mode was replaced with self-managed Karpenter, see [FIPS-Only EKS Compute](../../../docs/design/fips-eks-compute.md). For Karpenter IAM role design, see [Karpenter Node Provisioning](../../../docs/design/karpenter-node-provisioning.md). FIPS-validated compute will be delivered as part of the RHEL AMI work.
 
 ## Requirements
 

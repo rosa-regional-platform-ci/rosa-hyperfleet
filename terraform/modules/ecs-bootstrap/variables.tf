@@ -83,7 +83,7 @@ variable "redis_endpoint" {
 }
 
 variable "karpenter_controller_role_arn" {
-  description = "IAM role ARN for the Karpenter controller (IRSA). Required when the EKS cluster uses OSS Karpenter."
+  description = "IAM role ARN for the Karpenter controller (IRSA). Required when the EKS cluster uses self-managed Karpenter."
   type        = string
 
   validation {

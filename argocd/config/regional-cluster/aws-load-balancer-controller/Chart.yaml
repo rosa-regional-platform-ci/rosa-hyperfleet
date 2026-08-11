@@ -1,6 +1,6 @@
 apiVersion: v2
 name: aws-load-balancer-controller
-description: AWS Load Balancer Controller — provides TargetGroupBinding CRDs for OSS Karpenter clusters
+description: AWS Load Balancer Controller — provides TargetGroupBinding CRDs for self-managed Karpenter clusters
 type: application
 version: 0.1.0
 

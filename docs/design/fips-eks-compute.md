@@ -4,7 +4,7 @@
 
 ## Summary
 
-All EKS clusters in the ROSA HyperFleet use OSS Karpenter v1 with an `EC2NodeClass` (`fips`)
+All EKS clusters in the ROSA HyperFleet use self-managed Karpenter v1 with an `EC2NodeClass` (`fips`)
 and a cluster-type-specific `NodePool` for platform and application workloads. A dedicated
 `karpenter-bootstrap` managed node group (t3.large, 2 nodes, tainted `CriticalAddonsOnly`)
 provides stable capacity for Karpenter itself, CoreDNS, and metrics-server. All other workloads
@@ -34,7 +34,7 @@ node OS configuration.
     cluster API access. See [ECS Fargate Bootstrap for Fully Private EKS Clusters](./fully-private-eks-bootstrap.md).
   - Karpenter controller must run on stable, pre-provisioned nodes — it cannot schedule itself
   - FIPS-validated compute requires RHEL nodes with FIPS mode enabled at boot time (planned)
-- **Assumptions**: All clusters run OSS Karpenter. EKS Auto Mode is disabled.
+- **Assumptions**: All clusters run self-managed Karpenter. EKS Auto Mode is disabled.
 
 ## Alternatives Considered
 
@@ -52,7 +52,7 @@ node OS configuration.
 3. **Keep EKS Auto Mode, patch built-in pools**: AWS auto-reverts user modifications to built-in
    pools. Not durable. Rejected.
 
-4. **OSS Karpenter with dedicated bootstrap node group**: Provides a stable, pre-provisioned node
+4. **Self-managed Karpenter with dedicated bootstrap node group**: Provides a stable, pre-provisioned node
    group (tainted `CriticalAddonsOnly`) for Karpenter controller, CoreDNS, and metrics-server.
    Karpenter provisions all other nodes on demand using custom `EC2NodeClass`. Enables future
    FIPS compliance for customer-bearing workloads via RHEL AMI configuration. **Chosen.**
@@ -83,12 +83,12 @@ node OS configuration.
 
 ### Positive
 
-- OSS Karpenter architecture enables future FIPS compliance: RHEL nodes with FIPS mode can be
+- Self-managed Karpenter architecture enables future FIPS compliance: RHEL nodes with FIPS mode can be
   configured via `EC2NodeClass` userData once the RHEL AMI work is complete, providing
   node-level FIPS-validated cryptographic modules for customer-bearing compute.
 - Bootstrap is reliable: the bootstrap node group provisions nodes immediately, ArgoCD installs
   cleanly, and retry-with-backoff guarantees NodePool creation succeeds once Karpenter is ready.
-- OSS Karpenter can be independently upgraded via Helm chart version changes in the ArgoCD
+- Self-managed Karpenter can be independently upgraded via Helm chart version changes in the ArgoCD
   Application without waiting for AWS EKS Auto Mode support cycles.
 - The `EC2NodeClass` and `NodePool` are managed exclusively by ArgoCD via the eks-nodepool
   Application, providing full GitOps lifecycle (version control, drift detection, self-healing).

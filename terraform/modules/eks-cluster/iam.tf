@@ -1,5 +1,5 @@
 # =============================================================================
-# IAM Roles and Policies for EKS Cluster (OSS Karpenter)
+# IAM Roles and Policies for EKS Cluster (Self-managed Karpenter)
 #
 # - eks_cluster role: AmazonEKSClusterPolicy
 # - karpenter_node role: AmazonEKSWorkerNodePolicy + CNI + ECR + SSM

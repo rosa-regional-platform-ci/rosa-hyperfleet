@@ -1,6 +1,6 @@
 apiVersion: v2
 name: karpenter
-description: OSS Karpenter controller for node provisioning
+description: Self-managed Karpenter controller for node provisioning
 type: application
 version: 1.0.0
 dependencies:

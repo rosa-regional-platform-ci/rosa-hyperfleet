@@ -7,7 +7,7 @@ Creates the IAM role and EKS Pod Identity association required to run the [AWS L
 The AWS Load Balancer Controller (LBC) provides the `TargetGroupBinding` CRD used by platform
 services (Thanos, Loki, RHOBS API Gateway) to wire Kubernetes services to ALB target groups.
 LBC replaced the load balancing functionality previously bundled with EKS Auto Mode when clusters
-migrated to OSS Karpenter.
+migrated to self-managed Karpenter.
 
 This module provisions:
 

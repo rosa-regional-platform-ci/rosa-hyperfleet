@@ -1,7 +1,7 @@
 # =============================================================================
 # EKS Cluster Configuration
 #
-# Creates a fully private EKS cluster with OSS Karpenter compute.
+# Creates a fully private EKS cluster with self-managed Karpenter compute.
 # Includes KMS encryption for secrets, proper networking,
 # and managed addons for a complete cluster deployment.
 # VPC and networking are provided as inputs from the vpc module.

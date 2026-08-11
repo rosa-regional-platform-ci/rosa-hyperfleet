@@ -558,9 +558,9 @@ module "cloudwatch_exporter" {
 }
 
 # =============================================================================
-# AWS Load Balancer Controller (Pod Identity for OSS Karpenter clusters)
+# AWS Load Balancer Controller (Pod Identity for self-managed Karpenter clusters)
 #
-# EKS Auto Mode includes LBC built-in. OSS Karpenter clusters must install it
+# EKS Auto Mode includes LBC built-in. Self-managed Karpenter clusters must install it
 # explicitly to provide the TargetGroupBinding CRD used by platform-api.
 # =============================================================================
 
