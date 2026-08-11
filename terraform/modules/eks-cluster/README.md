@@ -131,7 +131,7 @@ When `bootstrap_enabled` is `true`, the module automatically installs Karpenter 
 5. **GitOps Configuration**: Creates Application of Applications for self-management
 6. **Synchronous Execution**: Bootstrap completes during `terraform apply` with visible logs
 
-After bootstrap, ArgoCD manages Karpenter installation (sync wave 0) and node provisioning configuration (sync wave 10). See the bootstrap sequence in [Karpenter Lifecycle SOP](../../../docs/sop/karpenter-lifecycle.md).
+After bootstrap, ArgoCD manages Karpenter installation and node provisioning configuration. Applications sync concurrently with no sync-wave ordering; `selfHeal` and unlimited retry with backoff mean node provisioning resources are re-applied until Karpenter's CRDs are registered. See the bootstrap sequence in [Karpenter Lifecycle SOP](../../../docs/sop/karpenter-lifecycle.md).
 
 ### Karpenter Infrastructure
 

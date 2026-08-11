@@ -292,29 +292,31 @@ resource "aws_ecs_task_definition" "bootstrap" {
           # HostedCluster manifests. This wait is a CI accommodation — bootstrap
           # has no production requirement to block on application-level health.
           if [ "$${CLUSTER_TYPE:-}" = "management-cluster" ]; then
-            echo "=== Waiting for hypershift Application to be Healthy (up to 30m) ==="
+            echo "=== Waiting for hypershift Application to be Synced and Healthy (up to 30m) ==="
             _HS_DEADLINE=$((SECONDS + 1800))
-            until _HS_HEALTH=$(kubectl get application hypershift -n argocd \
-                -o jsonpath='{.status.health.status}' 2>/tmp/hs-err) \
-                && [ "$${_HS_HEALTH}" = "Healthy" ]; do
+            until _HS_STATE=$(kubectl get application hypershift -n argocd \
+                -o jsonpath='{.status.sync.status}|{.status.health.status}' 2>/tmp/hs-err) \
+                && [ "$${_HS_STATE}" = "Synced|Healthy" ]; do
               if grep -qiE "unable to connect|connection refused|i/o timeout|no such host" /tmp/hs-err 2>/dev/null; then
                 echo "ERROR: kubectl cannot reach the API server — cannot wait for hypershift:" >&2
                 cat /tmp/hs-err >&2
                 exit 1
               fi
               if [ $SECONDS -ge $_HS_DEADLINE ]; then
-                echo "ERROR: hypershift Application not Healthy after 30 minutes" >&2
+                echo "ERROR: hypershift Application not Synced and Healthy after 30 minutes" >&2
                 kubectl get application hypershift -n argocd -o yaml 2>/dev/null || true
                 exit 1
               fi
-              _HS_STATUS=$(kubectl get application hypershift -n argocd \
+              _HS_SYNC=$(kubectl get application hypershift -n argocd \
+                -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "NotFound")
+              _HS_HEALTH=$(kubectl get application hypershift -n argocd \
                 -o jsonpath='{.status.health.status}' 2>/dev/null || echo "NotFound")
               _HS_MSG=$(kubectl get application hypershift -n argocd \
                 -o jsonpath='{.status.health.message}' 2>/dev/null || true)
-              echo "  hypershift health: $${_HS_STATUS} ($(( _HS_DEADLINE - SECONDS ))s remaining)$${_HS_MSG:+ — $${_HS_MSG}}"
+              echo "  hypershift sync: $${_HS_SYNC}, health: $${_HS_HEALTH} ($(( _HS_DEADLINE - SECONDS ))s remaining)$${_HS_MSG:+ — $${_HS_MSG}}"
               sleep 15
             done
-            echo "=== hypershift is Healthy ==="
+            echo "=== hypershift is Synced and Healthy ==="
           fi
 
           echo "=== Bootstrap completed successfully ==="

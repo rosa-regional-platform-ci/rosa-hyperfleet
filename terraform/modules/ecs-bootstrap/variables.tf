@@ -85,5 +85,9 @@ variable "redis_endpoint" {
 variable "karpenter_controller_role_arn" {
   description = "IAM role ARN for the Karpenter controller (IRSA). Required when the EKS cluster uses OSS Karpenter."
   type        = string
-  default     = ""
+
+  validation {
+    condition     = length(var.karpenter_controller_role_arn) > 0
+    error_message = "karpenter_controller_role_arn must not be empty."
+  }
 }
