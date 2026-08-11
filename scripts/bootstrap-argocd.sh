@@ -110,6 +110,8 @@ fi
 
 RHOBS_API_URL="${RHOBS_API_URL:-}"
 DNS_ZONE_OPERATOR_ROLE_ARN="${DNS_ZONE_OPERATOR_ROLE_ARN:-}"
+# Set by E2E CI workflows only — gates the post-bootstrap HyperShift health wait.
+WAIT_FOR_HYPERSHIFT_HEALTH="${WAIT_FOR_HYPERSHIFT_HEALTH:-false}"
 
 echo "Bootstrapping ArgoCD on $CLUSTER_NAME"
 set +e
@@ -149,7 +151,8 @@ RUN_TASK_OUTPUT=$(aws ecs run-task \
         {\"name\": \"SRE_THANOS_TARGET_GROUP_ARN\", \"value\": \"$SRE_THANOS_TARGET_GROUP_ARN\"},
         {\"name\": \"SRE_ALB_DNS_NAME\", \"value\": \"$SRE_ALB_DNS_NAME\"},
         {\"name\": \"SRE_DOMAIN\", \"value\": \"$SRE_DOMAIN\"},
-        {\"name\": \"REDIS_ENDPOINT\", \"value\": \"$REDIS_ENDPOINT\"}
+        {\"name\": \"REDIS_ENDPOINT\", \"value\": \"$REDIS_ENDPOINT\"},
+        {\"name\": \"WAIT_FOR_HYPERSHIFT_HEALTH\", \"value\": \"$WAIT_FOR_HYPERSHIFT_HEALTH\"}
       ]
     }]
   }" 2>&1)

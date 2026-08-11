@@ -291,7 +291,10 @@ resource "aws_ecs_task_definition" "bootstrap" {
           # HyperShift must be fully installed before work agents apply
           # HostedCluster manifests. This wait is a CI accommodation — bootstrap
           # has no production requirement to block on application-level health.
-          if [ "$${CLUSTER_TYPE:-}" = "management-cluster" ]; then
+          # WAIT_FOR_HYPERSHIFT_HEALTH must be set to "true" by the E2E workflow
+          # invocation (e.g. via bootstrap-argocd.sh); ordinary bootstraps leave
+          # it unset and skip this wait entirely.
+          if [ "$${CLUSTER_TYPE:-}" = "management-cluster" ] && [ "$${WAIT_FOR_HYPERSHIFT_HEALTH:-false}" = "true" ]; then
             echo "=== Waiting for hypershift Application to be Synced and Healthy (up to 30m) ==="
             _HS_DEADLINE=$((SECONDS + 1800))
             until _HS_STATE=$(kubectl get application hypershift -n argocd \
