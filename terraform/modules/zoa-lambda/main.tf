@@ -443,6 +443,7 @@ resource "aws_lambda_function" "api" {
       HANDLER_MODE                 = "api"
       AWS_LWA_PORT                 = "8080"
       AWS_LWA_READINESS_CHECK_PATH = "/health"
+      AWS_LWA_INVOKE_MODE          = "response_stream"
       AWS_LAMBDA_EXEC_WRAPPER      = "/opt/extensions/lambda-adapter"
       EXECUTION_DEADLINE_SECONDS   = tostring(var.lambda_api_timeout - 5)
     })
