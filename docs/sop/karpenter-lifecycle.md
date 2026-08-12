@@ -44,8 +44,11 @@ sequenceDiagram
 The bootstrap node group is **not scaled by Karpenter**. It is declared in Terraform with fixed
 capacity and persists indefinitely. ArgoCD and Karpenter run there with the `bootstrap-critical`
 PriorityClass (value 100000), which lets them preempt lower-priority pods if the nodes fill up.
-Other pods may land here too when there's room — nothing excludes them — but ArgoCD and Karpenter
-are guaranteed the capacity they need via preemption rather than exclusion.
+Other pods may land here too when there's room — nothing excludes them — and, conversely, nothing
+pins ArgoCD/Karpenter to this node group either: they land here because it's the only node group
+that exists at initial bootstrap, not because of a nodeSelector, affinity rule, or taint. The
+PriorityClass guarantees them capacity via preemption wherever they're scheduled; it doesn't
+guarantee they're scheduled here specifically.
 
 ## ArgoCD ownership of Karpenter
 
@@ -77,7 +80,7 @@ karpenter:
 The `karpenter_controller_role_arn` annotation is written to the cluster identity secret by the ECS
 bootstrap task (sourced from a Terraform output via an ECS environment variable).
 
-**Karpenter chart** (`argocd/config/{management-cluster,regional-cluster}/karpenter/Chart.yaml`):
+**Karpenter chart** (`argocd/config/shared/karpenter/Chart.yaml` — both cluster types' ApplicationSets discover this shared chart):
 
 ```yaml
 dependencies:
@@ -107,7 +110,7 @@ controller IAM role has permission to read from this queue.
 | **Node provisioning**     | AWS-managed; compute optimized by default           | Operator-defined `NodePool` and `EC2NodeClass` CRs                                                                               |
 | **Instance selection**    | AWS selects instance family automatically           | Declared in `NodePool` requirements; engineers control family/arch/capacity type                                                 |
 | **Node images**           | AWS manages AMI selection and updates               | Bottlerocket AMI alias `bottlerocket@v1.64.0` (RHEL with FIPS mode planned); configured on both MC and RC EC2NodeClass resources |
-| **GitOps ownership**      | No Karpenter Application; AWS reconciles internally | `argocd/config/<cluster-type>/karpenter/` chart, ArgoCD-managed                                                                  |
+| **GitOps ownership**      | No Karpenter Application; AWS reconciles internally | `argocd/config/shared/karpenter/` chart, ArgoCD-managed                                                                          |
 | **Lifecycle management**  | Auto Mode lifecycle controller (AWS)                | Karpenter `NodePool` disruption budget and expiry settings                                                                       |
 | **Interruption handling** | AWS-managed                                         | SQS queue + Karpenter interruption handler                                                                                       |
 | **Version upgrades**      | EKS console / API flag                              | Update `Chart.yaml` version → ArgoCD syncs                                                                                       |

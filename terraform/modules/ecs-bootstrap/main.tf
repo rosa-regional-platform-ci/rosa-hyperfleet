@@ -153,9 +153,12 @@ resource "aws_ecs_task_definition" "bootstrap" {
           done
 
           # Applied unconditionally (not just on first install) so a changed
-          # value/preemptionPolicy is picked up on every bootstrap re-run.
+          # value/preemptionPolicy is picked up on every bootstrap re-run. Both
+          # fields are immutable on an existing PriorityClass, so a plain
+          # `kubectl apply` fails with an Invalid error if either changed since
+          # the object was created — fall back to delete+recreate in that case.
           echo "Creating bootstrap-critical PriorityClass..."
-          cat <<-PRIORITYCLASS_EOF | kubectl apply -f -
+          PRIORITYCLASS_MANIFEST=$(cat <<-PRIORITYCLASS_EOF
           apiVersion: scheduling.k8s.io/v1
           kind: PriorityClass
           metadata:
@@ -165,6 +168,18 @@ resource "aws_ecs_task_definition" "bootstrap" {
           preemptionPolicy: PreemptLowerPriority
           description: "ArgoCD and Karpenter controller pods on the karpenter-bootstrap node group."
           PRIORITYCLASS_EOF
+          )
+          if ! _pc_apply_out=$(echo "$PRIORITYCLASS_MANIFEST" | kubectl apply -f - 2>&1); then
+            if echo "$_pc_apply_out" | grep -qiE 'immutable|may not be changed'; then
+              echo "PriorityClass value/preemptionPolicy changed (immutable) — recreating..."
+              echo "$PRIORITYCLASS_MANIFEST" | kubectl replace --force -f -
+            else
+              echo "$_pc_apply_out" >&2
+              exit 1
+            fi
+          else
+            echo "$_pc_apply_out"
+          fi
           echo "✓ bootstrap-critical PriorityClass applied"
 
           if ! kubectl get deployment argocd-server -n argocd 2>/dev/null; then

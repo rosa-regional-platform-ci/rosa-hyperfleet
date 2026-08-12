@@ -140,19 +140,48 @@ check_kubernetes_objects() {
     fi
   fi
 
+  local nodepools_json
+  nodepools_json=$(kubectl get nodepool -o json 2>/dev/null)
+
+  local pool_count
+  pool_count=$(echo "$nodepools_json" | jq -r '.items | length')
+  if [[ "$pool_count" -eq 0 ]]; then
+    fail "No NodePools found — cannot verify FIPS NodeClass usage"
+    return
+  fi
+
   echo ""
   echo "  NodePool -> NodeClass bindings:"
-  kubectl get nodepool -o json 2>/dev/null | jq -r \
+  echo "$nodepools_json" | jq -r \
     '.items[] | "    \(.metadata.name) -> \(.spec.template.spec.nodeClassRef.name)"'
 
   local non_fips_pools
-  non_fips_pools=$(kubectl get nodepool -o json 2>/dev/null | jq -r \
+  non_fips_pools=$(echo "$nodepools_json" | jq -r \
     '.items[] | select(.spec.template.spec.nodeClassRef.name != "fips") | .metadata.name')
-  if [[ -z "$non_fips_pools" ]]; then
-    pass "All NodePools reference the FIPS NodeClass"
-  else
+  if [[ -n "$non_fips_pools" ]]; then
     fail "NodePools NOT using FIPS NodeClass: $non_fips_pools"
+    return
   fi
+
+  # A NodePool referencing a NodeClass named "fips" doesn't guarantee the
+  # NodeClass actually uses a FIPS-validated AMI — validate its spec directly.
+  local nodeclass_check
+  local nodeclass_status=0
+  nodeclass_check=$(kubectl get ec2nodeclass fips -o json 2>&1) || nodeclass_status=$?
+  if [[ $nodeclass_status -ne 0 ]]; then
+    fail "kubectl get ec2nodeclass fips failed: $nodeclass_check"
+    return
+  fi
+
+  local bottlerocket_alias
+  bottlerocket_alias=$(echo "$nodeclass_check" | jq -r \
+    '.spec.amiSelectorTerms[]? | select((.alias // "") | startswith("bottlerocket@")) | .alias')
+  if [[ -n "$bottlerocket_alias" ]]; then
+    fail "EC2NodeClass/fips uses a standard Bottlerocket AMI ($bottlerocket_alias), not a FIPS-validated AMI"
+    return
+  fi
+
+  pass "All NodePools reference the FIPS NodeClass, and EC2NodeClass/fips does not use a standard Bottlerocket AMI"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

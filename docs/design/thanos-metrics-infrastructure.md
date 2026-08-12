@@ -1,6 +1,6 @@
 # Thanos Metrics Infrastructure
 
-**Last Updated**: 2026-03-27
+**Last Updated**: 2026-08-12
 
 ## Summary
 
