@@ -471,5 +471,5 @@ variable "management_clusters" {
 variable "zoa_image_tag" {
   description = "ZOA image tag for Quay→ECR mirroring and runner ref."
   type        = string
-  default     = "a487433"
+  default     = "ef2b6d1"
 }
