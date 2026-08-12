@@ -157,6 +157,14 @@ variable "max_concurrent_per_target" {
   default     = 10
 }
 
+# --- Kubernetes namespace ---
+
+variable "zoa_jobs_namespace" {
+  description = "Kubernetes namespace for ZOA ServiceAccounts, Jobs, and Secrets. Must exist on the target cluster (provisioned by ArgoCD/Terraform)."
+  type        = string
+  default     = "zoa-jobs"
+}
+
 # --- Feature flags ---
 
 variable "enable_reconciler" {

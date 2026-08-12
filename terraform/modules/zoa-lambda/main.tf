@@ -34,7 +34,7 @@ locals {
     ARTIFACT_BUCKET           = var.artifact_bucket_name
     KMS_KEY_ARN               = var.kms_key_arn
     JOB_IMAGE                 = var.job_image_uri
-    JOB_NAMESPACE             = "zoa-jobs"
+    ZOA_JOBS_NAMESPACE        = var.zoa_jobs_namespace
     DYNAMODB_TTL_DAYS         = tostring(var.dynamodb_ttl_days)
     TARGET_CLUSTER            = var.cluster_id
     UPLOADER_ROLE_ARN         = var.uploader_role_arn
