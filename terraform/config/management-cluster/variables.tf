@@ -122,7 +122,7 @@ variable "zoa_lambda_ecr_url" {
 variable "zoa_image_tag" {
   description = "ZOA image tag for Lambda and runner images."
   type        = string
-  default     = "88b3101"
+  default     = "db9d3db"
 }
 
 variable "zoa_runner_quay_repository" {
