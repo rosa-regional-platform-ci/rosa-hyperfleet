@@ -137,10 +137,9 @@ resource "aws_eks_cluster" "main" {
   # creates its own ALBs/NLBs, so there's no LBC-created load balancer to
   # worry about orphaning here.
   provisioner "local-exec" {
-    when        = destroy
-    on_failure  = fail
-    interpreter = ["/bin/bash", "-c"]
-    command     = <<-EOT
+    when       = destroy
+    on_failure = fail
+    command    = <<-EOT
       set -euo pipefail
 
       if ! command -v aws >/dev/null 2>&1; then

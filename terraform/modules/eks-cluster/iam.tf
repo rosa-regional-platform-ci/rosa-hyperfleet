@@ -261,10 +261,8 @@ resource "aws_iam_role_policy" "karpenter_controller" {
   })
 }
 
-# The controller (IRSA) calls RunInstances, which requires kms:CreateGrant so EC2 can decrypt a
-# KMS-encrypted custom AMI's EBS snapshot on instance launch. Not used today — the current
-# EC2NodeClass uses the standard (unencrypted) Bottlerocket AMI alias; this policy only takes
-# effect if ami_kms_key_arn is set for a future KMS-encrypted custom AMI.
+# The controller (IRSA) calls RunInstances, which requires kms:CreateGrant so
+# EC2 can decrypt the RHEL FIPS AMI's encrypted EBS snapshot on instance launch.
 # kms:GrantIsForAWSResource restricts grant creation to AWS service principals,
 # preventing the controller from granting arbitrary IAM principals key access.
 resource "aws_iam_role_policy" "karpenter_controller_kms" {
@@ -321,11 +319,6 @@ resource "aws_sqs_queue_policy" "karpenter_interruption" {
       Principal = { Service = "events.amazonaws.com" }
       Action    = "sqs:SendMessage"
       Resource  = aws_sqs_queue.karpenter_interruption.arn
-      Condition = {
-        ArnLike = {
-          "aws:SourceArn" = "arn:${data.aws_partition.current.partition}:events:*:${data.aws_caller_identity.current.account_id}:rule/${local.cluster_id}-karpenter-*"
-        }
-      }
     }]
   })
 }

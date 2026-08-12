@@ -148,50 +148,35 @@ spec:
               # to hypershift install CLI, then replace this post-install patch
               # with native flags.
               if [ -n "${DNS_ZONE_OPERATOR_ROLE_ARN:-}" ]; then
-                # This Job re-runs on every ArgoCD sync (Replace=true,Force=true above), and
-                # each JSON Patch "add" below appends to an array — re-applying an already-applied
-                # patch would duplicate the arg / RBAC rules. Check current state first (no jq in
-                # this image, so grep on the raw JSON) and only patch what's missing.
-                _existing_deploy=$(curl -s --cacert "$_CA" -H "Authorization: Bearer $_TOKEN" \
-                  "${_API}/apis/apps/v1/namespaces/hypershift/deployments/external-dns" 2>/dev/null || echo "")
-                if echo "$_existing_deploy" | grep -qF "\"--aws-assume-role=${DNS_ZONE_OPERATOR_ROLE_ARN}\""; then
-                  echo "  external-dns deployment already has --aws-assume-role arg — skipping"
-                else
-                  echo "Patching external-dns with --aws-assume-role=${DNS_ZONE_OPERATOR_ROLE_ARN}"
-                  _patch_http=$(curl -s --cacert "$_CA" -H "Authorization: Bearer $_TOKEN" \
-                    -H "Content-Type: application/json-patch+json" -X PATCH \
-                    "${_API}/apis/apps/v1/namespaces/hypershift/deployments/external-dns" \
-                    -d '[
-                      {"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--aws-assume-role='"${DNS_ZONE_OPERATOR_ROLE_ARN}"'"}
-                    ]' \
-                    -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
-                  echo "  external-dns deployment patch: HTTP ${_patch_http}"
-                  if [ "$_patch_http" != "200" ] && [ "$_patch_http" != "201" ]; then
-                    echo "WARNING: external-dns deployment patch returned HTTP ${_patch_http} — skipping" >&2
-                  fi
+                echo "Patching external-dns with --aws-assume-role=${DNS_ZONE_OPERATOR_ROLE_ARN}"
+
+                _patch_http=$(curl -s --cacert "$_CA" -H "Authorization: Bearer $_TOKEN" \
+                  -H "Content-Type: application/json-patch+json" -X PATCH \
+                  "${_API}/apis/apps/v1/namespaces/hypershift/deployments/external-dns" \
+                  -d '[
+                    {"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--aws-assume-role='"${DNS_ZONE_OPERATOR_ROLE_ARN}"'"}
+                  ]' \
+                  -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
+                echo "  external-dns deployment patch: HTTP ${_patch_http}"
+                if [ "$_patch_http" != "200" ] && [ "$_patch_http" != "201" ]; then
+                  echo "WARNING: external-dns deployment patch returned HTTP ${_patch_http} — skipping" >&2
                 fi
 
                 # Upstream v0.21.0 needs discovery.k8s.io and networking.k8s.io API groups
                 # that HyperShift's generated ClusterRole doesn't include.
                 # Use JSON Patch (RFC 6902) to add rules without replacing HyperShift's existing rules.
-                _existing_cr=$(curl -s --cacert "$_CA" -H "Authorization: Bearer $_TOKEN" \
-                  "${_API}/apis/rbac.authorization.k8s.io/v1/clusterroles/external-dns" 2>/dev/null || echo "")
-                if echo "$_existing_cr" | grep -qF '"discovery.k8s.io"'; then
-                  echo "  external-dns clusterrole already patched — skipping"
-                else
-                  _patch_http=$(curl -s --cacert "$_CA" -H "Authorization: Bearer $_TOKEN" \
-                    -H "Content-Type: application/json-patch+json" -X PATCH \
-                    "${_API}/apis/rbac.authorization.k8s.io/v1/clusterroles/external-dns" \
-                    -d '[
-                      {"op":"add","path":"/rules/-","value":{"apiGroups":["","discovery.k8s.io"],"resources":["services","endpoints","pods","nodes","endpointslices"],"verbs":["get","watch","list"]}},
-                      {"op":"add","path":"/rules/-","value":{"apiGroups":["extensions","networking.k8s.io"],"resources":["ingresses","ingressroutes","ingressroutetcps","ingressrouteudps"],"verbs":["get","list","watch"]}},
-                      {"op":"add","path":"/rules/-","value":{"apiGroups":["route.openshift.io"],"resources":["routes"],"verbs":["get","list","watch"]}}
-                    ]' \
-                    -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
-                  echo "  external-dns clusterrole patch: HTTP ${_patch_http}"
-                  if [ "$_patch_http" != "200" ] && [ "$_patch_http" != "201" ]; then
-                    echo "WARNING: external-dns clusterrole patch returned HTTP ${_patch_http} — skipping" >&2
-                  fi
+                _patch_http=$(curl -s --cacert "$_CA" -H "Authorization: Bearer $_TOKEN" \
+                  -H "Content-Type: application/json-patch+json" -X PATCH \
+                  "${_API}/apis/rbac.authorization.k8s.io/v1/clusterroles/external-dns" \
+                  -d '[
+                    {"op":"add","path":"/rules/-","value":{"apiGroups":["","discovery.k8s.io"],"resources":["services","endpoints","pods","nodes","endpointslices"],"verbs":["get","watch","list"]}},
+                    {"op":"add","path":"/rules/-","value":{"apiGroups":["extensions","networking.k8s.io"],"resources":["ingresses","ingressroutes","ingressroutetcps","ingressrouteudps"],"verbs":["get","list","watch"]}},
+                    {"op":"add","path":"/rules/-","value":{"apiGroups":["route.openshift.io"],"resources":["routes"],"verbs":["get","list","watch"]}}
+                  ]' \
+                  -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
+                echo "  external-dns clusterrole patch: HTTP ${_patch_http}"
+                if [ "$_patch_http" != "200" ] && [ "$_patch_http" != "201" ]; then
+                  echo "WARNING: external-dns clusterrole patch returned HTTP ${_patch_http} — skipping" >&2
                 fi
               fi
 

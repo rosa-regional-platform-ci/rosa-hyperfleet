@@ -85,10 +85,9 @@ variable "redis_endpoint" {
 variable "karpenter_controller_role_arn" {
   description = "IAM role ARN for the Karpenter controller (IRSA). Required when the EKS cluster uses self-managed Karpenter."
   type        = string
-  nullable    = false
 
   validation {
-    condition     = can(regex("^arn:aws[a-zA-Z-]*:iam::[0-9]{12}:role/.+$", var.karpenter_controller_role_arn))
-    error_message = "karpenter_controller_role_arn must be a valid IAM role ARN (arn:aws:iam::<account-id>:role/<name>)."
+    condition     = length(var.karpenter_controller_role_arn) > 0
+    error_message = "karpenter_controller_role_arn must not be empty."
   }
 }

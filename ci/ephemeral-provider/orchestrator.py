@@ -746,15 +746,13 @@ class EphemeralEnvOrchestrator:
                         failed.append(pipeline_name)
 
         if failed:
-            log.error(
-                "%d pipeline(s) failed or timed out during teardown: %s — continuing to "
-                "pipeline-provisioner destroy so remaining infrastructure isn't left orphaned.",
-                len(failed), ", ".join(failed),
-            )
             try:
                 self.collect_codebuild_logs()
             except Exception:
                 log.exception("Failed to collect teardown CodeBuild logs")
+            raise RuntimeError(
+                f"{len(failed)} pipeline(s) failed during teardown: {', '.join(failed)}"
+            )
 
         # Phase 2: Pipeline teardown
         log.info("")
@@ -774,17 +772,11 @@ class EphemeralEnvOrchestrator:
 
         git.modify_config(TARGET_ENVIRONMENT, self.region, set_delete_pipeline_flag)
 
-        # Wait for pipeline-provisioner to destroy the pipelines (central region). A timeout here
-        # must not skip Phase 3 below — the pipeline-provisioner's terraform destroy is the step
-        # that actually releases real AWS infrastructure, so it's attempted regardless.
-        try:
-            provisioner_exec_id = self.central_monitor.wait_for_new_execution(
-                self.provisioner_name, provisioner_known
-            )
-            self.central_monitor.wait_for_completion(self.provisioner_name, provisioner_exec_id)
-        except (RuntimeError, TimeoutError) as e:
-            log.error("Pipeline destroy (Phase 2) failed or timed out: %s", e)
-            failed.append(self.provisioner_name)
+        # Wait for pipeline-provisioner to destroy the pipelines (central region)
+        provisioner_exec_id = self.central_monitor.wait_for_new_execution(
+            self.provisioner_name, provisioner_known
+        )
+        self.central_monitor.wait_for_completion(self.provisioner_name, provisioner_exec_id)
 
         # Phase 3: Destroy pipeline-provisioner via terraform destroy
         log.info("")
@@ -792,12 +784,6 @@ class EphemeralEnvOrchestrator:
         log.info("Teardown: Pipeline Provisioner Destroy")
         log.info("==========================================")
         self._destroy_pipeline_provisioner(git)
-
-        if failed:
-            raise RuntimeError(
-                f"{len(failed)} pipeline(s) failed during teardown: {', '.join(failed)} "
-                "(pipeline-provisioner destroy was still attempted)"
-            )
 
         log.info("Teardown complete.")
 

@@ -10,12 +10,6 @@ and a cluster-type-specific `NodePool` for platform and application workloads. A
 `bootstrap-critical` PriorityClass) provides stable capacity for Karpenter itself, CoreDNS, and
 metrics-server. All other workloads land on Karpenter-provisioned nodes.
 
-**Note**: `bootstrap-critical` controls preemption priority, not placement — nothing (nodeSelector,
-affinity, or taint) currently pins ArgoCD/Karpenter to the `karpenter-bootstrap` node group
-specifically, or excludes other pods from it. In practice they land there because it's the only
-node group that exists at initial bootstrap; once Karpenter is provisioning workload nodes, the
-scheduler is free to place a rescheduled ArgoCD/Karpenter pod on either node group.
-
 **Note**: FIPS-validated compute (RHEL nodes with FIPS mode enabled) is planned for a future
 iteration. Current implementation uses standard Bottlerocket AMIs pinned via the
 `bottlerocket@v1.64.0` alias. FIPS enablement will be delivered as part of the RHEL AMI work.
@@ -130,9 +124,8 @@ node OS configuration.
   land in the correct private subnets with correct network policies.
 - Karpenter controller IAM role uses IRSA (ServiceAccount annotation on `kube-system/karpenter`)
   with least-privilege SQS, EC2, and IAM instance profile permissions.
-- The `EC2NodeClass`'s `spec.instanceProfile` references the pre-created
-  `${cluster_id}-karpenter-node-role` instance profile (not the IAM role directly), scoping node
-  permissions to a cluster-specific role.
+- Karpenter node IAM role (`${cluster_id}-karpenter-node-role`) is referenced directly in the
+  `EC2NodeClass`, scoping node permissions to a cluster-specific role.
 - FIPS-validated cryptographic modules (RHEL with FIPS mode enabled) will be configured via
   `EC2NodeClass` userData once the RHEL AMI work is complete, satisfying the node-level portion
   of FIPS 140-2/140-3 requirements for SC-13. Full SC-13 coverage requires validated cryptography

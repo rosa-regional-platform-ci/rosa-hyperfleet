@@ -97,8 +97,8 @@ output "karpenter_controller_role_arn" {
 }
 
 output "karpenter_queue_url" {
-  description = "SQS queue name for Karpenter interruption handling (Karpenter's settings.interruptionQueue expects a queue name, not a URL)"
-  value       = aws_sqs_queue.karpenter_interruption.name
+  description = "SQS queue URL for Karpenter interruption handling"
+  value       = aws_sqs_queue.karpenter_interruption.url
 }
 
 output "karpenter_node_instance_profile_name" {

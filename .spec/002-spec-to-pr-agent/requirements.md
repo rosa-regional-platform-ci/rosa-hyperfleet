@@ -54,12 +54,7 @@ Build a **Spec-to-PR Agent** — a Python-based orchestrator using the Claude Ag
   - **swap-branch**: Switch an environment to a different branch/repo
   - **list**: Display all tracked environments with status
   - **e2e**: Run end-to-end tests against an environment
-  - **dump-env**: Gather Kubernetes logs and DB state from clusters. Exported fields MUST be
-    limited to an explicit allowlist; sensitive spec/status data (credentials, tokens, customer
-    data) MUST be redacted locally before archiving, and redaction MUST complete before any
-    archive is uploaded. Uploaded archives MUST be encrypted and access-restricted, with a defined
-    retention/deletion period. When `S3_ONLY=true`, the same allowlist/redaction/encryption
-    requirements apply to the uploaded archive — local-only output is not a substitute
+  - **dump-env**: Gather Kubernetes logs and DB state from clusters
   - **shell**: Open an interactive shell with credentials
   - **bastion**: Connect to RC/MC cluster bastions
   - **port-forward**: Tunnel Kubernetes services (ArgoCD, Prometheus, Grafana)

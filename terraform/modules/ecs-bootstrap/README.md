@@ -41,10 +41,8 @@ The ECS task executes the following steps in order:
 
 After ECS bootstrap completes, ArgoCD takes over cluster management:
 
-1. **Install Karpenter**: ArgoCD deploys the `karpenter` Application, installing Karpenter via Helm
-2. **Create eks-nodepool Application**: ArgoCD deploys the `eks-nodepool` Application, which applies the `EC2NodeClass` and cluster-type-specific workloads `NodePool`
-
-Both Applications sync concurrently — there is no sync-wave ordering between them. `eks-nodepool`'s apply may fail on first sync if Karpenter's CRDs aren't registered yet; `selfHeal` and unlimited retry with backoff mean ArgoCD keeps retrying until the CRDs exist and the apply succeeds.
+1. **Install Karpenter** (sync wave 0): ArgoCD deploys the `karpenter` Application, installing Karpenter via Helm
+2. **Create eks-nodepool Application** (sync wave 10): ArgoCD deploys the `eks-nodepool` Application, which applies the `EC2NodeClass` and cluster-type-specific workloads `NodePool`
 
 **Note**: The current `EC2NodeClass` uses standard Bottlerocket AMIs. FIPS-validated compute (RHEL nodes with FIPS mode enabled) will be configured via userData once the RHEL AMI work is complete.
 
@@ -76,7 +74,7 @@ Both Applications sync concurrently — there is no sync-wave ordering between t
 | `eks_cluster_arn`               | EKS cluster ARN for bootstrap configuration                                                                                                                                     | `string`       | n/a     |   yes    |
 | `eks_cluster_name`              | EKS cluster name for bootstrap configuration                                                                                                                                    | `string`       | n/a     |   yes    |
 | `eks_cluster_security_group_id` | EKS cluster security group ID                                                                                                                                                   | `string`       | n/a     |   yes    |
-| `karpenter_controller_role_arn` | IAM role ARN for Karpenter controller (IRSA). Set from `eks_cluster.karpenter_controller_role_arn`. Injected into the ArgoCD cluster secret for ApplicationSet value injection. | `string`       | n/a     |   yes    |
+| `karpenter_controller_role_arn` | IAM role ARN for Karpenter controller (IRSA). Set from `eks_cluster.karpenter_controller_role_arn`. Injected into the ArgoCD cluster secret for ApplicationSet value injection. | `string`       | `""`    |    no    |
 | `environment`                   | Environment name for tagging                                                                                                                                                    | `string`       | `"dev"` |    no    |
 
 ## Outputs
