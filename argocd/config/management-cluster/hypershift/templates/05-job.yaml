@@ -154,8 +154,7 @@ spec:
                   -H "Content-Type: application/json-patch+json" -X PATCH \
                   "${_API}/apis/apps/v1/namespaces/hypershift/deployments/external-dns" \
                   -d '[
-                    {"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--aws-assume-role='"${DNS_ZONE_OPERATOR_ROLE_ARN}"'"},
-                    {"op":"add","path":"/spec/template/spec/tolerations","value":[{"key":"CriticalAddonsOnly","operator":"Exists","effect":"NoSchedule"}]}
+                    {"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--aws-assume-role='"${DNS_ZONE_OPERATOR_ROLE_ARN}"'"}
                   ]' \
                   -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
                 echo "  external-dns deployment patch: HTTP ${_patch_http}"
@@ -184,7 +183,3 @@ spec:
               {{- end }}
       restartPolicy: Never
       serviceAccountName: hypershift-installer
-      tolerations:
-        - key: CriticalAddonsOnly
-          operator: Exists
-          effect: NoSchedule
