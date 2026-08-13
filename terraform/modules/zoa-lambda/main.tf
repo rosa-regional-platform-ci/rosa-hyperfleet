@@ -249,6 +249,11 @@ resource "aws_iam_role_policy" "zoa_aws_read" {
         ]
         Resource = "${var.artifact_bucket_arn}/executions/*"
       },
+      {
+        Effect   = "Allow"
+        Action   = "kms:GenerateDataKey"
+        Resource = var.kms_key_arn
+      },
     ]
   })
 }
@@ -295,6 +300,11 @@ resource "aws_iam_role_policy" "zoa_aws_write" {
           "s3:PutObjectTagging",
         ]
         Resource = "${var.artifact_bucket_arn}/executions/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "kms:GenerateDataKey"
+        Resource = var.kms_key_arn
       },
     ]
   })
