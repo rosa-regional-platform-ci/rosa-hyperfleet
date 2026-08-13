@@ -125,8 +125,8 @@ variable "zoa_image_tag" {
   default     = "8001671"
 }
 
-variable "zoa_runner_quay_repository" {
-  description = "Quay.io repository for ZOA Runner image (K8s pulls directly, no ECR needed)"
+variable "zoa_runner_source_image" {
+  description = "Source registry image for ZOA Runner (K8s pulls directly, no ECR mirror)"
   type        = string
   default     = "quay.io/slopezz/zoa-runner"
 }

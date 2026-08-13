@@ -3,7 +3,7 @@
 # =============================================================================
 # Private ECR repos with OU-scoped cross-account pull access.
 # MC Lambdas (different account, same region) pull using the same image URI.
-# Images are mirrored from Quay via crane (registry-to-registry, no docker).
+# Images are mirrored from the source registry via skopeo (registry-to-registry, no daemon).
 
 resource "aws_ecr_repository" "lambda" {
   name                 = "${var.regional_id}-zoa-lambda"
@@ -81,7 +81,7 @@ resource "aws_ecr_repository_policy" "lambda" {
 }
 
 
-# --- Mirror images from Quay → ECR (skip if tag already exists) ---
+# --- Mirror images from source registry → ECR (skip if tag already exists) ---
 
 resource "null_resource" "mirror_lambda" {
   count = var.zoa_image_tag != "" ? 1 : 0
@@ -97,10 +97,10 @@ resource "null_resource" "mirror_lambda" {
           --image-ids imageTag=${var.zoa_image_tag} 2>/dev/null | grep -q imageDigest; then
         echo "zoa-lambda:${var.zoa_image_tag} already in ECR, skipping"
       else
-        crane auth login ${split("/", aws_ecr_repository.lambda.repository_url)[0]} \
-          -u AWS -p $(aws ecr get-login-password --region ${data.aws_region.current.id})
-        crane copy ${var.zoa_quay_repository}:${var.zoa_image_tag} \
-          ${aws_ecr_repository.lambda.repository_url}:${var.zoa_image_tag}
+        skopeo copy \
+          docker://${var.zoa_lambda_source_image}:${var.zoa_image_tag} \
+          docker://${aws_ecr_repository.lambda.repository_url}:${var.zoa_image_tag} \
+          --dest-creds "AWS:$(aws ecr get-login-password --region ${data.aws_region.current.id})"
         echo "zoa-lambda:${var.zoa_image_tag} mirrored to ECR"
       fi
     EOT

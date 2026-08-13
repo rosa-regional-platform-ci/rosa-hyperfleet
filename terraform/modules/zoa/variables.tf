@@ -45,22 +45,22 @@ variable "output_retention_days" {
   default     = 365
 }
 
-# --- Container images (mirrored from Quay → ECR) ---
+# --- Container images (mirrored from source registry → ECR) ---
 
-variable "zoa_quay_repository" {
-  description = "Quay.io repository for ZOA Lambda image"
+variable "zoa_lambda_source_image" {
+  description = "Source registry image for ZOA Lambda (mirrored to ECR at deploy time)"
   type        = string
   default     = "quay.io/slopezz/zoa-lambda"
 }
 
-variable "zoa_runner_quay_repository" {
-  description = "Quay.io repository for ZOA Runner image (K8s pulls directly, no ECR needed)"
+variable "zoa_runner_source_image" {
+  description = "Source registry image for ZOA Runner (K8s pulls directly, no ECR mirror)"
   type        = string
   default     = "quay.io/slopezz/zoa-runner"
 }
 
 variable "zoa_image_tag" {
-  description = "Immutable image tag (git SHA). Used for Quay→ECR mirroring and runner image ref."
+  description = "Immutable image tag (git SHA). Used for source→ECR mirroring and runner image ref."
   type        = string
   default     = "0c3ca66"
 }

@@ -53,7 +53,7 @@ output "lambda_image_uri" {
 }
 
 output "runner_image_uri" {
-  description = "Quay image URI for the K8s Job runner. K8s nodes pull directly from Quay."
-  value       = var.zoa_image_tag != "" ? "${var.zoa_runner_quay_repository}:${var.zoa_image_tag}" : ""
+  description = "Source image URI for the K8s Job runner. K8s nodes pull directly from source registry."
+  value       = var.zoa_image_tag != "" ? "${var.zoa_runner_source_image}:${var.zoa_image_tag}" : ""
 }
 
