@@ -160,7 +160,7 @@ variable "max_concurrent_per_target" {
 # --- Kubernetes namespace ---
 
 variable "zoa_jobs_namespace" {
-  description = "Kubernetes namespace for ZOA ServiceAccounts, Jobs, and Secrets. Must exist on the target cluster (provisioned by ArgoCD/Terraform)."
+  description = "Kubernetes namespace for ZOA ServiceAccounts, Jobs, and Secrets. Created by this module via the kubernetes provider."
   type        = string
   default     = "zoa-jobs"
 }
@@ -171,6 +171,12 @@ variable "enable_reconciler" {
   description = "Enable the EventBridge reconciler and GC schedules (disable for testing)"
   type        = bool
   default     = true
+}
+
+variable "log_level" {
+  description = "Application log level for ZOA Lambda functions (debug, info, warn, error). Tunable without code change."
+  type        = string
+  default     = "info"
 }
 
 variable "dynamodb_ttl_days" {

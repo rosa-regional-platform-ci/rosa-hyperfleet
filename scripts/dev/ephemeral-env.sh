@@ -440,20 +440,20 @@ cmd_provision() {
             rhobs_api_url=$(jq -r '.rhobs_api_url.value // empty' "$tmpdir/tf-outputs.json" 2>/dev/null || true)
         fi
 
-        local zoa_rc_url="" zoa_mc_url=""
+        local zoa_rc_api_url="" zoa_mc_api_url=""
         if [[ -f "$tmpdir/tf-outputs.json" ]]; then
-            zoa_rc_url=$(jq -r '.zoa_api_function_url.value // empty' "$tmpdir/tf-outputs.json" 2>/dev/null || true)
+            zoa_rc_api_url=$(jq -r '.zoa_api_function_url.value // empty' "$tmpdir/tf-outputs.json" 2>/dev/null || true)
         fi
         if [[ -f "$tmpdir/tf-outputs-mc.json" ]]; then
-            zoa_mc_url=$(jq -r '.zoa_api_function_url.value // empty' "$tmpdir/tf-outputs-mc.json" 2>/dev/null || true)
+            zoa_mc_api_url=$(jq -r '.zoa_api_function_url.value // empty' "$tmpdir/tf-outputs-mc.json" 2>/dev/null || true)
         fi
 
         update_state "$ID" "ready"
         [[ -z "$region" ]]  || append_field "$ID" "REGION" "$region"
         [[ -z "$api_url" ]] || append_field "$ID" "API_URL" "$api_url"
         [[ -z "$rhobs_api_url" ]] || append_field "$ID" "RHOBS_API_URL" "$rhobs_api_url"
-        [[ -z "$zoa_rc_url" ]] || append_field "$ID" "ZOA_RC_URL" "$zoa_rc_url"
-        [[ -z "$zoa_mc_url" ]] || append_field "$ID" "ZOA_MC_URL" "$zoa_mc_url"
+        [[ -z "$zoa_rc_api_url" ]] || append_field "$ID" "ZOA_RC_API_URL" "$zoa_rc_api_url"
+        [[ -z "$zoa_mc_api_url" ]] || append_field "$ID" "ZOA_MC_API_URL" "$zoa_mc_api_url"
 
         # Store ephemeral branch name so it survives branch swaps
         append_field "$ID" "EPH_BRANCH" "$(derive_eph_branch "$ID" "$branch")"
@@ -461,8 +461,8 @@ cmd_provision() {
         echo ""
         echo "Environment recorded in $ENVS_FILE."
         [[ -z "$api_url" ]] || echo -e "\n  API Gateway:  $api_url"
-        [[ -z "$zoa_rc_url" ]] || echo -e "  ZOA API (RC): $zoa_rc_url"
-        [[ -z "$zoa_mc_url" ]] || echo -e "  ZOA API (MC): $zoa_mc_url"
+        [[ -z "$zoa_rc_api_url" ]] || echo -e "  ZOA API (RC): $zoa_rc_api_url"
+        [[ -z "$zoa_mc_api_url" ]] || echo -e "  ZOA API (MC): $zoa_mc_api_url"
         echo ""
         echo "  To interact with the API:"
         echo "    make ephemeral-shell ID=$ID"
@@ -672,11 +672,11 @@ cmd_shell() {
         "No ready environments found." \
         true
 
-    local api_url region zoa_rc_url zoa_mc_url
+    local api_url region zoa_rc_api_url zoa_mc_api_url
     api_url=$(get_field "$ENV_LINE" API_URL)
     region=$(get_field "$ENV_LINE" REGION)
-    zoa_rc_url=$(get_field "$ENV_LINE" ZOA_RC_URL)
-    zoa_mc_url=$(get_field "$ENV_LINE" ZOA_MC_URL)
+    zoa_rc_api_url=$(get_field "$ENV_LINE" ZOA_RC_API_URL)
+    zoa_mc_api_url=$(get_field "$ENV_LINE" ZOA_MC_API_URL)
 
     # Fetch credentials and write container config
     setup_aws_config
@@ -690,16 +690,16 @@ cmd_shell() {
         -e "AWS_DEFAULT_REGION=$region" \
         -e "AWS_REGION=$region" \
         -e "API_URL=$api_url" \
-        -e "ZOA_RC_URL=${zoa_rc_url:-}" \
-        -e "ZOA_MC_URL=${zoa_mc_url:-}" \
+        -e "ZOA_RC_API_URL=${zoa_rc_api_url:-}" \
+        -e "ZOA_MC_API_URL=${zoa_mc_api_url:-}" \
         "$CI_IMAGE" \
         bash -c '
             echo ""
             echo "ROSA HyperFleet shell"
             echo ""
             echo "API Gateway: $API_URL"
-            [[ -z "${ZOA_RC_URL:-}" ]] || echo "ZOA API (RC): $ZOA_RC_URL"
-            [[ -z "${ZOA_MC_URL:-}" ]] || echo "ZOA API (MC): $ZOA_MC_URL"
+            [[ -z "${ZOA_RC_API_URL:-}" ]] || echo "ZOA API (RC): $ZOA_RC_API_URL"
+            [[ -z "${ZOA_MC_API_URL:-}" ]] || echo "ZOA API (MC): $ZOA_MC_API_URL"
             echo "Region:      $AWS_DEFAULT_REGION"
             echo ""
             echo "Example commands:"
@@ -1019,11 +1019,11 @@ cmd_e2e() {
         "Select environment for e2e tests:" \
         "No ready environments found."
 
-    local api_url region zoa_rc_url zoa_mc_url
+    local api_url region zoa_rc_api_url zoa_mc_api_url
     api_url=$(get_field "$ENV_LINE" API_URL)
     region=$(get_field "$ENV_LINE" REGION)
-    zoa_rc_url=$(get_field "$ENV_LINE" ZOA_RC_URL)
-    zoa_mc_url=$(get_field "$ENV_LINE" ZOA_MC_URL)
+    zoa_rc_api_url=$(get_field "$ENV_LINE" ZOA_RC_API_URL)
+    zoa_mc_api_url=$(get_field "$ENV_LINE" ZOA_MC_API_URL)
     [[ -n "$api_url" ]] \
         || die "No API_URL found for ID $BUILD_ID. Was it captured during provision?"
 
@@ -1039,8 +1039,8 @@ cmd_e2e() {
     echo "  ID:             $BUILD_ID"
     echo "  API_URL:        $api_url"
     echo "  RHOBS_API_URL:  ${rhobs_api_url:-<not set>}"
-    echo "  ZOA_RC_URL:     ${zoa_rc_url:-<not set>}"
-    echo "  ZOA_MC_URL:     ${zoa_mc_url:-<not set>}"
+    echo "  ZOA_RC_API_URL:     ${zoa_rc_api_url:-<not set>}"
+    echo "  ZOA_MC_API_URL:     ${zoa_mc_api_url:-<not set>}"
     echo "  REGION:         $region"
     echo "  E2E_REF:        $e2e_ref"
     echo "  E2E_REPO:       $e2e_repo"
@@ -1053,8 +1053,8 @@ cmd_e2e() {
         -e "BUILD_ID=$BUILD_ID" \
         -e "BASE_URL=$api_url" \
         -e "RHOBS_API_URL=${rhobs_api_url:-}" \
-        -e "ZOA_RC_URL=${zoa_rc_url:-}" \
-        -e "ZOA_MC_URL=${zoa_mc_url:-}" \
+        -e "ZOA_RC_API_URL=${zoa_rc_api_url:-}" \
+        -e "ZOA_MC_API_URL=${zoa_mc_api_url:-}" \
         -e "AWS_DEFAULT_REGION=$region" \
         -e "AWS_REGION=$region" \
         -e "E2E_REF=$e2e_ref" \

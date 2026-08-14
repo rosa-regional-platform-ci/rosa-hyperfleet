@@ -37,6 +37,11 @@ resource "aws_dynamodb_table" "executions" {
     type = "S"
   }
 
+  attribute {
+    name = "targetStatusKey"
+    type = "S"
+  }
+
   global_secondary_index {
     name            = "account-index"
     hash_key        = "accountId"
@@ -55,6 +60,13 @@ resource "aws_dynamodb_table" "executions" {
     name            = "target-index"
     hash_key        = "targetCluster"
     range_key       = "createdAt"
+    projection_type = "ALL"
+  }
+
+  global_secondary_index {
+    name            = "target-status-index"
+    hash_key        = "targetCluster"
+    range_key       = "targetStatusKey"
     projection_type = "ALL"
   }
 
