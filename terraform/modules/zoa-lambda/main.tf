@@ -93,6 +93,12 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
   name = "${local.function_prefix}-dynamodb"
   role = aws_iam_role.lambda.id
 
+  # Cross-account DynamoDB access: when calling DynamoDB with a table name,
+  # the service initially resolves the resource ARN using the CALLER's account ID.
+  # If the identity policy only allows the remote account's ARN, IAM denies the
+  # request before it reaches the resource-based policy. Using wildcard account (*)
+  # lets the IAM check pass, after which DynamoDB routes to the correct table via
+  # the resource-based policy on the target account.
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -105,10 +111,10 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
         "dynamodb:DescribeTable",
       ]
       Resource = [
-        var.dynamodb_table_arn,
-        "${var.dynamodb_table_arn}/index/*",
-        var.audit_table_arn,
-        "${var.audit_table_arn}/index/*",
+        "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.dynamodb_table_name}",
+        "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.dynamodb_table_name}/index/*",
+        "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.audit_table_name}",
+        "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.audit_table_name}/index/*",
       ]
     }]
   })
