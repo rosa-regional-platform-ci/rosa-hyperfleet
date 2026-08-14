@@ -283,3 +283,115 @@ resource "aws_iam_role_policy" "uploader_kms" {
     }]
   })
 }
+
+# =============================================================================
+# Data Access Role (cross-account)
+# =============================================================================
+# MC Lambdas cannot access RC DynamoDB/S3 directly because:
+# 1. DynamoDB resolves table names to the caller's account. DescribeTable and
+#    data-plane operations all fail with ResourceNotFoundException when called
+#    from a different account — even with resource-based policies — because the
+#    SDK version (v1.60.x) does not support the TableArn parameter needed for
+#    automatic cross-account routing.
+# 2. S3 HeadBucket also fails cross-account without explicit credentials.
+#
+# Solution: MC Lambdas assume this role (in the RC account) to obtain temporary
+# credentials that target RC-local DynamoDB tables and the S3 bucket.
+
+resource "aws_iam_role" "data_access" {
+  name        = "${var.regional_id}-zoa-data-access"
+  description = "Cross-account role for MC Lambda DynamoDB+S3 access to RC data layer"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        AWS = "*"
+      }
+      Action = "sts:AssumeRole"
+      Condition = {
+        "ForAnyValue:StringLike" = {
+          "aws:PrincipalOrgPaths" = "${var.mc_ou_path}*"
+        }
+        ArnLike = {
+          "aws:PrincipalArn" = "arn:aws:iam::*:role/*-zoa-lambda"
+        }
+      }
+    }]
+  })
+
+  tags = merge(local.common_tags, {
+    Name = "${var.regional_id}-zoa-data-access-role"
+  })
+}
+
+resource "aws_iam_role_policy" "data_access_dynamodb" {
+  name = "${var.regional_id}-zoa-data-access-dynamodb"
+  role = aws_iam_role.data_access.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Query",
+        "dynamodb:DescribeTable",
+      ]
+      Resource = [
+        aws_dynamodb_table.executions.arn,
+        "${aws_dynamodb_table.executions.arn}/index/*",
+        aws_dynamodb_table.audit_log.arn,
+        "${aws_dynamodb_table.audit_log.arn}/index/*",
+      ]
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "data_access_s3" {
+  name = "${var.regional_id}-zoa-data-access-s3"
+  role = aws_iam_role.data_access.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:PutObjectTagging",
+        ]
+        Resource = "${aws_s3_bucket.outputs.arn}/executions/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:HeadBucket",
+        ]
+        Resource = aws_s3_bucket.outputs.arn
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "data_access_kms" {
+  name = "${var.regional_id}-zoa-data-access-kms"
+  role = aws_iam_role.data_access.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "kms:Decrypt",
+        "kms:GenerateDataKey",
+      ]
+      Resource = aws_kms_key.zoa.arn
+    }]
+  })
+}

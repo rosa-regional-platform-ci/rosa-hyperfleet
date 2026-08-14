@@ -96,6 +96,12 @@ variable "uploader_role_arn" {
   type        = string
 }
 
+variable "data_access_role_arn" {
+  description = "ARN of the cross-account data-access role in the RC account. When set, Lambda assumes this role for DynamoDB and S3 operations. Required for MC deployments where tables are in a different account."
+  type        = string
+  default     = ""
+}
+
 
 # --- Sizing and timeouts ---
 

@@ -40,6 +40,11 @@ output "uploader_role_arn" {
   value       = aws_iam_role.uploader.arn
 }
 
+output "data_access_role_arn" {
+  description = "ARN of the data-access role (MC Lambdas assume this for cross-account DynamoDB+S3)"
+  value       = aws_iam_role.data_access.arn
+}
+
 # ECR
 
 output "lambda_ecr_url" {

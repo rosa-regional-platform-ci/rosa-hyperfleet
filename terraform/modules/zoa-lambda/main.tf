@@ -28,7 +28,7 @@ data "aws_region" "current" {}
 locals {
   function_prefix = "${var.cluster_id}-zoa"
 
-  common_env = {
+  common_env = merge({
     EXECUTION_TABLE           = var.dynamodb_table_name
     AUDIT_TABLE               = var.audit_table_name
     ARTIFACT_BUCKET           = var.artifact_bucket_name
@@ -46,7 +46,7 @@ locals {
     WRITE_COOLDOWN_SECONDS    = tostring(var.write_cooldown_seconds)
     MAX_CONCURRENT_PER_TARGET = tostring(var.max_concurrent_per_target)
     LOG_LEVEL                 = var.log_level
-  }
+  }, var.data_access_role_arn != "" ? { DATA_STORE_ROLE_ARN = var.data_access_role_arn } : {})
 
   common_tags = {
     Component = "zoa"
@@ -195,11 +195,12 @@ resource "aws_iam_role_policy" "lambda_sts" {
     Statement = [{
       Effect = "Allow"
       Action = "sts:AssumeRole"
-      Resource = [
+      Resource = compact([
         var.uploader_role_arn,
         aws_iam_role.zoa_aws_read.arn,
         aws_iam_role.zoa_aws_write.arn,
-      ]
+        var.data_access_role_arn,
+      ])
     }]
   })
 }

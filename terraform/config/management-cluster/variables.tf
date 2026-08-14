@@ -122,7 +122,7 @@ variable "zoa_lambda_ecr_url" {
 variable "zoa_image_tag" {
   description = "ZOA image tag for Lambda and runner images."
   type        = string
-  default     = "954c0be"
+  default     = "a3d5f28"
 }
 
 variable "zoa_runner_source_image" {
@@ -157,6 +157,12 @@ variable "zoa_audit_table_arn" {
 
 variable "zoa_uploader_role_arn" {
   description = "ARN of the ZOA uploader role (in RC account, for STS AssumeRole)"
+  type        = string
+  default     = ""
+}
+
+variable "zoa_data_access_role_arn" {
+  description = "ARN of the ZOA data-access role (in RC account, for cross-account DynamoDB+S3)"
   type        = string
   default     = ""
 }

@@ -442,6 +442,11 @@ output "zoa_uploader_role_arn" {
   value       = module.zoa.uploader_role_arn
 }
 
+output "zoa_data_access_role_arn" {
+  description = "ARN of the ZOA data-access role (MC Lambdas assume this for cross-account DynamoDB+S3)"
+  value       = module.zoa.data_access_role_arn
+}
+
 output "zoa_lambda_ecr_url" {
   description = "ECR repository URL for ZOA Lambda (MC appends tag for cross-account pull)"
   value       = module.zoa.lambda_ecr_url

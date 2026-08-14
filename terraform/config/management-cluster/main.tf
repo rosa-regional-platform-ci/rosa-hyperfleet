@@ -130,6 +130,7 @@ module "zoa_lambda" {
   artifact_bucket_arn  = var.zoa_outputs_bucket_arn
   kms_key_arn          = var.zoa_kms_key_arn
   uploader_role_arn    = var.zoa_uploader_role_arn
+  data_access_role_arn = var.zoa_data_access_role_arn
 }
 
 # =============================================================================
