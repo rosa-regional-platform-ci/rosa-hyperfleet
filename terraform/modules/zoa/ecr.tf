@@ -93,16 +93,32 @@ resource "null_resource" "mirror_lambda" {
 
   provisioner "local-exec" {
     command = <<-EOT
-      if aws ecr describe-images --repository-name ${aws_ecr_repository.lambda.name} \
-          --image-ids imageTag=${var.zoa_image_tag} 2>/dev/null | grep -q imageDigest; then
-        echo "zoa-lambda:${var.zoa_image_tag} already in ECR, skipping"
-      else
-        skopeo copy \
-          docker://${var.zoa_lambda_source_image}:${var.zoa_image_tag} \
-          docker://${aws_ecr_repository.lambda.repository_url}:${var.zoa_image_tag} \
-          --dest-creds "AWS:$(aws ecr get-login-password --region ${data.aws_region.current.id})"
-        echo "zoa-lambda:${var.zoa_image_tag} mirrored to ECR"
+      set -eo pipefail
+
+      REPO="${aws_ecr_repository.lambda.name}"
+      TAG="${var.zoa_image_tag}"
+      SRC="docker://${var.zoa_lambda_source_image}:$TAG"
+      DST="docker://${aws_ecr_repository.lambda.repository_url}:$TAG"
+      REGION="${data.aws_region.current.id}"
+
+      if aws ecr describe-images --repository-name "$REPO" \
+          --image-ids imageTag="$TAG" --region "$REGION" 2>/dev/null | grep -q imageDigest; then
+        echo "[zoa] $REPO:$TAG already in ECR, skipping mirror"
+        exit 0
       fi
+
+      if ! command -v skopeo &>/dev/null; then
+        echo "[zoa] ERROR: skopeo not found. Rebuild platform image (re-run central-account-bootstrap)." >&2
+        exit 1
+      fi
+
+      echo "[zoa] Mirroring $SRC → $DST"
+      skopeo copy --retry-times 3 "$SRC" "$DST" \
+        --dest-creds "AWS:$(aws ecr get-login-password --region "$REGION")"
+
+      echo "[zoa] Verifying image exists in ECR after mirror..."
+      aws ecr describe-images --repository-name "$REPO" --image-ids imageTag="$TAG" --region "$REGION" > /dev/null
+      echo "[zoa] $REPO:$TAG mirrored and verified"
     EOT
   }
 

@@ -110,6 +110,7 @@ resource "aws_dynamodb_resource_policy" "executions_cross_account" {
         "dynamodb:PutItem",
         "dynamodb:UpdateItem",
         "dynamodb:Query",
+        "dynamodb:DescribeTable",
       ]
       Resource = [
         aws_dynamodb_table.executions.arn,
