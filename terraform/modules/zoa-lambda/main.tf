@@ -29,23 +29,24 @@ locals {
   function_prefix = "${var.cluster_id}-zoa"
 
   common_env = merge({
-    EXECUTION_TABLE           = var.dynamodb_table_name
-    AUDIT_TABLE               = var.audit_table_name
-    ARTIFACT_BUCKET           = var.artifact_bucket_name
-    KMS_KEY_ARN               = var.kms_key_arn
-    JOB_IMAGE                 = var.job_image_uri
-    ZOA_JOBS_NAMESPACE        = var.zoa_jobs_namespace
-    DYNAMODB_TTL_DAYS         = tostring(var.dynamodb_ttl_days)
-    TARGET_CLUSTER            = var.cluster_id
-    UPLOADER_ROLE_ARN         = var.uploader_role_arn
-    AWS_READ_ROLE_ARN         = aws_iam_role.zoa_aws_read.arn
-    AWS_WRITE_ROLE_ARN        = aws_iam_role.zoa_aws_write.arn
-    EKS_CLUSTER_ENDPOINT      = var.eks_cluster_endpoint
-    EKS_CLUSTER_CA            = var.eks_cluster_ca
-    EKS_CLUSTER_NAME          = var.eks_cluster_name
-    WRITE_COOLDOWN_SECONDS    = tostring(var.write_cooldown_seconds)
-    MAX_CONCURRENT_PER_TARGET = tostring(var.max_concurrent_per_target)
-    LOG_LEVEL                 = var.log_level
+    EXECUTION_TABLE                   = var.dynamodb_table_name
+    AUDIT_TABLE                       = var.audit_table_name
+    ARTIFACT_BUCKET                   = var.artifact_bucket_name
+    KMS_KEY_ARN                       = var.kms_key_arn
+    JOB_IMAGE                         = var.job_image_uri
+    ZOA_JOBS_NAMESPACE                = var.zoa_jobs_namespace
+    DYNAMODB_TTL_DAYS                 = tostring(var.dynamodb_ttl_days)
+    TARGET_CLUSTER                    = var.cluster_id
+    UPLOADER_ROLE_ARN                 = var.uploader_role_arn
+    AWS_READ_ROLE_ARN                 = aws_iam_role.zoa_aws_read.arn
+    AWS_WRITE_ROLE_ARN                = aws_iam_role.zoa_aws_write.arn
+    EKS_CLUSTER_ENDPOINT              = var.eks_cluster_endpoint
+    EKS_CLUSTER_CA                    = var.eks_cluster_ca
+    EKS_CLUSTER_NAME                  = var.eks_cluster_name
+    WRITE_COOLDOWN_SECONDS            = tostring(var.write_cooldown_seconds)
+    MAX_CONCURRENT_PER_TARGET         = tostring(var.max_concurrent_per_target)
+    ASYNC_SCHEDULING_OVERHEAD_SECONDS = tostring(var.async_scheduling_overhead_seconds)
+    LOG_LEVEL                         = var.log_level
   }, var.data_access_role_arn != "" ? { DATA_STORE_ROLE_ARN = var.data_access_role_arn } : {})
 
   common_tags = {

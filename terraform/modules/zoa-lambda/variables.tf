@@ -163,6 +163,12 @@ variable "max_concurrent_per_target" {
   default     = 10
 }
 
+variable "async_scheduling_overhead_seconds" {
+  description = "Extra time added to a TA's timeout when checking async execution deadline. Accounts for GSI eventual consistency + reconciler cadence + Job scheduling. TA authors set TimeoutSeconds for actual execution; this is platform overhead they don't see."
+  type        = number
+  default     = 180
+}
+
 # --- Kubernetes namespace ---
 
 variable "zoa_jobs_namespace" {
