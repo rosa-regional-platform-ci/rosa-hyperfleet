@@ -97,6 +97,25 @@ resource "aws_kms_key_policy" "zoa" {
         }
       },
       {
+        Sid    = "AllowCrossAccountAWSRoleKMS"
+        Effect = "Allow"
+        Principal = {
+          AWS = "*"
+        }
+        Action = [
+          "kms:GenerateDataKey",
+        ]
+        Resource = "*"
+        Condition = {
+          "ForAnyValue:StringLike" = {
+            "aws:PrincipalOrgPaths" = "${var.mc_ou_path}*"
+          }
+          StringLike = {
+            "aws:PrincipalArn" = "arn:*:iam::*:role/*-zoa-aws-*"
+          }
+        }
+      },
+      {
         Sid    = "AllowCrossAccountLambdaKMS"
         Effect = "Allow"
         Principal = {
