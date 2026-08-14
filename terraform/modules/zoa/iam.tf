@@ -232,20 +232,42 @@ resource "aws_iam_role" "uploader" {
   name        = "${var.regional_id}-zoa-uploader"
   description = "STS-assumed role for ZOA async Job S3 uploads (scoped per-execution)"
 
+  # Two trust statements:
+  # 1. Same-account: RC Lambda assumes this for RC async Jobs
+  # 2. Cross-account: MC Lambdas assume this for MC async Jobs (S3 bucket is in RC)
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = {
-        AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
-      }
-      Action = "sts:AssumeRole"
-      Condition = {
-        ArnLike = {
-          "aws:PrincipalArn" = "arn:aws:iam::*:role/*-zoa-lambda"
+    Statement = [
+      {
+        Sid    = "SameAccountLambdas"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
         }
-      }
-    }]
+        Action = "sts:AssumeRole"
+        Condition = {
+          ArnLike = {
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/*-zoa-lambda"
+          }
+        }
+      },
+      {
+        Sid    = "CrossAccountMCLambdas"
+        Effect = "Allow"
+        Principal = {
+          AWS = "*"
+        }
+        Action = "sts:AssumeRole"
+        Condition = {
+          "ForAnyValue:StringLike" = {
+            "aws:PrincipalOrgPaths" = "${var.mc_ou_path}*"
+          }
+          ArnLike = {
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/*-zoa-lambda"
+          }
+        }
+      },
+    ]
   })
 
   tags = merge(local.common_tags, {
