@@ -46,15 +46,7 @@ provider "pagerduty" {
   skip_credentials_validation = true
 }
 
-provider "kubernetes" {
-  host                   = module.regional_cluster.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.regional_cluster.cluster_certificate_authority_data)
-  exec {
-    api_version = "client.authentication.k8s.io/v1beta1"
-    command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", module.regional_cluster.cluster_name, "--region", var.region]
-  }
-}
+
 
 # =============================================================================
 # Data Sources

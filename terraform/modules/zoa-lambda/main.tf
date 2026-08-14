@@ -34,7 +34,7 @@ locals {
     ARTIFACT_BUCKET           = var.artifact_bucket_name
     KMS_KEY_ARN               = var.kms_key_arn
     JOB_IMAGE                 = var.job_image_uri
-    ZOA_JOBS_NAMESPACE        = kubernetes_namespace.zoa_jobs.metadata[0].name
+    ZOA_JOBS_NAMESPACE        = var.zoa_jobs_namespace
     DYNAMODB_TTL_DAYS         = tostring(var.dynamodb_ttl_days)
     TARGET_CLUSTER            = var.cluster_id
     UPLOADER_ROLE_ARN         = var.uploader_role_arn
@@ -276,15 +276,10 @@ resource "aws_iam_role" "zoa_aws_write" {
   })
 }
 
-resource "aws_iam_role_policy" "zoa_aws_write" {
-  name = "write-permissions"
-  role = aws_iam_role.zoa_aws_write.id
-
-  policy = jsonencode({
-    Version   = "2012-10-17"
-    Statement = []
-  })
-}
+# No inline policy for write role — no write TAs are implemented yet.
+# When write TAs are added, attach a policy with the required actions here.
+# The role exists so that Lambda env vars reference a valid ARN and STS
+# AssumeRole can target it without Terraform changes.
 
 # Worker self-invocation: reconciler invokes same worker Lambda for TA execution
 resource "aws_iam_role_policy" "lambda_self_invoke" {
@@ -335,164 +330,34 @@ resource "aws_eks_access_entry" "lambda" {
 }
 
 # =============================================================================
-# Kubernetes RBAC for ZOA Lambda (least-privilege, managed by Terraform)
+# EKS Access Policy for ZOA Lambda
 # =============================================================================
-# We use the hashicorp/kubernetes provider to manage Lambda's K8s permissions
-# directly, rather than relying on an EKS managed access policy.
+# The ideal approach is to use fine-grained Kubernetes RBAC (ClusterRole + Role)
+# managed by the Terraform kubernetes provider. However, this requires network
+# connectivity to the private EKS API endpoint, which CodeBuild (running in the
+# central CI account) does not have.
 #
-# Why not an EKS managed policy?
-#   - AmazonEKSClusterAdminPolicy: grants full cluster-admin (wildcard on all
-#     resources in all API groups). Far too broad for a Lambda that only manages
-#     SAs, Secrets, Jobs, and RBAC objects in specific namespaces.
-#   - AmazonEKSAdminPolicy: the closest fit, but it lacks clusterroles/
-#     clusterrolebindings management, bind/escalate verbs, and cannot be
-#     simultaneously scoped to zoa-jobs (for SA/Secret/Job) AND arbitrary
-#     target namespaces (for Roles/RoleBindings). No managed policy matches
-#     our exact permission set.
+# Current approach: AmazonEKSClusterAdminPolicy grants full K8s access. This is
+# intentionally broad because no managed policy matches our exact permission set
+# (namespaces:get, RBAC:create/delete/bind/escalate, SA/Secret/Job in zoa-jobs).
 #
-# Why Terraform, not ArgoCD?
-#   - Lambda RBAC is infrastructure with the same lifecycle as the Lambda
-#     itself (created once at provisioning, rarely changed). Terraform
-#     guarantees atomic provisioning: the ClusterRole exists in the same
-#     apply as the Lambda and EventBridge schedules. No race condition between
-#     "Lambda starts receiving events" and "RBAC is deployed."
-#   - ArgoCD is for application lifecycle with frequent changes. Lambda RBAC
-#     changes only when new TA types require new K8s API access — a code PR,
-#     not a GitOps sync.
+# The Lambda's Go code (ensureNamespace, createExecutionResources) already
+# creates the zoa-jobs namespace, SAs, Roles, RoleBindings, and Jobs with
+# precise RBAC scoping at runtime. The EKS policy here is only the "outer shell"
+# that allows the Lambda IAM principal to authenticate to K8s.
 #
-# Why a custom ClusterRole + namespace Role?
-#   - Minimizes blast radius: cluster-scoped permissions (RBAC management in
-#     any namespace) are separated from namespace-scoped permissions (SA/Secret/
-#     Job lifecycle in zoa-jobs only). The impersonate verb is intentionally in
-#     the namespace Role to limit impersonation to SAs in zoa-jobs only.
-#
-# Pipeline ordering guarantee:
-#   Source → Terraform (EKS access entry + ClusterRole + Lambda + EventBridge)
-#   → ArgoCD bootstrap (irrelevant to Lambda RBAC). RBAC is guaranteed to
-#   exist before first invocation. No retries, no health checks, no eventual
-#   consistency.
+# Future: When the pipeline runs in-VPC (e.g., CodeBuild in the target VPC or
+# a Terraform Cloud agent), replace this with kubernetes provider-managed
+# ClusterRole + Role for true least-privilege.
 # =============================================================================
 
-resource "kubernetes_namespace" "zoa_jobs" {
-  metadata {
-    name = var.zoa_jobs_namespace
-    labels = {
-      "app.kubernetes.io/managed-by" = "terraform"
-      "app.kubernetes.io/component"  = "zoa"
-    }
-  }
-}
+resource "aws_eks_access_policy_association" "lambda" {
+  cluster_name  = var.eks_cluster_name
+  principal_arn = aws_iam_role.lambda.arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
-resource "kubernetes_cluster_role" "zoa_lambda" {
-  metadata {
-    name = "${local.function_prefix}-lambda"
-    labels = merge(local.common_tags, {
-      "app.kubernetes.io/managed-by" = "terraform"
-    })
-  }
-
-  # Check any namespace exists before creating Role there
-  rule {
-    api_groups = [""]
-    resources  = ["namespaces"]
-    verbs      = ["get"]
-  }
-
-  # TA RBAC in any target namespace (namespace-scoped TAs)
-  rule {
-    api_groups = ["rbac.authorization.k8s.io"]
-    resources  = ["roles", "rolebindings"]
-    verbs      = ["create", "delete", "get"]
-  }
-
-  # Cluster-scoped TA RBAC (cluster-scoped TAs like get_resource across namespaces)
-  rule {
-    api_groups = ["rbac.authorization.k8s.io"]
-    resources  = ["clusterroles", "clusterrolebindings"]
-    verbs      = ["create", "delete", "get"]
-  }
-
-  # K8s requires bind/escalate to create bindings referencing roles
-  # the principal doesn't already hold
-  rule {
-    api_groups = ["rbac.authorization.k8s.io"]
-    resources  = ["clusterroles", "roles"]
-    verbs      = ["bind", "escalate"]
-  }
-}
-
-resource "kubernetes_cluster_role_binding" "zoa_lambda" {
-  metadata {
-    name = "${local.function_prefix}-lambda"
-    labels = merge(local.common_tags, {
-      "app.kubernetes.io/managed-by" = "terraform"
-    })
-  }
-
-  role_ref {
-    api_group = "rbac.authorization.k8s.io"
-    kind      = "ClusterRole"
-    name      = kubernetes_cluster_role.zoa_lambda.metadata[0].name
-  }
-
-  subject {
-    kind      = "User"
-    name      = aws_iam_role.lambda.arn
-    api_group = "rbac.authorization.k8s.io"
-  }
-}
-
-resource "kubernetes_role" "zoa_lambda" {
-  metadata {
-    name      = "${local.function_prefix}-lambda"
-    namespace = kubernetes_namespace.zoa_jobs.metadata[0].name
-    labels = merge(local.common_tags, {
-      "app.kubernetes.io/managed-by" = "terraform"
-    })
-  }
-
-  # Ephemeral SA lifecycle + sync TA impersonation
-  # (scoped: Lambda can ONLY impersonate SAs in zoa-jobs, not any other namespace)
-  rule {
-    api_groups = [""]
-    resources  = ["serviceaccounts"]
-    verbs      = ["create", "delete", "get", "impersonate"]
-  }
-
-  # STS credential secrets for async Jobs
-  rule {
-    api_groups = [""]
-    resources  = ["secrets"]
-    verbs      = ["create", "delete"]
-  }
-
-  # Async K8s Jobs + reconciler polling + GC
-  rule {
-    api_groups = ["batch"]
-    resources  = ["jobs"]
-    verbs      = ["create", "delete", "get", "list"]
-  }
-}
-
-resource "kubernetes_role_binding" "zoa_lambda" {
-  metadata {
-    name      = "${local.function_prefix}-lambda"
-    namespace = kubernetes_namespace.zoa_jobs.metadata[0].name
-    labels = merge(local.common_tags, {
-      "app.kubernetes.io/managed-by" = "terraform"
-    })
-  }
-
-  role_ref {
-    api_group = "rbac.authorization.k8s.io"
-    kind      = "Role"
-    name      = kubernetes_role.zoa_lambda.metadata[0].name
-  }
-
-  subject {
-    kind      = "User"
-    name      = aws_iam_role.lambda.arn
-    api_group = "rbac.authorization.k8s.io"
+  access_scope {
+    type = "cluster"
   }
 }
 

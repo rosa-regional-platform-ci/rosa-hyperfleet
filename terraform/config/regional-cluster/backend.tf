@@ -10,9 +10,5 @@ terraform {
       source  = "PagerDuty/pagerduty"
       version = ">= 3.0"
     }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.35"
-    }
   }
 }
