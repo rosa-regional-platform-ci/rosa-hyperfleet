@@ -119,27 +119,13 @@ resource "aws_eks_cluster" "main" {
     aws_kms_key.eks_secrets
   ]
 
-  # Terminate Karpenter-provisioned EC2 instances before the cluster is deleted.
-  # Karpenter nodes are not in Terraform state, so they survive EKS deletion and
-  # block VPC/subnet teardown with DependencyViolation due to lingering ENIs.
-  #
-  # This intentionally does not attempt to reach the cluster API (kubectl,
-  # update-kubeconfig, graceful NodePool deletion) first: the CodeBuild project
-  # that runs terraform destroy has no VPC connectivity to this fully-private
-  # cluster's API endpoint, so that path never actually succeeds — it silently
-  # fell through to this same tag-based termination anyway. Since the whole
-  # cluster is being destroyed, there's no workload to protect by draining
-  # gracefully first; terminating by tag has no dependency on kubeconfig,
-  # cluster reachability, or kubectl being installed.
-  #
-  # LBC only reconciles TargetGroupBinding resources in this architecture
-  # (registering pod IPs into Terraform-managed target groups); it never
-  # creates its own ALBs/NLBs, so there's no LBC-created load balancer to
-  # worry about orphaning here.
+  # Terminate Karpenter-provisioned instances on destroy — they're not in
+  # Terraform state and their ENIs block VPC teardown.
   provisioner "local-exec" {
-    when       = destroy
-    on_failure = fail
-    command    = <<-EOT
+    when        = destroy
+    on_failure  = fail
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
       set -euo pipefail
 
       if ! command -v aws >/dev/null 2>&1; then
@@ -214,31 +200,25 @@ resource "aws_eks_addon" "pod_identity" {
   depends_on   = [aws_eks_node_group.karpenter_bootstrap]
 }
 
+# Fixed-size node group for Karpenter + ArgoCD (system-cluster-critical).
+# Karpenter provisions all other nodes.
 # -----------------------------------------------------------------------------
-# Karpenter Bootstrap Node Group
-#
-# AL2023 managed node group (m7i.xlarge x 2) that provides fixed capacity
-# for the Karpenter controller and VPC CNI daemonset before any
-# Karpenter-provisioned nodes exist. This breaks the bootstrap deadlock:
-# Karpenter cannot provision nodes for itself.
-#
-# ArgoCD and Karpenter schedule here via the bootstrap-critical PriorityClass
-# (applied by the ECS bootstrap task, see ecs-bootstrap module) rather than a
-# node taint -- other pods may land here too when there's room, but ArgoCD and
-# Karpenter can preempt them if the nodes fill up.
-#
-# IMPORTANT: This node group is WHERE Karpenter and ArgoCD run at runtime. The
-# ecs-bootstrap module provides the HOW (installation mechanism). Because this
-# cluster is fully private, Terraform cannot reach the EKS API to install ArgoCD
-# via the helm provider. The ECS task runs in the VPC with EKS API access and
-# performs the initial `helm install` of Karpenter and ArgoCD onto these nodes.
-# After bootstrap, this node group continues to host Karpenter + ArgoCD for the
-# lifetime of the cluster. See docs/design/fully-private-eks-bootstrap.md.
-#
-# No custom launch template: EKS managed node groups set IMDSv2 hop limit to 2
-# by default for AL2023, and managed node group auth is handled automatically
-# by EKS regardless of node name format.
-# -----------------------------------------------------------------------------
+
+resource "aws_launch_template" "karpenter_bootstrap" {
+  name_prefix = "${local.cluster_id}-karpenter-bootstrap-"
+
+  metadata_options {
+    http_tokens = "required"
+  }
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+    ebs {
+      encrypted   = true
+      volume_type = "gp3"
+    }
+  }
+}
 
 resource "aws_eks_node_group" "karpenter_bootstrap" {
   cluster_name    = aws_eks_cluster.main.name
@@ -248,6 +228,11 @@ resource "aws_eks_node_group" "karpenter_bootstrap" {
 
   ami_type       = "AL2023_x86_64_STANDARD"
   instance_types = ["m7i.xlarge"]
+
+  launch_template {
+    id      = aws_launch_template.karpenter_bootstrap.id
+    version = aws_launch_template.karpenter_bootstrap.latest_version
+  }
 
   scaling_config {
     desired_size = 2

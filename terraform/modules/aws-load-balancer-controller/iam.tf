@@ -159,6 +159,11 @@ resource "aws_iam_role_policy" "aws_lbc" {
           "ec2:RevokeSecurityGroupIngress",
         ]
         Resource = "*"
+        Condition = {
+          Null = {
+            "aws:ResourceTag/elbv2.k8s.aws/cluster" = "false"
+          }
+        }
       },
       {
         Sid      = "EC2CreateSecurityGroup"

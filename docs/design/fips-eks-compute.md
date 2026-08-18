@@ -7,12 +7,13 @@
 All EKS clusters in the ROSA HyperFleet use self-managed Karpenter with an `EC2NodeClass` (`fips`)
 and a cluster-type-specific `NodePool` for platform and application workloads. A dedicated
 `karpenter-bootstrap` managed node group (m7i.xlarge, 2 nodes, scheduled via the
-`bootstrap-critical` PriorityClass) provides stable capacity for Karpenter itself, CoreDNS, and
+`system-cluster-critical` PriorityClass) provides stable capacity for Karpenter itself, CoreDNS, and
 metrics-server. All other workloads land on Karpenter-provisioned nodes.
 
-**Note**: FIPS-validated compute (RHEL nodes with FIPS mode enabled) is planned for a future
-iteration. Current implementation uses standard Bottlerocket AMIs pinned via the
-`bottlerocket@v1.64.0` alias. FIPS enablement will be delivered as part of the RHEL AMI work.
+**Note**: Bottlerocket FIPS AMIs are used for Karpenter-provisioned nodes, selected via name filter
+(`bottlerocket-aws-k8s-1.34-fips-x86_64-*`) since Karpenter's alias system
+[does not support FIPS variants](https://github.com/aws/karpenter-provider-aws/issues/8198).
+RHEL-based FIPS nodes are planned for a future iteration to align with the broader RHEL AMI strategy.
 
 ## Context
 
@@ -53,14 +54,14 @@ node OS configuration.
    pools. Not durable. Rejected.
 
 4. **Self-managed Karpenter with dedicated bootstrap node group**: Provides a stable, pre-provisioned node
-   group (`bootstrap-critical` PriorityClass) for Karpenter controller, CoreDNS, and metrics-server.
+   group (`system-cluster-critical` PriorityClass) for Karpenter controller, CoreDNS, and metrics-server.
    Karpenter provisions all other nodes on demand using custom `EC2NodeClass`. Enables future
    FIPS compliance for customer-bearing workloads via RHEL AMI configuration. **Chosen.**
 
 ## Design Rationale
 
 - **Justification**: The `karpenter-bootstrap` managed node group (m7i.xlarge, 2 nodes,
-  `bootstrap-critical` PriorityClass) provides stable, pre-provisioned capacity for Karpenter itself and
+  `system-cluster-critical` PriorityClass) provides stable, pre-provisioned capacity for Karpenter itself and
   EKS system addons. This eliminates the bootstrap chicken-and-egg problem: ECS bootstrap installs
   ArgoCD, then ArgoCD installs Karpenter and creates the `EC2NodeClass` and `NodePool` via GitOps
   Applications.
@@ -69,7 +70,7 @@ node OS configuration.
   between them, consistent with the project's eventual-consistency ArgoCD model (`selfHeal: true`,
   `retry.limit: -1` with exponential backoff). If eks-nodepool's apply runs before Karpenter's CRDs
   are registered, ArgoCD retries until it succeeds. The ApplicationSet injects cluster-specific
-  values (clusterName, interruptionQueue, IRSA role ARN) into the Karpenter Helm chart, and the
+  values (clusterName, interruptionQueue) into the Karpenter Helm chart, and the
   eks-nodepool chart creates the `EC2NodeClass` and workloads `NodePool`.
 
 - **Tradeoff**: The `karpenter-bootstrap` node group runs standard Amazon Linux 2023 (AL2023) nodes.
@@ -97,10 +98,11 @@ node OS configuration.
 
 - Karpenter controller, CoreDNS, and metrics-server run on standard AL2023 m7i.xlarge nodes. These
   are platform system components, not customer-bearing workloads. CoreDNS and metrics-server are
-  AWS-managed EKS addons; Karpenter is OSS software installed and managed by ArgoCD.
-- Platform and application workloads currently run on standard Bottlerocket nodes. FIPS-validated
-  compute (RHEL with FIPS mode enabled) will be delivered as part of the RHEL AMI work.
-- Two IAM roles are required: the IRSA-backed Karpenter controller role, and
+  AWS-managed EKS addons; Karpenter is self-managed software installed and managed by ArgoCD.
+- Platform and application workloads run on Bottlerocket FIPS nodes (selected via AMI name filter;
+  see [karpenter-provider-aws#8198](https://github.com/aws/karpenter-provider-aws/issues/8198) for alias support).
+  RHEL-based FIPS nodes are planned for a future iteration.
+- Two IAM roles are required: the Pod Identity-backed Karpenter controller role, and
   `karpenter-node-role`, shared by both the `karpenter-bootstrap` node group and
   Karpenter-provisioned nodes.
 
@@ -119,7 +121,7 @@ node OS configuration.
 
 - The `EC2NodeClass` selects subnets and security groups via cluster-owned tags, ensuring nodes
   land in the correct private subnets with correct network policies.
-- Karpenter controller IAM role uses IRSA (ServiceAccount annotation on `kube-system/karpenter`)
+- Karpenter controller IAM role uses Pod Identity (bound to `karpenter/karpenter`)
   with least-privilege SQS, EC2, and IAM instance profile permissions.
 - Karpenter node IAM role (`${cluster_id}-karpenter-node-role`) is referenced directly in the
   `EC2NodeClass`, scoping node permissions to a cluster-specific role.
@@ -142,11 +144,9 @@ node OS configuration.
 ### Operability
 
 - The `EC2NodeClass` and `NodePool` are managed by ArgoCD via the eks-nodepool Application.
-  Day-2 changes are made via GitOps — edit the chart in `argocd/config/<cluster-type>/eks-nodepool/`
-  and ArgoCD syncs the change automatically.
-- Adding a new cluster type requires creating an `argocd/config/<cluster-type>/eks-nodepool/`
-  directory with appropriate `EC2NodeClass` and `NodePool` manifests. The ApplicationSet
-  automatically generates an Application for any directory under `argocd/config/<cluster-type>/`.
+  Day-2 changes are made via GitOps — edit the chart in `argocd/config/shared/eks-nodepool/`
+  and ArgoCD syncs the change automatically. The shared chart deploys identically to both
+  RC and MC clusters.
 - EC2 interruption events (spot reclamation, instance retirement) are handled by Karpenter via
   an SQS queue wired to EventBridge rules provisioned by the `eks-cluster` module.
 - FIPS configuration will be added to the `EC2NodeClass` userData field once RHEL AMI support

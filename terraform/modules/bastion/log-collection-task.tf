@@ -210,7 +210,6 @@ resource "aws_iam_role_policy" "log_collector_s3" {
 # EKS Access — Grants the log-collector task role cluster admin access
 # =============================================================================
 
-
 resource "aws_eks_access_entry" "log_collector" {
   cluster_name  = var.cluster_name
   principal_arn = aws_iam_role.log_collector.arn

@@ -115,7 +115,6 @@ module "regional_cluster" {
 | `vpc_id`                               | VPC ID where cluster is deployed                   |
 | `private_subnets`                      | Private subnet IDs where worker nodes are deployed |
 | `cluster_security_group_id`            | EKS cluster security group ID                      |
-| `karpenter_controller_role_arn`        | IAM role ARN for Karpenter controller (IRSA)       |
 | `karpenter_queue_url`                  | SQS queue URL for Karpenter interruption handling  |
 | `karpenter_node_instance_profile_name` | Instance profile for Karpenter-provisioned nodes   |
 | `bootstrap_report`                     | Bootstrap process information and status           |
@@ -136,14 +135,14 @@ When `bootstrap_enabled` is `true`, the module automatically installs ArgoCD for
 The ECS bootstrap task:
 
 - Runs in the cluster's private subnets for network access
-- Updates kubeconfig using EKS access entries and Pod Identity
+- Updates kubeconfig using EKS access entries
 - Waits for CoreDNS, metrics-server, and Pod Identity agent to become Active
 - Installs ArgoCD using Helm from the official repository
 - Creates bootstrap application pointing to your repository
 - Enables ArgoCD to take over cluster management
 
-- **`karpenter-bootstrap` managed node group**: 2x AL2023 m7i.xlarge nodes. ArgoCD and Karpenter schedule here via the `bootstrap-critical` PriorityClass (able to preempt lower-priority pods rather than excluding them via a taint). Hosts Karpenter controller, CoreDNS, and metrics-server.
-- **Karpenter controller IAM role**: IRSA-backed, scoped to `kube-system/karpenter` ServiceAccount with SQS, EC2, and IAM instance profile permissions.
+- **`karpenter-bootstrap` managed node group**: 2x AL2023 m7i.xlarge nodes. ArgoCD and Karpenter schedule here via the `system-cluster-critical` PriorityClass (able to preempt lower-priority pods rather than excluding them via a taint). Hosts Karpenter controller, CoreDNS, and metrics-server.
+- **Karpenter controller IAM role**: Pod Identity-backed, scoped to `karpenter/karpenter` ServiceAccount with SQS, EC2, and IAM instance profile permissions.
 - **Karpenter node IAM role**: Full `AmazonEKSWorkerNodePolicy`, VPC CNI, ECR pull-only, and optional KMS decrypt for FIPS AMI snapshots.
 - **SQS queue**: Receives EC2 interruption events (spot reclamation, instance health, rebalance) for graceful node draining.
 - **EventBridge rules**: Four rules forward EC2 lifecycle events to the SQS queue.

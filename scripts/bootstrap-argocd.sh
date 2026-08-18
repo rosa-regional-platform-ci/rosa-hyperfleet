@@ -110,12 +110,6 @@ fi
 
 RHOBS_API_URL="${RHOBS_API_URL:-}"
 DNS_ZONE_OPERATOR_ROLE_ARN="${DNS_ZONE_OPERATOR_ROLE_ARN:-}"
-# Set by E2E CI workflows only — gates the post-bootstrap HyperShift health wait.
-WAIT_FOR_HYPERSHIFT_HEALTH="${WAIT_FOR_HYPERSHIFT_HEALTH:-false}"
-if [[ "$WAIT_FOR_HYPERSHIFT_HEALTH" != "true" && "$WAIT_FOR_HYPERSHIFT_HEALTH" != "false" ]]; then
-    echo "ERROR: WAIT_FOR_HYPERSHIFT_HEALTH must be 'true' or 'false', got '${WAIT_FOR_HYPERSHIFT_HEALTH}'" >&2
-    exit 1
-fi
 
 OVERRIDES_JSON=$(jq -nc \
   --arg cluster_name "$CLUSTER_NAME" \
@@ -145,7 +139,6 @@ OVERRIDES_JSON=$(jq -nc \
   --arg sre_alb_dns_name "$SRE_ALB_DNS_NAME" \
   --arg sre_domain "$SRE_DOMAIN" \
   --arg redis_endpoint "$REDIS_ENDPOINT" \
-  --arg wait_for_hypershift_health "$WAIT_FOR_HYPERSHIFT_HEALTH" \
   '{
     containerOverrides: [{
       name: "bootstrap",
@@ -176,15 +169,14 @@ OVERRIDES_JSON=$(jq -nc \
         {name: "SRE_THANOS_TARGET_GROUP_ARN", value: $sre_thanos_target_group_arn},
         {name: "SRE_ALB_DNS_NAME", value: $sre_alb_dns_name},
         {name: "SRE_DOMAIN", value: $sre_domain},
-        {name: "REDIS_ENDPOINT", value: $redis_endpoint},
-        {name: "WAIT_FOR_HYPERSHIFT_HEALTH", value: $wait_for_hypershift_health}
+        {name: "REDIS_ENDPOINT", value: $redis_endpoint}
       ]
     }]
   }')
 
 # ECS RunTask enforces an 8192-character limit on the serialized --overrides value.
-if [[ ${#OVERRIDES_JSON} -ge 8192 ]]; then
-    echo "ERROR: --overrides payload is ${#OVERRIDES_JSON} characters, at or over the ECS 8192-character limit" >&2
+if [[ ${#OVERRIDES_JSON} -gt 8192 ]]; then
+    echo "ERROR: --overrides payload is ${#OVERRIDES_JSON} characters, over the ECS 8192-character limit" >&2
     exit 1
 fi
 

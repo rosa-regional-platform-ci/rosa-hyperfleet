@@ -60,10 +60,10 @@ module "management_cluster" {
 #
 # This ecs_bootstrap module creates ECS Fargate infrastructure that runs in the
 # cluster's VPC and can reach the private EKS API. A one-time bootstrap task
-# performs `helm install` of Karpenter and ArgoCD onto the bootstrap nodes, then
-# exits. After bootstrap, Karpenter and ArgoCD continue running on the managed
-# node group, and the ECS infrastructure remains available for future audited
-# SRE operations.
+# performs `helm install` of ArgoCD onto the bootstrap nodes, then exits. ArgoCD
+# then installs Karpenter and everything else via GitOps. Both continue running
+# on the managed node group. The ECS infrastructure remains available for future
+# audited SRE operations.
 #
 # See docs/design/fully-private-eks-bootstrap.md for the full architecture.
 # =============================================================================
@@ -82,8 +82,6 @@ module "ecs_bootstrap" {
 
   repository_url    = var.repository_url
   repository_branch = var.repository_branch
-
-  karpenter_controller_role_arn = module.management_cluster.karpenter_controller_role_arn
 }
 
 # =============================================================================

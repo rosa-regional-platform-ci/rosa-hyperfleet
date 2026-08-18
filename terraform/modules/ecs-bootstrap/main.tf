@@ -1,29 +1,5 @@
-# =============================================================================
-# ECS Bootstrap Module for ArgoCD
-#
-# IMPORTANT: This module provides the INSTALLATION MECHANISM for ArgoCD in
-# fully private EKS clusters. It does NOT host the runtime workloads, and it
-# does NOT install Karpenter — ArgoCD installs Karpenter via GitOps after
-# bootstrap completes (see the root Application created below).
-#
-# The Problem: Terraform can provision EKS clusters but cannot reach fully
-# private cluster APIs to install software via the helm provider.
-#
-# The Solution: ECS Fargate tasks run in the cluster's VPC with network access
-# to the private EKS API. A one-time bootstrap task performs `helm install` of
-# ArgoCD onto the karpenter-bootstrap managed node group (defined in the
-# eks-cluster module), then creates the root ArgoCD Application, which ArgoCD
-# uses to install Karpenter and everything else. After installation completes,
-# the ECS task exits.
-#
-# Runtime: Karpenter and ArgoCD run on the karpenter-bootstrap node group
-# (2× m7i.xlarge, scheduled via the bootstrap-critical PriorityClass) for the
-# lifetime of the cluster.
-#
-# See docs/design/fully-private-eks-bootstrap.md for the full architecture and
-# rationale for choosing ECS over alternatives (public→private transition, node
-# group user data scripts, etc.).
-# =============================================================================
+# ECS Fargate infrastructure for bootstrapping ArgoCD on private EKS clusters.
+# See docs/design/fully-private-eks-bootstrap.md for architecture.
 
 locals {
   bootstrap_container_name = "bootstrap"
@@ -93,21 +69,7 @@ resource "aws_cloudwatch_log_group" "bootstrap" {
   depends_on = [aws_kms_key.bootstrap_logs]
 }
 
-# -----------------------------------------------------------------------------
-# ECS Task Definition for Bootstrap Execution
-#
-# This task definition runs a one-time container that:
-# 1. Connects to the private EKS cluster API (via VPC networking)
-# 2. Installs ArgoCD (helm install) onto karpenter-bootstrap nodes
-# 3. Creates the root ArgoCD Application for GitOps self-management —
-#    ArgoCD then installs Karpenter (and everything else) via this Application
-# 4. Exits
-#
-# After this task completes, Karpenter and ArgoCD continue running on the
-# karpenter-bootstrap managed node group. This task is NOT the runtime - it's
-# the installer. The ECS infrastructure remains available for future audited
-# SRE operations (resync, break-glass access, disaster recovery).
-# -----------------------------------------------------------------------------
+# Idempotent task: installs/updates ArgoCD, the cluster secret, and root Application.
 resource "aws_ecs_task_definition" "bootstrap" {
   family                   = "${var.cluster_id}-bootstrap"
   network_mode             = "awsvpc"
@@ -153,21 +115,6 @@ resource "aws_ecs_task_definition" "bootstrap" {
             echo "✓ $ADDON active"
           done
 
-          # Applied unconditionally (not just on first install) so a changed
-          # value/preemptionPolicy is picked up on every bootstrap re-run.
-          echo "Creating bootstrap-critical PriorityClass..."
-          cat <<-PRIORITYCLASS_EOF | kubectl apply -f -
-          apiVersion: scheduling.k8s.io/v1
-          kind: PriorityClass
-          metadata:
-            name: bootstrap-critical
-          value: 100000
-          globalDefault: false
-          preemptionPolicy: PreemptLowerPriority
-          description: "ArgoCD and Karpenter controller pods on the karpenter-bootstrap node group."
-          PRIORITYCLASS_EOF
-          echo "✓ bootstrap-critical PriorityClass applied"
-
           if ! kubectl get deployment argocd-server -n argocd 2>/dev/null; then
             echo "Installing ArgoCD from repo chart..."
 
@@ -178,17 +125,8 @@ resource "aws_ecs_task_definition" "bootstrap" {
             helm repo add argo https://argoproj.github.io/argo-helm
             helm dependency build "$REPO_DIR/argocd/config/shared/argocd"
 
-            # Install using the same chart that the self-managed ArgoCD app
-            # uses (argocd/config/shared/argocd/), with tracking-id annotations
-            # so the self-managed ArgoCD app can adopt these resources.
-            # redisSecretInit is enabled here to create the Redis auth secret;
-            # the self-managed ArgoCD app has it disabled and prunes the
-            # completed Job on adoption.
-            # ArgoCD components schedule via the bootstrap-critical
-            # PriorityClass (argo-cd.global.priorityClassName in values.yaml,
-            # applied automatically to all components except redis-ha which
-            # needs its own explicit override). redisSecretInit is a one-time
-            # init Job with no scheduling override — it schedules normally.
+            # tracking-id annotations let the self-managed ArgoCD app adopt these resources.
+            # redisSecretInit creates the Redis auth secret (disabled in the self-managed app).
             helm upgrade --install argocd "$REPO_DIR/argocd/config/shared/argocd" \
               --namespace argocd \
               --set argo-cd.redisSecretInit.enabled=true \
@@ -260,7 +198,6 @@ resource "aws_ecs_task_definition" "bootstrap" {
               sre_alb_dns_name: "$SRE_ALB_DNS_NAME"
               sre_domain: "$SRE_DOMAIN"
               redis_endpoint: "$REDIS_ENDPOINT"
-              karpenter_controller_role_arn: "$KARPENTER_CONTROLLER_ROLE_ARN"
               vpc_id: "$VPC_ID"
           type: Opaque
           stringData:
@@ -300,46 +237,6 @@ resource "aws_ecs_task_definition" "bootstrap" {
                 - CreateNamespace=true
           APP_EOF
 
-          # ArgoCD will install Karpenter and create the NodePool via Applications.
-          # No ECS seeding needed - Applications sync concurrently (no sync-wave
-          # ordering) and retry with backoff until eks-nodepool's NodePool/
-          # EC2NodeClass apply succeeds once Karpenter's CRDs are registered.
-
-          # CI: E2E test runner starts immediately after bootstrap exits, so
-          # HyperShift must be fully installed before work agents apply
-          # HostedCluster manifests. This wait is a CI accommodation — bootstrap
-          # has no production requirement to block on application-level health.
-          # WAIT_FOR_HYPERSHIFT_HEALTH must be set to "true" by the E2E workflow
-          # invocation (e.g. via bootstrap-argocd.sh); ordinary bootstraps leave
-          # it unset and skip this wait entirely.
-          if [ "$${CLUSTER_TYPE:-}" = "management-cluster" ] && [ "$${WAIT_FOR_HYPERSHIFT_HEALTH:-false}" = "true" ]; then
-            echo "=== Waiting for hypershift Application to be Synced and Healthy (up to 30m) ==="
-            _HS_DEADLINE=$((SECONDS + 1800))
-            until _HS_STATE=$(kubectl get application hypershift -n argocd --request-timeout=10s \
-                -o jsonpath='{.status.sync.status}|{.status.health.status}' 2>/tmp/hs-err) \
-                && [ "$${_HS_STATE}" = "Synced|Healthy" ]; do
-              if grep -qiE "unable to connect|connection refused|i/o timeout|no such host" /tmp/hs-err 2>/dev/null; then
-                echo "ERROR: kubectl cannot reach the API server — cannot wait for hypershift:" >&2
-                cat /tmp/hs-err >&2
-                exit 1
-              fi
-              if [ $SECONDS -ge $_HS_DEADLINE ]; then
-                echo "ERROR: hypershift Application not Synced and Healthy after 30 minutes" >&2
-                kubectl get application hypershift -n argocd --request-timeout=10s -o yaml 2>/dev/null || true
-                exit 1
-              fi
-              _HS_SYNC=$(kubectl get application hypershift -n argocd --request-timeout=10s \
-                -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "NotFound")
-              _HS_HEALTH=$(kubectl get application hypershift -n argocd --request-timeout=10s \
-                -o jsonpath='{.status.health.status}' 2>/dev/null || echo "NotFound")
-              _HS_MSG=$(kubectl get application hypershift -n argocd --request-timeout=10s \
-                -o jsonpath='{.status.health.message}' 2>/dev/null || true)
-              echo "  hypershift sync: $${_HS_SYNC}, health: $${_HS_HEALTH} ($(( _HS_DEADLINE - SECONDS ))s remaining)$${_HS_MSG:+ — $${_HS_MSG}}"
-              sleep 15
-            done
-            echo "=== hypershift is Synced and Healthy ==="
-          fi
-
           echo "=== Bootstrap completed successfully ==="
         EOF
       ]
@@ -374,10 +271,6 @@ resource "aws_ecs_task_definition" "bootstrap" {
         {
           name  = "REDIS_ENDPOINT"
           value = var.redis_endpoint
-        },
-        {
-          name  = "KARPENTER_CONTROLLER_ROLE_ARN"
-          value = var.karpenter_controller_role_arn
         },
         {
           name  = "VPC_ID"
