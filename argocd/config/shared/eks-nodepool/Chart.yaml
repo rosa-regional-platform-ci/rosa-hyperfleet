@@ -1,6 +1,6 @@
 apiVersion: v2
 name: eks-nodepool
-description: Custom Karpenter NodePool for regional cluster workloads
+description: Karpenter EC2NodeClass and workloads NodePool
 type: application
 version: 0.1.0
 appVersion: "latest"

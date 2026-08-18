@@ -87,6 +87,7 @@ spec:
             _TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
             _API="https://kubernetes.default.svc"
 
+            # Patch the command and add --aws-assume-role.
             curl -sf --cacert "$_CA" -H "Authorization: Bearer $_TOKEN" \
               -H "Content-Type: application/json-patch+json" -X PATCH \
               "${_API}/apis/apps/v1/namespaces/hypershift/deployments/external-dns" \

@@ -25,8 +25,7 @@ module "ecs_bootstrap" {
   eks_cluster_security_group_id = module.eks_cluster.cluster_security_group_id
   cluster_id                   = var.regional_id  # or var.management_id
 
-  # Karpenter inputs (from eks-cluster module outputs)
-  karpenter_controller_role_arn = module.eks_cluster.karpenter_controller_role_arn
+  # Karpenter auth is handled by Pod Identity (in eks-cluster module)
 }
 ```
 
@@ -41,10 +40,10 @@ The ECS task executes the following steps in order:
 
 After ECS bootstrap completes, ArgoCD takes over cluster management:
 
-1. **Install Karpenter** (sync wave 0): ArgoCD deploys the `karpenter` Application, installing Karpenter via Helm
-2. **Create eks-nodepool Application** (sync wave 10): ArgoCD deploys the `eks-nodepool` Application, which applies the `EC2NodeClass` and cluster-type-specific workloads `NodePool`
+1. **Install Karpenter**: ArgoCD deploys the `karpenter` Application, installing Karpenter via Helm
+2. **Create eks-nodepool Application**: ArgoCD deploys the `eks-nodepool` Application, which applies the `EC2NodeClass` and cluster-type-specific workloads `NodePool`
 
-**Note**: The current `EC2NodeClass` uses standard Bottlerocket AMIs. FIPS-validated compute (RHEL nodes with FIPS mode enabled) will be configured via userData once the RHEL AMI work is complete.
+**Note**: The current `EC2NodeClass` uses Bottlerocket FIPS AMIs selected via name filter (`bottlerocket-aws-k8s-1.34-fips-x86_64-*`), since Karpenter's alias system [does not support FIPS variants](https://github.com/aws/karpenter-provider-aws/issues/8198).
 
 ## Security Features
 
@@ -66,16 +65,15 @@ After ECS bootstrap completes, ArgoCD takes over cluster management:
 
 ## Inputs
 
-| Name                            | Description                                                                                                                                                                     | Type           | Default | Required |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------- | :------: |
-| `cluster_id`                    | Cluster identifier for resource naming (e.g., `regional`, `mc01`)                                                                                                               | `string`       | n/a     |   yes    |
-| `vpc_id`                        | VPC ID for ECS task execution                                                                                                                                                   | `string`       | n/a     |   yes    |
-| `private_subnets`               | Private subnet IDs for task execution                                                                                                                                           | `list(string)` | n/a     |   yes    |
-| `eks_cluster_arn`               | EKS cluster ARN for bootstrap configuration                                                                                                                                     | `string`       | n/a     |   yes    |
-| `eks_cluster_name`              | EKS cluster name for bootstrap configuration                                                                                                                                    | `string`       | n/a     |   yes    |
-| `eks_cluster_security_group_id` | EKS cluster security group ID                                                                                                                                                   | `string`       | n/a     |   yes    |
-| `karpenter_controller_role_arn` | IAM role ARN for Karpenter controller (IRSA). Set from `eks_cluster.karpenter_controller_role_arn`. Injected into the ArgoCD cluster secret for ApplicationSet value injection. | `string`       | n/a     |   yes    |
-| `environment`                   | Environment name for tagging                                                                                                                                                    | `string`       | `"dev"` |    no    |
+| Name                            | Description                                                       | Type           | Default | Required |
+| ------------------------------- | ----------------------------------------------------------------- | -------------- | ------- | :------: |
+| `cluster_id`                    | Cluster identifier for resource naming (e.g., `regional`, `mc01`) | `string`       | n/a     |   yes    |
+| `vpc_id`                        | VPC ID for ECS task execution                                     | `string`       | n/a     |   yes    |
+| `private_subnets`               | Private subnet IDs for task execution                             | `list(string)` | n/a     |   yes    |
+| `eks_cluster_arn`               | EKS cluster ARN for bootstrap configuration                       | `string`       | n/a     |   yes    |
+| `eks_cluster_name`              | EKS cluster name for bootstrap configuration                      | `string`       | n/a     |   yes    |
+| `eks_cluster_security_group_id` | EKS cluster security group ID                                     | `string`       | n/a     |   yes    |
+| `environment`                   | Environment name for tagging                                      | `string`       | `"dev"` |    no    |
 
 ## Outputs
 

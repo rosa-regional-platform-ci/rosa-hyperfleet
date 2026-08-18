@@ -5,13 +5,8 @@ argo-cd:
   ha:
     enabled: true
 
-  # bootstrap-critical PriorityClass for all ArgoCD components so they can
-  # preempt lower-priority pods on the karpenter-bootstrap node group before
-  # Karpenter has provisioned any worker nodes. The PriorityClass is applied
-  # by the ECS bootstrap task (see ecs-bootstrap module). Harmless on regular
-  # nodes.
   global:
-    priorityClassName: bootstrap-critical
+    priorityClassName: system-cluster-critical
 
   # Server configuration
   server:
@@ -150,10 +145,10 @@ argo-cd:
     enabled: true
     replicas: 2
     hardAntiAffinity: false
-    priorityClassName: bootstrap-critical
+    priorityClassName: system-cluster-critical
     haproxy:
       hardAntiAffinity: false
-      priorityClassName: bootstrap-critical
+      priorityClassName: system-cluster-critical
 
   # redis key kept for non-HA mode reference (unused when ha.enabled=true)
   redis:
