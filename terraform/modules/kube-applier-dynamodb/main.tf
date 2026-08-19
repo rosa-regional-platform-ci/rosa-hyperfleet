@@ -166,7 +166,10 @@ resource "aws_dynamodb_resource_policy" "specs" {
         "dynamodb:Scan",
         "dynamodb:Query",
       ]
-      Resource = aws_dynamodb_table.specs[each.key].arn
+      Resource = [
+        aws_dynamodb_table.specs[each.key].arn,
+        "${aws_dynamodb_table.specs[each.key].arn}/index/*",
+      ]
     }]
   })
 }
@@ -190,7 +193,10 @@ resource "aws_dynamodb_resource_policy" "status" {
         "dynamodb:PutItem",
         "dynamodb:DeleteItem",
       ]
-      Resource = aws_dynamodb_table.status[each.key].arn
+      Resource = [
+        aws_dynamodb_table.status[each.key].arn,
+        "${aws_dynamodb_table.status[each.key].arn}/index/*",
+      ]
     }]
   })
 }

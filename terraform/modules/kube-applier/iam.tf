@@ -53,6 +53,7 @@ resource "aws_iam_role_policy" "kube_applier_specs" {
         ]
         Resource = [
           "arn:aws:dynamodb:${var.aws_region}:${var.rc_aws_account_id}:table/${var.management_id}-specs-*",
+          "arn:aws:dynamodb:${var.aws_region}:${var.rc_aws_account_id}:table/${var.management_id}-specs-*/index/*",
         ]
       },
       {
