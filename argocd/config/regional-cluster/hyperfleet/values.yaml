@@ -9,7 +9,7 @@ hyperfleet:
 
   source:
     repoURL: https://github.com/rrp-bot/rosa-hyperfleet-api.git
-    targetRevision: feature/hyperfleet-dynamo
+    targetRevision: 748e6d7
     path: hyperfleet-operator/charts
 
   syncPolicy:
@@ -20,7 +20,7 @@ hyperfleet:
   helmValues:
     image:
       repository: quay.io/psav/hyperfleet-operator
-      tag: "dd3789e"
+      tag: "748e6d7"
       pullPolicy: Always
 
     replicaCount: 2
@@ -37,3 +37,9 @@ hyperfleet:
       requests:
         cpu: 100m
         memory: 128Mi
+
+    dynamoWatcher:
+      pollInterval: ""
+      relistInterval: ""
+      lookbackMax: ""
+      syncInterval: ""
