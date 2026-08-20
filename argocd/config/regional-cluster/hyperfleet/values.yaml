@@ -9,7 +9,7 @@ hyperfleet:
 
   source:
     repoURL: https://github.com/rrp-bot/rosa-hyperfleet-api.git
-    targetRevision: 748e6d7
+    targetRevision: b4826eb
     path: hyperfleet-operator/charts
 
   syncPolicy:
