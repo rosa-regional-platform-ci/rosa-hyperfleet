@@ -163,6 +163,7 @@ resource "aws_dynamodb_resource_policy" "specs" {
       Action = [
         "dynamodb:DescribeTable",
         "dynamodb:GetItem",
+        "dynamodb:BatchGetItem",
         "dynamodb:Scan",
         "dynamodb:Query",
       ]
@@ -188,6 +189,7 @@ resource "aws_dynamodb_resource_policy" "status" {
       }
       Action = [
         "dynamodb:GetItem",
+        "dynamodb:BatchGetItem",
         "dynamodb:Scan",
         "dynamodb:Query",
         "dynamodb:PutItem",

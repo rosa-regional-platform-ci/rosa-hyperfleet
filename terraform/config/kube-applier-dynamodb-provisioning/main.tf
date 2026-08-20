@@ -56,6 +56,7 @@ resource "aws_iam_role_policy" "hyperfleet_operator_dynamodb" {
           "dynamodb:UpdateItem",
           "dynamodb:DeleteItem",
           "dynamodb:GetItem",
+          "dynamodb:BatchGetItem",
           "dynamodb:Query",
           "dynamodb:Scan"
         ]
@@ -69,6 +70,7 @@ resource "aws_iam_role_policy" "hyperfleet_operator_dynamodb" {
         Effect = "Allow"
         Action = [
           "dynamodb:GetItem",
+          "dynamodb:BatchGetItem",
           "dynamodb:Query",
           "dynamodb:Scan",
           "dynamodb:DescribeTable"
