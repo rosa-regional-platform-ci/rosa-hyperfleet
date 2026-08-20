@@ -48,6 +48,7 @@ resource "aws_iam_role_policy" "kube_applier_specs" {
         Action = [
           "dynamodb:DescribeTable",
           "dynamodb:GetItem",
+          "dynamodb:BatchGetItem",
           "dynamodb:Scan",
           "dynamodb:Query",
         ]
