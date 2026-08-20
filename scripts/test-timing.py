@@ -164,17 +164,38 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
+def compute_shard(document_id: str, shard_count: int = 4) -> str:
+    """
+    Mirror of hyperfleet-dynamo ComputeShard (dynamodb/shard.go):
+      1. Strip hyphens from the UUID string.
+      2. Parse the first 8 hex characters as a base-16 uint64.
+      3. Return str(value % shard_count).
+    Items written without this attribute are invisible to the GSI poller.
+    """
+    stripped = document_id.replace("-", "")
+    if len(stripped) < 8:
+        return "0"
+    try:
+        v = int(stripped[:8], 16)
+    except ValueError:
+        return "0"
+    return str(v % shard_count)
+
+
 # ---------------------------------------------------------------------------
 # DynamoDB item construction
 # ---------------------------------------------------------------------------
 
 
-def apply_desire_item(doc_id: str, mc_name: str, namespace: str, cm_name: str) -> dict:
+def apply_desire_item(
+    doc_id: str, cluster_name: str, namespace: str, cm_name: str
+) -> dict:
     """
     Build a DynamoDB item for an ApplyDesire (ServerSideApply, ConfigMap).
 
     Top-level attributes written:
       documentID        S  — partition key
+      shard             S  — GSI partition key (computed from documentID, required for GSI poller)
       version           N  — optimistic concurrency (start at 1)
       updateTime        S  — ISO-8601
       createTime        S  — ISO-8601
@@ -193,12 +214,13 @@ def apply_desire_item(doc_id: str, mc_name: str, namespace: str, cm_name: str) -
     )
     return {
         "documentID": {"S": doc_id},
+        "shard": {"S": compute_shard(doc_id)},
         "version": {"N": "1"},
         "updateTime": {"S": now},
         "createTime": {"S": now},
         "spec": {
             "M": {
-                "managementCluster": {"S": mc_name},
+                "managementCluster": {"S": cluster_name},
                 "clusterID": {"S": "timing-test"},
                 "type": {"S": "ServerSideApply"},
                 "targetItem": {
@@ -221,12 +243,14 @@ def apply_desire_item(doc_id: str, mc_name: str, namespace: str, cm_name: str) -
 def apply_desire_delete_item(existing_item: dict) -> dict:
     """
     Flip an existing ApplyDesire item to Type=Delete.
-    Increments version, updates updateTime, removes serverSideApply, sets type=Delete.
+    Increments version, updates updateTime, recomputes shard, removes serverSideApply, sets type=Delete.
     """
     item = json.loads(json.dumps(existing_item))  # deep copy via JSON
     old_version = int(item["version"]["N"])
     item["version"] = {"N": str(old_version + 1)}
-    item["updateTime"] = {"S": now_iso()}
+    new_time = now_iso()
+    item["updateTime"] = {"S": new_time}
+    item["shard"] = {"S": compute_shard(item["documentID"]["S"])}
     spec = item["spec"]["M"]
     spec["type"] = {"S": "Delete"}
     spec.pop("serverSideApply", None)
@@ -234,19 +258,22 @@ def apply_desire_delete_item(existing_item: dict) -> dict:
     return item
 
 
-def read_desire_item(doc_id: str, mc_name: str, namespace: str, cm_name: str) -> dict:
+def read_desire_item(
+    doc_id: str, cluster_name: str, namespace: str, cm_name: str
+) -> dict:
     """
     Build a DynamoDB item for a ReadDesire targeting the same ConfigMap.
     """
     now = now_iso()
     return {
         "documentID": {"S": doc_id},
+        "shard": {"S": compute_shard(doc_id)},
         "version": {"N": "1"},
         "updateTime": {"S": now},
         "createTime": {"S": now},
         "spec": {
             "M": {
-                "managementCluster": {"S": mc_name},
+                "managementCluster": {"S": cluster_name},
                 "clusterID": {"S": "timing-test"},
                 "targetItem": {
                     "M": {
@@ -403,7 +430,7 @@ def main():
     # Step 1: Write ApplyDesire (ServerSideApply)                         #
     # ------------------------------------------------------------------ #
     log("Step 1: Writing ApplyDesire (ServerSideApply) to specs table...")
-    apply_item = apply_desire_item(apply_doc_id, args.mc, args.namespace, cm_name)
+    apply_item = apply_desire_item(apply_doc_id, cluster_name, args.namespace, cm_name)
     t0 = time.monotonic()
     ddb.put_item(TableName=tbl_specs_apply, Item=apply_item)
     timings["write_apply_desire_ms"] = (time.monotonic() - t0) * 1000
@@ -413,7 +440,7 @@ def main():
     # Step 2: Write ReadDesire                                            #
     # ------------------------------------------------------------------ #
     log("Step 2: Writing ReadDesire to specs table...")
-    read_item = read_desire_item(read_doc_id, args.mc, args.namespace, cm_name)
+    read_item = read_desire_item(read_doc_id, cluster_name, args.namespace, cm_name)
     t0 = time.monotonic()
     ddb.put_item(TableName=tbl_specs_read, Item=read_item)
     timings["write_read_desire_ms"] = (time.monotonic() - t0) * 1000
