@@ -10,5 +10,6 @@
   "management_id": "eph-e7d175-mc01",
   "regional_aws_account_id": "720644165472",
   "eph_prefix": "eph-e7d175",
-  "enable_bastion": true
+  "enable_bastion": true,
+  "delete": true
 }
