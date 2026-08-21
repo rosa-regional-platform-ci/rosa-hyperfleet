@@ -26,5 +26,5 @@ argo-cd:
     rbac:
       policy.default: role:readonly
 hyperfleet:
-  oidcS3Bucket: hyperfleet--regional-oidc-ssm:///infra/integration/us-east-1/account_id
+  oidcS3Bucket: hypershift-eph-ddc08f67-regional-oidc-ssm:///infra/integration/us-east-1/account_id
   oidcIssuerBaseUrl: https://hyperfleet-oidc-us-east-1.s3.us-east-1.amazonaws.com

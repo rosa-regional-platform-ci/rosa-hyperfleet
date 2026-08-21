@@ -9,7 +9,7 @@ eksNodePool:
   instanceFamilies:
   - m8i-flex
   - m7i-flex
-baseDomain: us-east-1.dev0.rosa.devshift.net
+baseDomain: us-east-1-eph-ddc08f67.dev0.rosa.devshift.net
 pagerduty:
   enabled: false
 grafana:
@@ -26,5 +26,5 @@ argo-cd:
     rbac:
       policy.default: ''
 hyperfleet:
-  oidcS3Bucket: hyperfleet--regional-oidc-ssm:///infra/ephemeral/us-east-1/account_id
+  oidcS3Bucket: hypershift-eph-ddc08f67-regional-oidc-599476212575
   oidcIssuerBaseUrl: https://hyperfleet-oidc-us-east-1.s3.us-east-1.amazonaws.com

@@ -201,7 +201,7 @@ applications:
         rbac:
           policy.default: "{% if regional_cluster.enable_write_sre_tools %}{% else %}role:readonly{% endif %}"
     hyperfleet:
-      oidcS3Bucket: "hyperfleet-{{ eph_prefix }}-regional-oidc-{{ account_id }}"
+      oidcS3Bucket: "hypershift-{{ eph_prefix }}-regional-oidc-{{ account_id }}"
       # oidcS3Bucket: "{{ regional_id }}-oidc-{{ account_id }}"
       oidcIssuerBaseUrl: "https://hyperfleet-oidc-{{ aws_region }}.s3.{{ aws_region }}.amazonaws.com"
 

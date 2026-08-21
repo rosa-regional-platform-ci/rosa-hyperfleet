@@ -33,10 +33,10 @@ deployment_name: "{{ aws_region }}{% if eph_prefix %}-{{ eph_prefix }}{% endif %
 aws:
   # @doc aws.account_id Regional AWS account ID.
   # @used-by aws.account_id _context
-  account_id: "ssm:///infra/{{ environment }}/{{ aws_region }}/account_id"
+  account_id: '599476212575'
   # @doc aws.management_cluster_account_id Default account for MCs when entry has no account_id.
   # @used-by aws.management_cluster_account_id _context
-  management_cluster_account_id: "ssm:///infra/{{ environment }}/{{ aws_region }}/{{ cluster_prefix }}/account_id"
+  management_cluster_account_id: '855246887846'
 
 dns:
   # @doc dns.domain Base domain for the environment. Must be set per environment. See config/ephemeral/defaults.yaml for how the ephemeral template selects between CI and dev account pools.
@@ -201,7 +201,7 @@ applications:
         rbac:
           policy.default: "{% if regional_cluster.enable_write_sre_tools %}{% else %}role:readonly{% endif %}"
     hyperfleet:
-      oidcS3Bucket: "hyperfleet-{{ eph_prefix }}-regional-oidc-{{ account_id }}"
+      oidcS3Bucket: "hypershift-{{ eph_prefix }}-regional-oidc-{{ account_id }}"
       # oidcS3Bucket: "{{ regional_id }}-oidc-{{ account_id }}"
       oidcIssuerBaseUrl: "https://hyperfleet-oidc-{{ aws_region }}.s3.{{ aws_region }}.amazonaws.com"
 
