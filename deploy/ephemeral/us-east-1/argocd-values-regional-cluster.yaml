@@ -9,7 +9,7 @@ eksNodePool:
   instanceFamilies:
   - m8i-flex
   - m7i-flex
-baseDomain: us-east-1.dev0.rosa.devshift.net
+baseDomain: us-east-1-eph-eb8bb3.ci00.rosa.devshift.net
 hyperfleet:
   oidcS3Bucket: hyperfleet-oidc-us-east-1
   oidcIssuerBaseUrl: https://hyperfleet-oidc-us-east-1.s3.us-east-1.amazonaws.com
