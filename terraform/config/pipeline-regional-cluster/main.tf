@@ -85,7 +85,7 @@ resource "aws_iam_role_policy" "codebuild_policy" {
       {
         Effect   = "Allow"
         Action   = "sts:AssumeRole"
-        Resource = "arn:aws:iam::*:role/OrganizationAccountAccessRole"
+        Resource = "arn:aws:iam::*:role/${var.child_admin_role_name}"
       }
     ]
   })
@@ -264,6 +264,11 @@ resource "aws_codebuild_project" "regional_apply" {
       name  = "ENVIRONMENT_HOSTED_ZONE_ID"
       value = var.environment_hosted_zone_id
     }
+    # IAM role name assumed in the target (child) account for infra apply (hop 2)
+    environment_variable {
+      name  = "CHILD_ADMIN_ROLE_NAME"
+      value = var.child_admin_role_name
+    }
   }
 
   source {
@@ -317,6 +322,11 @@ resource "aws_codebuild_project" "regional_bootstrap" {
     environment_variable {
       name  = "REPOSITORY_BRANCH"
       value = var.repository_branch
+    }
+    # IAM role name assumed in the target (child) account for argocd bootstrap (hop 2)
+    environment_variable {
+      name  = "CHILD_ADMIN_ROLE_NAME"
+      value = var.child_admin_role_name
     }
   }
 

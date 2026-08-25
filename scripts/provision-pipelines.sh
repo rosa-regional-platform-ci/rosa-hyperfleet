@@ -55,14 +55,17 @@ bootstrap_target_state_bucket() {
         # Same account - run bootstrap directly
         ./scripts/bootstrap-state.sh "$target_region"
     else
-        # Cross-account - assume role first
+        # Cross-account (hop 1) - assume the child admin role first.
+        # Role name is configurable per environment (defaults to the AWS
+        # Organizations role); stage uses the scoped day-2 role.
+        local admin_role="${CHILD_ADMIN_ROLE_NAME:-OrganizationAccountAccessRole}"
         local creds
         if ! creds=$(aws sts assume-role \
-            --role-arn "arn:aws:iam::${target_account_id}:role/OrganizationAccountAccessRole" \
+            --role-arn "arn:aws:iam::${target_account_id}:role/${admin_role}" \
             --role-session-name "bootstrap-state-${target_account_id}" \
             --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
             --output text 2>&1); then
-            echo "ERROR: Failed to assume role in account $target_account_id for state bootstrap"
+            echo "ERROR: Failed to assume ${admin_role} role in account $target_account_id for state bootstrap"
             echo "Error: $creds"
             return 1
         fi
@@ -98,7 +101,7 @@ fi
 
 # If not found in config, try to detect from bucket location
 if [ -z "$TF_STATE_REGION" ]; then
-    BUCKET_REGION=$(aws s3api get-bucket-location --bucket "$TF_STATE_BUCKET" --region us-east-1 --query LocationConstraint --output text 2>/dev/null || echo "")
+    BUCKET_REGION=$(aws s3api get-bucket-location --bucket "$TF_STATE_BUCKET" --region us-east-1 --query LocationConstraint --output text --no-cli-pager 2>/dev/null || echo "")
     if [ "$BUCKET_REGION" == "None" ] || [ "$BUCKET_REGION" == "null" ] || [ -z "$BUCKET_REGION" ]; then
         TF_STATE_REGION="us-east-1"
     else
@@ -142,7 +145,8 @@ resolve_ssm_param() {
             --with-decryption \
             --query 'Parameter.Value' \
             --output text \
-            --region "${region}"
+            --region "${region}" \
+            --no-cli-pager
     else
         echo "$value"
     fi
@@ -248,8 +252,19 @@ for region_dir in deploy/${ENVIRONMENT}/*/; do
         # Extract configuration from JSON
         AWS_REGION=$(jq -r '.region // .target_region // "us-east-1"' "$REGIONAL_CONFIG")
         TARGET_ACCOUNT_ID=$(jq -r '.account_id // ""' "$REGIONAL_CONFIG")
-        TARGET_ACCOUNT_ID=$(resolve_ssm_param "$TARGET_ACCOUNT_ID")
+        TARGET_ACCOUNT_ID=$(resolve_ssm_param "$TARGET_ACCOUNT_ID" "$AWS_REGION")
         REGIONAL_ID=$(jq -r '.regional_id // ""' "$REGIONAL_CONFIG")
+
+        # Child admin role assumed for hop 1 (state bootstrap, below) and hop 2
+        # (infra apply, threaded to the pipeline CodeBuild via TF var).
+        export CHILD_ADMIN_ROLE_NAME
+        CHILD_ADMIN_ROLE_NAME=$(jq -r '.child_admin_role_name // "OrganizationAccountAccessRole"' "$REGIONAL_CONFIG")
+
+        # Validate child_admin_role_name is one of the two allowed values
+        if [[ "$CHILD_ADMIN_ROLE_NAME" != "OrganizationAccountAccessRole" && "$CHILD_ADMIN_ROLE_NAME" != "rosa-hyperfleet-account-admin" ]]; then
+            echo "ERROR: child_admin_role_name must be either 'OrganizationAccountAccessRole' or 'rosa-hyperfleet-account-admin', got '${CHILD_ADMIN_ROLE_NAME}'" >&2
+            exit 1
+        fi
 
         # Read delete_pipeline from the regional-cluster provisioner input
         DELETE_FLAG=$(jq -r '.delete_pipeline // false' "$REGIONAL_CONFIG")
@@ -280,11 +295,12 @@ for region_dir in deploy/${ENVIRONMENT}/*/; do
             -var="github_branch=${GITHUB_BRANCH}"
             -var="region=${AWS_REGION}"
         )
-        [ -n "$GITHUB_CONNECTION_ARN" ] && TF_ARGS+=( -var="github_connection_arn=${GITHUB_CONNECTION_ARN}" )
-        [ -n "$TARGET_ACCOUNT_ID" ] && TF_ARGS+=( -var="target_account_id=${TARGET_ACCOUNT_ID}" )
-        [ -n "$AWS_REGION" ] && TF_ARGS+=( -var="target_region=${AWS_REGION}" )
-        [ -n "$REGIONAL_ID" ] && TF_ARGS+=( -var="regional_id=${REGIONAL_ID}" )
-        [ -n "$ENVIRONMENT" ] && TF_ARGS+=( -var="target_environment=${ENVIRONMENT}" )
+        [ -n "${GITHUB_CONNECTION_ARN:-}" ] && TF_ARGS+=( -var="github_connection_arn=${GITHUB_CONNECTION_ARN}" )
+        [ -n "${TARGET_ACCOUNT_ID:-}" ] && TF_ARGS+=( -var="target_account_id=${TARGET_ACCOUNT_ID}" )
+        [ -n "${AWS_REGION:-}" ] && TF_ARGS+=( -var="target_region=${AWS_REGION}" )
+        [ -n "${REGIONAL_ID:-}" ] && TF_ARGS+=( -var="regional_id=${REGIONAL_ID}" )
+        [ -n "${ENVIRONMENT:-}" ] && TF_ARGS+=( -var="target_environment=${ENVIRONMENT}" )
+        [ -n "${CHILD_ADMIN_ROLE_NAME:-}" ] && TF_ARGS+=( -var="child_admin_role_name=${CHILD_ADMIN_ROLE_NAME}" )
         # Repository URL and branch for cluster configuration
         TF_ARGS+=(
             -var="repository_url=https://github.com/${GITHUB_REPOSITORY}.git"
@@ -292,7 +308,7 @@ for region_dir in deploy/${ENVIRONMENT}/*/; do
             -var="codebuild_image=${PLATFORM_IMAGE}"
         )
         # DNS configuration (optional)
-        [ -n "$ENVIRONMENT_HOSTED_ZONE_ID" ] && TF_ARGS+=( -var="environment_hosted_zone_id=${ENVIRONMENT_HOSTED_ZONE_ID}" )
+        [ -n "${ENVIRONMENT_HOSTED_ZONE_ID:-}" ] && TF_ARGS+=( -var="environment_hosted_zone_id=${ENVIRONMENT_HOSTED_ZONE_ID}" )
 
         if [ "$DELETE_FLAG" == "true" ]; then
             if destroy_pipeline "regional"; then
@@ -328,8 +344,19 @@ for region_dir in deploy/${ENVIRONMENT}/*/; do
 
             AWS_REGION=$(jq -r '.region // .target_region // "us-east-1"' "$mc_config")
             TARGET_ACCOUNT_ID=$(jq -r '.account_id // ""' "$mc_config")
-            TARGET_ACCOUNT_ID=$(resolve_ssm_param "$TARGET_ACCOUNT_ID")
+            TARGET_ACCOUNT_ID=$(resolve_ssm_param "$TARGET_ACCOUNT_ID" "$AWS_REGION")
             MANAGEMENT_ID=$(jq -r '.management_id // ""' "$mc_config")
+
+            # Child admin role assumed for hop 1 (state bootstrap) and hop 2
+            # (infra apply, threaded to the pipeline CodeBuild via TF var).
+            export CHILD_ADMIN_ROLE_NAME
+            CHILD_ADMIN_ROLE_NAME=$(jq -r '.child_admin_role_name // "OrganizationAccountAccessRole"' "$mc_config")
+
+            # Validate child_admin_role_name is one of the two allowed values
+            if [[ "$CHILD_ADMIN_ROLE_NAME" != "OrganizationAccountAccessRole" && "$CHILD_ADMIN_ROLE_NAME" != "rosa-hyperfleet-account-admin" ]]; then
+                echo "ERROR: child_admin_role_name must be either 'OrganizationAccountAccessRole' or 'rosa-hyperfleet-account-admin', got '${CHILD_ADMIN_ROLE_NAME}'" >&2
+                exit 1
+            fi
 
             # Read delete_pipeline from the management-cluster provisioner input
             DELETE_FLAG=$(jq -r '.delete_pipeline // false' "$mc_config")
@@ -360,11 +387,13 @@ for region_dir in deploy/${ENVIRONMENT}/*/; do
                 -var="github_branch=${GITHUB_BRANCH}"
                 -var="region=${AWS_REGION}"
             )
-            [ -n "$GITHUB_CONNECTION_ARN" ] && TF_ARGS+=( -var="github_connection_arn=${GITHUB_CONNECTION_ARN}" )
-            [ -n "$TARGET_ACCOUNT_ID" ] && TF_ARGS+=( -var="target_account_id=${TARGET_ACCOUNT_ID}" )
-            [ -n "$AWS_REGION" ] && TF_ARGS+=( -var="target_region=${AWS_REGION}" )
-            [ -n "$MANAGEMENT_ID" ] && TF_ARGS+=( -var="management_id=${MANAGEMENT_ID}" )
-            [ -n "$ENVIRONMENT" ] && TF_ARGS+=( -var="target_environment=${ENVIRONMENT}" )
+            [ -n "${GITHUB_CONNECTION_ARN:-}" ] && TF_ARGS+=( -var="github_connection_arn=${GITHUB_CONNECTION_ARN}" )
+            [ -n "${TARGET_ACCOUNT_ID:-}" ] && TF_ARGS+=( -var="target_account_id=${TARGET_ACCOUNT_ID}" )
+            [ -n "${AWS_REGION:-}" ] && TF_ARGS+=( -var="target_region=${AWS_REGION}" )
+            [ -n "${MANAGEMENT_ID:-}" ] && TF_ARGS+=( -var="management_id=${MANAGEMENT_ID}" )
+            [ -n "${ENVIRONMENT:-}" ] && TF_ARGS+=( -var="target_environment=${ENVIRONMENT}" )
+            [ -n "${CHILD_ADMIN_ROLE_NAME:-}" ] && TF_ARGS+=( -var="child_admin_role_name=${CHILD_ADMIN_ROLE_NAME}" )
+            [ -n "${MC_CODEBUILD_ROLE_ARN:-}" ] && TF_ARGS+=( -var="mc_codebuild_role_arn=${MC_CODEBUILD_ROLE_ARN}" )
             # Repository URL and branch for cluster configuration
             TF_ARGS+=(
                 -var="repository_url=https://github.com/${GITHUB_REPOSITORY}.git"

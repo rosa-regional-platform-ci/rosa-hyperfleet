@@ -113,7 +113,10 @@ _assume_account() {
         return
     fi
 
-    local role_arn="arn:aws:iam::${account_id}:role/OrganizationAccountAccessRole"
+    # hop 2: assume the child admin role for infra apply / argocd bootstrap.
+    # Role name is configurable per environment (set as a CodeBuild env var by
+    # the pipeline TF); defaults to the AWS Organizations role.
+    local role_arn="arn:aws:iam::${account_id}:role/${CHILD_ADMIN_ROLE_NAME:-OrganizationAccountAccessRole}"
     local creds
     if ! creds=$(
         AWS_ACCESS_KEY_ID="$_CENTRAL_AWS_ACCESS_KEY_ID" \

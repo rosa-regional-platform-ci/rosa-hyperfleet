@@ -21,8 +21,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-REGION=${POSITIONAL_ARGS[0]:-$(aws configure get region 2>/dev/null)}
-REGION=${REGION:-us-east-1}
+# Prioritize: 1) positional arg, 2) AWS_REGION env var, 3) AWS CLI config, 4) default us-east-1
+configured_region=$(aws configure get region 2>/dev/null || true)
+REGION="${POSITIONAL_ARGS[0]:-${AWS_REGION:-${configured_region:-us-east-1}}}"
 
 if [[ "$CENTRAL" == "true" ]]; then
     BUCKET_NAME="terraform-state-${ACCOUNT_ID}"
@@ -41,20 +42,23 @@ apply_bucket_security() {
     aws s3api put-bucket-versioning \
         --bucket "$BUCKET_NAME" \
         --versioning-configuration Status=Enabled \
-        --region "$REGION"
+        --region "$REGION" \
+        --no-cli-pager
 
     aws s3api put-bucket-encryption \
         --bucket "$BUCKET_NAME" \
         --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}' \
-        --region "$REGION"
+        --region "$REGION" \
+        --no-cli-pager
 
     aws s3api put-public-access-block \
         --bucket "$BUCKET_NAME" \
         --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" \
-        --region "$REGION"
+        --region "$REGION" \
+        --no-cli-pager
 
     # Get AWS Organization ID to restrict access to organization members only
-    ORG_ID=$(aws organizations describe-organization --query 'Organization.Id' --output text 2>/dev/null || echo "")
+    ORG_ID=$(aws organizations describe-organization --query 'Organization.Id' --output text --no-cli-pager 2>/dev/null || echo "")
 
     # Add bucket policy to allow cross-account access from OrganizationAccountAccessRole
     # This allows target accounts in the same organization to access their state files
@@ -117,7 +121,8 @@ EOF
     aws s3api put-bucket-policy \
         --bucket "$BUCKET_NAME" \
         --policy file:///tmp/bucket-policy.json \
-        --region "$REGION"
+        --region "$REGION" \
+        --no-cli-pager
 
     rm -f /tmp/bucket-policy.json
 
@@ -125,15 +130,15 @@ EOF
 }
 
 # Create S3 Bucket
-if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+if aws s3api head-bucket --bucket "$BUCKET_NAME" --no-cli-pager 2>/dev/null; then
     echo "✅ Bucket $BUCKET_NAME already exists."
     apply_bucket_security
 else
     echo "Creating bucket $BUCKET_NAME..."
     if [[ "$REGION" == "us-east-1" ]]; then
-        aws s3api create-bucket --bucket "$BUCKET_NAME" --region "$REGION"
+        aws s3api create-bucket --bucket "$BUCKET_NAME" --region "$REGION" --no-cli-pager
     else
-        aws s3api create-bucket --bucket "$BUCKET_NAME" --create-bucket-configuration LocationConstraint="$REGION" --region "$REGION"
+        aws s3api create-bucket --bucket "$BUCKET_NAME" --create-bucket-configuration LocationConstraint="$REGION" --region "$REGION" --no-cli-pager
     fi
     echo "✅ Bucket created successfully"
     apply_bucket_security
