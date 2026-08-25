@@ -1,0 +1,45 @@
+# Stage environment defaults.
+
+aws:
+  # Account IDs are resolved from SSM parameters in the CONTROL account (where
+  # the pipeline-provisioner runs). The RC account ID lives under the /rc/
+  # segment and each MC under /<cluster_prefix>/ (published by the internal
+  # account-config module). management_cluster_account_id falls back to the
+  # base default (ssm:///infra/<env>/<region>/<cluster_prefix>/account_id).
+  account_id: "ssm:///infra/{{ environment }}/{{ aws_region }}/rc/account_id"
+  # Stage children are minted by the internal repo, which provisions the scoped
+  # day-2 role instead of the AWS Organizations role. Pipelines assume this for
+  # both state-bucket bootstrap (hop 1) and infra apply (hop 2).
+  child_admin_role_name: "rosa-hyperfleet-account-admin"
+
+dns:
+  domain: stg0.rosa.devshift.org
+  create_environment_zone: true
+
+terraform_tags:
+  app_code: "OSD-002"
+  service_phase: "stage"
+  cost_center: "732"
+
+regional_cluster:
+  enable_bastion: true
+  enable_cloudtrail: true
+  enable_api_custom_domain: true
+  node_instance_families: ["m8i", "m7i"]
+  enable_sre_tools_gateway: true
+  enable_sre_public_access: true
+  sre_allowed_source_cidrs: []
+  enable_sre_oidc_auth: true
+  sre_oidc_issuer_url: "https://auth.stage.redhat.com/auth/realms/EmployeeIDP"
+  sre_grafana_oidc_client_id: "rosa-hyperfleet-grafana-sre-stage-us-east-1"
+  sre_argocd_oidc_client_id: "rosa-hyperfleet-argocd-sre-stage-us-east-1"
+  sre_prometheus_oidc_client_id: "rosa-hyperfleet-prometheus-sre-stage-us-east-1"
+  sre_thanos_oidc_client_id: "rosa-hyperfleet-thanos-sre-stage-us-east-1"
+
+management_cluster_defaults:
+  enable_bastion: true
+  node_instance_families: ["m8i", "m7i"]
+
+observability:
+  pagerduty:
+    enabled: false
