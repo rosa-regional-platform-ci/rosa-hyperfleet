@@ -1,4 +1,4 @@
-# Merged config: defaults.yaml → integration/defaults.yaml → integration/us-east-1.yaml
+# Merged config: defaults.yaml → stage/defaults.yaml → stage/us-east-1.yaml
 # This file is the output of stage 1 (merge). Stage 2 feeds it to config/templates/.
 
 # =============================================================================
@@ -33,20 +33,20 @@ deployment_name: "{{ aws_region }}"
 aws:
   # @doc aws.account_id Regional AWS account ID.
   # @used-by aws.account_id _context
-  account_id: "ssm:///infra/{{ environment }}/{{ aws_region }}/account_id"
+  account_id: "ssm:///infra/{{ environment }}/{{ aws_region }}/rc/account_id"
   # @doc aws.management_cluster_account_id Default account for MCs when entry has no account_id.
   # @used-by aws.management_cluster_account_id _context
   management_cluster_account_id: "ssm:///infra/{{ environment }}/{{ aws_region }}/{{ cluster_prefix }}/account_id"
   # @doc aws.child_admin_role_name Name of the IAM role the pipelines assume in RC/MC child accounts for state-bucket bootstrap (hop 1) and infra apply (hop 2). Defaults to the AWS Organizations role; override per environment to use a scoped day-2 role.
   # @used-by aws.child_admin_role_name pipeline-provisioner-inputs/regional-cluster.json.j2
   # @used-by aws.child_admin_role_name pipeline-provisioner-inputs/management-cluster.json.j2
-  child_admin_role_name: "OrganizationAccountAccessRole"
+  child_admin_role_name: "rosa-hyperfleet-account-admin"
 
 dns:
   # @doc dns.domain Base domain for the environment. Must be set per environment. See config/ephemeral/defaults.yaml for how the ephemeral template selects between CI and dev account pools.
   # @used-by dns.domain pipeline-provisioner-inputs/terraform.json.j2
   # @used-by dns.domain pipeline-regional-cluster-inputs/terraform.json.j2
-  domain: "int0.rosa.devshift.net"
+  domain: "stg0.rosa.devshift.org"
   # @doc dns.create_environment_zone Create the environment hosted zone in the central account. Set false to reuse an existing zone with pre-configured delegation.
   # @used-by dns.create_environment_zone pipeline-provisioner-inputs/terraform.json.j2
   create_environment_zone: true
@@ -55,15 +55,15 @@ terraform_tags:
   # @doc terraform_tags.app_code Application code for cost tagging.
   # @used-by terraform_tags.app_code pipeline-management-cluster-inputs/terraform.json.j2
   # @used-by terraform_tags.app_code pipeline-regional-cluster-inputs/terraform.json.j2
-  app_code: "infra"
+  app_code: "OSD-002"
   # @doc terraform_tags.service_phase Service deployment phase.
   # @used-by terraform_tags.service_phase pipeline-management-cluster-inputs/terraform.json.j2
   # @used-by terraform_tags.service_phase pipeline-regional-cluster-inputs/terraform.json.j2
-  service_phase: "dev"
+  service_phase: "stage"
   # @doc terraform_tags.cost_center Cost center code for billing.
   # @used-by terraform_tags.cost_center pipeline-management-cluster-inputs/terraform.json.j2
   # @used-by terraform_tags.cost_center pipeline-regional-cluster-inputs/terraform.json.j2
-  cost_center: "000"
+  cost_center: "732"
 
 regional_cluster:
   # @doc regional_cluster.enable_bastion Enable bastion host for regional cluster access.
@@ -120,16 +120,16 @@ regional_cluster:
   sre_oidc_issuer_url: "https://auth.stage.redhat.com/auth/realms/EmployeeIDP"
   # @doc regional_cluster.sre_grafana_oidc_client_id OIDC client ID for Grafana. Required when enable_sre_oidc_auth is true.
   # @used-by regional_cluster.sre_grafana_oidc_client_id pipeline-regional-cluster-inputs/terraform.json.j2
-  sre_grafana_oidc_client_id: "rrp-grafana-sre-int-us-east-1"
+  sre_grafana_oidc_client_id: "rosa-hyperfleet-grafana-sre-stage-us-east-1"
   # @doc regional_cluster.sre_argocd_oidc_client_id OIDC client ID for ArgoCD. Required when enable_sre_oidc_auth is true.
   # @used-by regional_cluster.sre_argocd_oidc_client_id pipeline-regional-cluster-inputs/terraform.json.j2
-  sre_argocd_oidc_client_id: "rrp-argocd-sre-int-us-east-1"
+  sre_argocd_oidc_client_id: "rosa-hyperfleet-argocd-sre-stage-us-east-1"
   # @doc regional_cluster.sre_prometheus_oidc_client_id OIDC client ID for Prometheus. Required when enable_sre_oidc_auth is true.
   # @used-by regional_cluster.sre_prometheus_oidc_client_id pipeline-regional-cluster-inputs/terraform.json.j2
-  sre_prometheus_oidc_client_id: "rrp-prometheus-sre-int-us-east-1"
+  sre_prometheus_oidc_client_id: "rosa-hyperfleet-prometheus-sre-stage-us-east-1"
   # @doc regional_cluster.sre_thanos_oidc_client_id OIDC client ID for Thanos. Required when enable_sre_oidc_auth is true.
   # @used-by regional_cluster.sre_thanos_oidc_client_id pipeline-regional-cluster-inputs/terraform.json.j2
-  sre_thanos_oidc_client_id: "rrp-thanos-sre-int-us-east-1"
+  sre_thanos_oidc_client_id: "rosa-hyperfleet-thanos-sre-stage-us-east-1"
 
 management_cluster_defaults:
   # @doc management_cluster_defaults.enable_bastion Default enable bastion for management clusters.
@@ -145,7 +145,7 @@ observability:
     # @doc observability.pagerduty.enabled Enable PagerDuty service provisioning for the region.
     # @used-by observability.pagerduty.enabled _context
     # @used-by observability.pagerduty.enabled pipeline-regional-cluster-inputs/terraform.json.j2
-    enabled: true
+    enabled: false
     # @doc observability.pagerduty.escalation_policy_id PagerDuty escalation policy ID for regional services.
     # @used-by observability.pagerduty.escalation_policy_id _context
     # @used-by observability.pagerduty.escalation_policy_id pipeline-regional-cluster-inputs/terraform.json.j2
@@ -242,3 +242,4 @@ applications:
 # These are now part of the regional_cluster stanza above.
 provision_mcs:
   mc01: {}
+  mc02: {}
