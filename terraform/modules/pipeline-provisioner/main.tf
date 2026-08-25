@@ -171,6 +171,10 @@ resource "aws_codebuild_project" "provisioner" {
       name  = "PLATFORM_IMAGE"
       value = var.codebuild_image
     }
+    environment_variable {
+      name  = "MC_CODEBUILD_ROLE_ARN"
+      value = var.mc_codebuild_role_arn
+    }
   }
 
   source {

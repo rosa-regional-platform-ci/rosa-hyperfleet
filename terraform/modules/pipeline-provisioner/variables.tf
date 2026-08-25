@@ -58,3 +58,9 @@ variable "codebuild_image" {
     error_message = "codebuild_image must be a non-empty ECR image URI"
   }
 }
+
+variable "mc_codebuild_role_arn" {
+  type        = string
+  description = "ARN of the shared MC CodeBuild IAM role (empty string to create per-MC roles)"
+  default     = ""
+}

@@ -128,15 +128,16 @@ if [ "$TF_VAR_enable_sre_oidc_auth" = "true" ]; then
     done
 fi
 
-# MC OU path from SSM (provisioned by account-minter, required for OIDC bucket policy)
+# MC OU path from SSM (provisioned by account-minter in rosa-hyperfleet-internal)
 TF_VAR_mc_ou_path=$(aws ssm get-parameter \
-    --name "/infra/region-ou-path" \
+    --name "/infra/${ENVIRONMENT}/${TARGET_REGION}/ou-path" \
     --with-decryption \
     --query 'Parameter.Value' \
     --output text \
     --region "${TARGET_REGION}" 2>/dev/null || true)
 if [ -z "${TF_VAR_mc_ou_path}" ]; then
-    echo "ERROR: SSM parameter /infra/region-ou-path not found in account ${TARGET_ACCOUNT_ID} region ${TARGET_REGION}" >&2
+    echo "ERROR: SSM parameter /infra/${ENVIRONMENT}/${TARGET_REGION}/ou-path not found in account ${TARGET_ACCOUNT_ID} region ${TARGET_REGION}" >&2
+    echo "This parameter is created by rosa-hyperfleet-internal/infra/modules/account-config" >&2
     exit 1
 fi
 export TF_VAR_mc_ou_path

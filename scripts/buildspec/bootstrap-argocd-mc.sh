@@ -25,7 +25,9 @@ _RC_REGIONAL_ID=$(jq -r '.regional_id // "regional"' "deploy/${ENVIRONMENT}/${TA
 _RC_STATE_KEY="regional-cluster/${_RC_REGIONAL_ID}.tfstate"
 _RC_TF_DIR="terraform/config/regional-cluster"
 
-use_rc_account
+# Access RC state bucket from central account via S3 bucket policy (PrincipalOrgID).
+# No role assumption needed - state bucket grants org-wide read/write access.
+_resolve_rc_account
 (cd "$_RC_TF_DIR" && terraform init -reconfigure \
     -backend-config="bucket=${_RC_STATE_BUCKET}" \
     -backend-config="key=${_RC_STATE_KEY}" \
