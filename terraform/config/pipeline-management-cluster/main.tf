@@ -14,6 +14,9 @@ locals {
   name_prefix    = var.management_id
   account_suffix = substr(data.aws_caller_identity.current.account_id, -8, 8)
 
+  # Explicit feature flag: use shared CodeBuild role (stage) or per-MC role (ephemeral/integration)
+  enable_shared_mc_role = var.mc_codebuild_role_arn != ""
+
   # Resource naming: {name_prefix}-{resource-type}
   artifact_bucket_name               = "${local.name_prefix}-artifacts-${local.account_suffix}"
   codebuild_role_name                = "${local.name_prefix}-codebuild-role"
@@ -27,8 +30,8 @@ locals {
   # Repository URL constructed from github_repository variable
   repository_url = "https://github.com/${var.github_repository}.git"
 
-  # Use shared role if provided (stage), otherwise use per-MC role created above (ephemeral/integration)
-  codebuild_role_arn = var.mc_codebuild_role_arn != "" ? var.mc_codebuild_role_arn : aws_iam_role.codebuild_role[0].arn
+  # Use shared role if enabled (stage), otherwise use per-MC role created below (ephemeral/integration)
+  codebuild_role_arn = local.enable_shared_mc_role ? var.mc_codebuild_role_arn : aws_iam_role.codebuild_role[0].arn
 }
 
 # Use shared GitHub Connection (passed from pipeline-provisioner)
@@ -37,11 +40,11 @@ data "aws_codestarconnections_connection" "github" {
 }
 
 # IAM Role for CodeBuild
-# Only create this role if a shared role ARN is NOT provided.
-# When mc_codebuild_role_arn is set (stage), use the shared role.
-# When empty (ephemeral/integration), create a per-MC role.
+# Only create this role if shared role mode is disabled.
+# When enable_shared_mc_role is true (stage), use the shared role from central-account-bootstrap.
+# When false (ephemeral/integration), create a per-MC role.
 resource "aws_iam_role" "codebuild_role" {
-  count = var.mc_codebuild_role_arn == "" ? 1 : 0
+  count = local.enable_shared_mc_role ? 0 : 1
   name  = local.codebuild_role_name
 
   assume_role_policy = jsonencode({
@@ -59,7 +62,7 @@ resource "aws_iam_role" "codebuild_role" {
 }
 
 resource "aws_iam_role_policy" "codebuild_policy" {
-  count = var.mc_codebuild_role_arn == "" ? 1 : 0
+  count = local.enable_shared_mc_role ? 0 : 1
   role  = aws_iam_role.codebuild_role[0].name
 
   policy = jsonencode({
@@ -560,6 +563,7 @@ resource "time_sleep" "iam_propagation" {
   # (shared role was created in central-account-bootstrap well before this).
   depends_on = [
     aws_iam_role_policy.codepipeline_policy,
+    aws_iam_role_policy.codebuild_policy,
   ]
   create_duration = "15s"
 }

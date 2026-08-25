@@ -74,6 +74,11 @@ variable "mc_codebuild_role_arn" {
   type        = string
   description = "ARN of the shared IAM role used by MC CodeBuild projects (created in central-account-bootstrap). If empty, creates a per-MC role (default behavior)."
   default     = ""
+
+  validation {
+    condition     = var.mc_codebuild_role_arn == "" || can(regex("^arn:aws:iam::[0-9]{12}:role/", var.mc_codebuild_role_arn))
+    error_message = "mc_codebuild_role_arn must be empty or a valid IAM role ARN (arn:aws:iam::<account>:role/<name>)"
+  }
 }
 
 # =============================================================================

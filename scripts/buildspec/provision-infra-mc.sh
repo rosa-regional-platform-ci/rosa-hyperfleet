@@ -27,9 +27,14 @@ if [ "${DELETE_FLAG}" == "true" ]; then
     export TF_VAR_oidc_bucket_arn="arn:aws:s3:::placeholder"
     export TF_VAR_oidc_bucket_region="us-east-1"
 else
-    # Access RC state bucket from central account via S3 bucket policy (PrincipalOrgID).
-    # No role assumption needed - state bucket grants org-wide read/write access.
+    # Assume child admin role in RC account to access state bucket (scoped access instead of org-wide).
     _resolve_rc_account
+    echo "Assuming ${CHILD_ADMIN_ROLE_NAME} in RC account ${RESOLVED_REGIONAL_ACCOUNT_ID} for state access..."
+    _rc_creds=$(aws sts assume-role \
+        --role-arn "arn:aws:iam::${RESOLVED_REGIONAL_ACCOUNT_ID}:role/${CHILD_ADMIN_ROLE_NAME}" \
+        --role-session-name "mc-read-rc-state-${MANAGEMENT_ID}" \
+        --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+        --output text)
 
     _RC_REGIONAL_ID=$(jq -r '.regional_id // "regional"' "deploy/${ENVIRONMENT}/${TARGET_REGION}/pipeline-regional-cluster-inputs/terraform.json" 2>/dev/null || echo "regional")
     export DNS_ZONE_OPERATOR_ROLE_ARN="arn:aws:iam::${RESOLVED_REGIONAL_ACCOUNT_ID}:role/${_RC_REGIONAL_ID}-dns-zone-operator"
@@ -40,11 +45,14 @@ else
     _RC_STATE_BUCKET="terraform-state-${RESOLVED_REGIONAL_ACCOUNT_ID}-${TARGET_REGION}"
     _RC_STATE_KEY="regional-cluster/${_RC_REGIONAL_ID}.tfstate"
     _RC_TF_DIR="terraform/config/regional-cluster"
-    (cd "$_RC_TF_DIR" && terraform init -reconfigure \
+    AWS_ACCESS_KEY_ID=$(echo "$_rc_creds" | awk '{print $1}') \
+    AWS_SECRET_ACCESS_KEY=$(echo "$_rc_creds" | awk '{print $2}') \
+    AWS_SESSION_TOKEN=$(echo "$_rc_creds" | awk '{print $3}') \
+    terraform -chdir="$_RC_TF_DIR" init -reconfigure \
         -backend-config="bucket=${_RC_STATE_BUCKET}" \
         -backend-config="key=${_RC_STATE_KEY}" \
         -backend-config="region=${TARGET_REGION}" \
-        -backend-config="use_lockfile=true" >/dev/null 2>&1)
+        -backend-config="use_lockfile=true" >/dev/null 2>&1
 
     # RC and MC pipelines run in parallel — retry until all outputs appear (up to 45 min)
     _OIDC_MAX_RETRIES=90
@@ -57,11 +65,11 @@ else
     TF_VAR_rhobs_api_url=""
     while [ $_OIDC_RETRY_COUNT -lt $_OIDC_MAX_RETRIES ]; do
         _OIDC_RETRY_COUNT=$((_OIDC_RETRY_COUNT + 1))
-        TF_VAR_oidc_cloudfront_domain=$(cd "$_RC_TF_DIR" && terraform output -raw oidc_cloudfront_domain 2>/dev/null || true)
-        TF_VAR_oidc_bucket_name=$(cd "$_RC_TF_DIR" && terraform output -raw oidc_bucket_name 2>/dev/null || true)
-        TF_VAR_oidc_bucket_arn=$(cd "$_RC_TF_DIR" && terraform output -raw oidc_bucket_arn 2>/dev/null || true)
-        TF_VAR_oidc_bucket_region=$(cd "$_RC_TF_DIR" && terraform output -raw oidc_bucket_region 2>/dev/null || true)
-        TF_VAR_rhobs_api_url=$(cd "$_RC_TF_DIR" && terraform output -raw rhobs_api_url 2>/dev/null || true)
+        TF_VAR_oidc_cloudfront_domain=$(AWS_ACCESS_KEY_ID=$(echo "$_rc_creds" | awk '{print $1}') AWS_SECRET_ACCESS_KEY=$(echo "$_rc_creds" | awk '{print $2}') AWS_SESSION_TOKEN=$(echo "$_rc_creds" | awk '{print $3}') terraform -chdir="$_RC_TF_DIR" output -raw oidc_cloudfront_domain 2>/dev/null || true)
+        TF_VAR_oidc_bucket_name=$(AWS_ACCESS_KEY_ID=$(echo "$_rc_creds" | awk '{print $1}') AWS_SECRET_ACCESS_KEY=$(echo "$_rc_creds" | awk '{print $2}') AWS_SESSION_TOKEN=$(echo "$_rc_creds" | awk '{print $3}') terraform -chdir="$_RC_TF_DIR" output -raw oidc_bucket_name 2>/dev/null || true)
+        TF_VAR_oidc_bucket_arn=$(AWS_ACCESS_KEY_ID=$(echo "$_rc_creds" | awk '{print $1}') AWS_SECRET_ACCESS_KEY=$(echo "$_rc_creds" | awk '{print $2}') AWS_SESSION_TOKEN=$(echo "$_rc_creds" | awk '{print $3}') terraform -chdir="$_RC_TF_DIR" output -raw oidc_bucket_arn 2>/dev/null || true)
+        TF_VAR_oidc_bucket_region=$(AWS_ACCESS_KEY_ID=$(echo "$_rc_creds" | awk '{print $1}') AWS_SECRET_ACCESS_KEY=$(echo "$_rc_creds" | awk '{print $2}') AWS_SESSION_TOKEN=$(echo "$_rc_creds" | awk '{print $3}') terraform -chdir="$_RC_TF_DIR" output -raw oidc_bucket_region 2>/dev/null || true)
+        TF_VAR_rhobs_api_url=$(AWS_ACCESS_KEY_ID=$(echo "$_rc_creds" | awk '{print $1}') AWS_SECRET_ACCESS_KEY=$(echo "$_rc_creds" | awk '{print $2}') AWS_SESSION_TOKEN=$(echo "$_rc_creds" | awk '{print $3}') terraform -chdir="$_RC_TF_DIR" output -raw rhobs_api_url 2>/dev/null || true)
         if [ -n "${TF_VAR_oidc_cloudfront_domain}" ] && \
            [ -n "${TF_VAR_oidc_bucket_name}" ] && \
            [ -n "${TF_VAR_oidc_bucket_arn}" ] && \
