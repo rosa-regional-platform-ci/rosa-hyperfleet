@@ -40,8 +40,16 @@ ENVIRONMENT VARIABLES:
     GITHUB_REPOSITORY   GitHub repository in owner/name format (e.g., 'openshift-online/rosa-hyperfleet')
     GITHUB_BRANCH       Git branch to track (default: main)
     TARGET_ENVIRONMENT  Environment to monitor (default: staging)
-    SLACK_WEBHOOK_SSM_PARAM  SSM Parameter Store path containing Slack webhook URL (optional, only for stage/staging/production/integration)
-                             Default: /rosa-regional/slack/webhook-url
+    AWS_REGION          AWS region to deploy to. Priority: 1) Source config filename (config/<env>/<region>.yaml),
+                        2) this env var, 3) AWS CLI config, 4) us-east-1. Region is extracted from the
+                        config filename stem (e.g., us-east-1.yaml → us-east-1). Only use this env var
+                        for bootstrapping before any config files exist.
+    ENABLE_SLACK_NOTIFICATIONS  Enable pipeline failure notifications to Slack (true|false).
+                             Opt-in: defaults to false. Set to true to enable.
+    SLACK_WEBHOOK_SSM_PARAM  SSM Parameter Store path containing Slack webhook URL (only used when
+                             notifications are enabled). Default: /rosa-regional/slack/webhook-url
+    ENABLE_SHARED_MC_ROLE    Create shared mc-codebuild-role for all MC pipelines (true|false).
+                             Opt-in: defaults to false. Set to true for stage environment only.
     AWS_PROFILE         AWS CLI profile to use
 
 EXAMPLES:
@@ -111,9 +119,6 @@ if [[ -z "$ACCOUNT_ID" || ! "$ACCOUNT_ID" =~ ^[0-9]{12}$ ]]; then
     exit 1
 fi
 
-REGION=$(aws configure get region 2>/dev/null || echo "")
-REGION=${REGION:-us-east-1}
-
 echo "✅ Authenticated as:"
 echo "$AWS_IDENTITY"
 echo ""
@@ -130,6 +135,44 @@ fi
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-openshift-online/rosa-hyperfleet}"
 GITHUB_BRANCH="${GITHUB_BRANCH:-main}"
 TARGET_ENVIRONMENT="${TARGET_ENVIRONMENT:-staging}"
+
+# Determine region from source config files (true source of truth)
+# Priority: 1) Source config filename (config/<env>/<region>.yaml), 2) AWS_REGION env var, 3) AWS CLI config, 4) us-east-1
+# Region is encoded in the config filename stem (e.g., config/stage/us-east-1.yaml → us-east-1)
+REGION=""
+FIRST_REGION_FILE=$(find "config/${TARGET_ENVIRONMENT}" -maxdepth 1 -type f -name "*.yaml" ! -name "defaults.yaml" 2>/dev/null | head -1)
+if [ -n "$FIRST_REGION_FILE" ] && [ -f "$FIRST_REGION_FILE" ]; then
+    # Extract region from filename stem (e.g., config/stage/us-east-1.yaml → us-east-1)
+    REGION=$(basename "$FIRST_REGION_FILE" .yaml)
+fi
+configured_region=$(aws configure get region 2>/dev/null || true)
+REGION="${REGION:-${AWS_REGION:-${configured_region:-us-east-1}}}"
+
+# Validate: all rendered pipeline configs should use the same region
+# This prevents pipelines from being scattered across different regions
+if [ -d "deploy/${TARGET_ENVIRONMENT}" ]; then
+    echo "Validating pipeline regions for consistency..."
+    MISMATCHED_REGIONS=()
+    while IFS= read -r json_file; do
+        CONFIG_REGION=$(jq -r '.region // empty' "$json_file" 2>/dev/null)
+        if [ -n "$CONFIG_REGION" ] && [ "$CONFIG_REGION" != "$REGION" ]; then
+            MISMATCHED_REGIONS+=("$json_file: expected $REGION, got $CONFIG_REGION")
+        fi
+    done < <(find "deploy/${TARGET_ENVIRONMENT}" -type f -name "*.json" -path "*/pipeline-*-inputs/*" 2>/dev/null)
+
+    if [ ${#MISMATCHED_REGIONS[@]} -gt 0 ]; then
+        echo "❌ ERROR: Pipeline region mismatch detected!" >&2
+        echo "Expected region: $REGION (from config/${TARGET_ENVIRONMENT}/<region>.yaml)" >&2
+        echo "" >&2
+        echo "Mismatched files:" >&2
+        printf '  %s\n' "${MISMATCHED_REGIONS[@]}" >&2
+        echo "" >&2
+        echo "Run 'uv run scripts/render.py' to regenerate deploy/ files from config/ source" >&2
+        exit 1
+    fi
+    echo "✓ All pipeline configs use region: $REGION"
+fi
+
 NAME_PREFIX="${NAME_PREFIX:-}"
 SLACK_WEBHOOK_SSM_PARAM="${SLACK_WEBHOOK_SSM_PARAM:-/rosa-regional/slack/webhook-url}"
 
@@ -140,23 +183,32 @@ if [[ ! "$GITHUB_REPOSITORY" =~ ^[^/]+/[^/]+$ ]]; then
     exit 1
 fi
 
-# Helper function to check if element is in array
-contains_element() {
-    local element="$1"
-    shift
-    local arr=("$@")
-    for e in "${arr[@]}"; do
-        [[ "$e" == "$element" ]] && return 0
-    done
-    return 1
-}
+# Determine whether Slack notifications should be enabled.
+# Explicit feature flag, opt-in: notifications are disabled unless
+# ENABLE_SLACK_NOTIFICATIONS=true is set.
+ENABLE_SLACK_NOTIFICATIONS="${ENABLE_SLACK_NOTIFICATIONS:-false}"
 
-# Verify SSM parameter for monitored environments
-# Must match Terraform: terraform/config/central-account-bootstrap/main.tf
-MONITORED_ENVS=("stage" "staging" "production" "integration")
-SLACK_NOTIFICATIONS_ENABLED=false
-if contains_element "$TARGET_ENVIRONMENT" "${MONITORED_ENVS[@]}"; then
-    # This environment requires Slack notifications
+# Normalize and validate the flag
+ENABLE_SLACK_NOTIFICATIONS=$(printf '%s' "$ENABLE_SLACK_NOTIFICATIONS" | tr '[:upper:]' '[:lower:]')
+if [[ "$ENABLE_SLACK_NOTIFICATIONS" != "true" && "$ENABLE_SLACK_NOTIFICATIONS" != "false" ]]; then
+    echo "❌ Error: ENABLE_SLACK_NOTIFICATIONS must be 'true' or 'false' (got: '$ENABLE_SLACK_NOTIFICATIONS')"
+    exit 1
+fi
+SLACK_NOTIFICATIONS_ENABLED="$ENABLE_SLACK_NOTIFICATIONS"
+
+# Determine whether to create a shared MC CodeBuild role.
+# Explicit feature flag, opt-in: shared role is disabled unless
+# ENABLE_SHARED_MC_ROLE=true is set (stage environment only).
+ENABLE_SHARED_MC_ROLE="${ENABLE_SHARED_MC_ROLE:-false}"
+
+# Normalize and validate the flag
+ENABLE_SHARED_MC_ROLE=$(printf '%s' "$ENABLE_SHARED_MC_ROLE" | tr '[:upper:]' '[:lower:]')
+if [[ "$ENABLE_SHARED_MC_ROLE" != "true" && "$ENABLE_SHARED_MC_ROLE" != "false" ]]; then
+    echo "❌ Error: ENABLE_SHARED_MC_ROLE must be 'true' or 'false' (got: '$ENABLE_SHARED_MC_ROLE')"
+    exit 1
+fi
+
+if [[ "$SLACK_NOTIFICATIONS_ENABLED" == "true" ]]; then
     # Verify the SSM parameter exists (Lambda will fetch the actual value at runtime)
     echo "Verifying Slack webhook SSM parameter: $SLACK_WEBHOOK_SSM_PARAM"
 
@@ -164,24 +216,22 @@ if contains_element "$TARGET_ENVIRONMENT" "${MONITORED_ENVS[@]}"; then
         --name "$SLACK_WEBHOOK_SSM_PARAM" \
         --query 'Parameter.Name' \
         --output text \
-        --region "$REGION" >/dev/null 2>&1; then
+        --region "$REGION" \
+        --no-cli-pager >/dev/null 2>&1; then
         echo "✅ SSM parameter verified: $SLACK_WEBHOOK_SSM_PARAM"
-        SLACK_NOTIFICATIONS_ENABLED=true
     else
-        # For monitored environments, fail fast if SSM parameter doesn't exist
+        # Notifications are enabled but the parameter is missing - fail fast
         echo "❌ Error: SSM parameter not found: $SLACK_WEBHOOK_SSM_PARAM"
-        echo "   Environment '$TARGET_ENVIRONMENT' requires Slack notifications."
-        echo "   Please ensure the SSM parameter exists and contains a valid webhook URL."
+        echo "   Slack notifications are enabled for environment '$TARGET_ENVIRONMENT'."
+        echo "   Set ENABLE_SLACK_NOTIFICATIONS=false to opt out, or create the parameter:"
         echo ""
-        echo "   To create the parameter, run:"
         echo "   aws ssm put-parameter --name '$SLACK_WEBHOOK_SSM_PARAM' \\"
         echo "     --value 'https://hooks.slack.com/services/...' \\"
         echo "     --type SecureString --region $REGION"
         exit 1
     fi
 else
-    # Non-monitored environment - notifications not required
-    echo "ℹ️  Environment '${TARGET_ENVIRONMENT}' does not require Slack notifications (skipping)"
+    echo "ℹ️  Slack notifications disabled for environment '${TARGET_ENVIRONMENT}' (skipping SSM verification)"
 fi
 
 echo ""
@@ -307,7 +357,9 @@ github_branch         = "${GITHUB_BRANCH}"
 region                = "${REGION}"
 environment           = "${TARGET_ENVIRONMENT}"
 name_prefix           = "${NAME_PREFIX}"
+enable_slack_notifications = ${SLACK_NOTIFICATIONS_ENABLED}
 slack_webhook_ssm_param = "${SLACK_WEBHOOK_SSM_PARAM}"
+enable_shared_mc_role = ${ENABLE_SHARED_MC_ROLE}
 EOF
 
 echo "Terraform configuration created (terraform.tfvars)"

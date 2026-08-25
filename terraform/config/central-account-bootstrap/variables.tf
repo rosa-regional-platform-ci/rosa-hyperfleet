@@ -47,9 +47,24 @@ variable "environment" {
 # Notifications Configuration
 # =============================================================================
 
+variable "enable_slack_notifications" {
+  type        = bool
+  description = "Enable Slack notifications for pipeline failures. When true, slack_webhook_ssm_param must point to a valid SSM parameter."
+  default     = false
+}
+
 variable "slack_webhook_ssm_param" {
   type        = string
-  description = "SSM Parameter Store path containing the Slack webhook URL (only required for staging, production, integration environments)"
+  description = "SSM Parameter Store path containing the Slack webhook URL (only used when enable_slack_notifications is true)"
   default     = "/rosa-regional/slack/webhook-url"
 }
 
+# =============================================================================
+# MC Shared Role Configuration
+# =============================================================================
+
+variable "enable_shared_mc_role" {
+  type        = bool
+  description = "Create a shared IAM role for all MC pipelines. When true, creates mc-codebuild-role; when false (default), each MC pipeline creates its own role. Only enable for stage environment."
+  default     = false
+}

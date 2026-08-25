@@ -399,13 +399,13 @@ resource "aws_route53_record" "zone_shard_delegation" {
 
 data "aws_ssm_parameter" "region_ou_path" {
   count           = var.environment_domain != null ? 1 : 0
-  name            = "/infra/region-ou-path"
+  name            = "/infra/${var.environment}/${var.region}/ou-path"
   with_decryption = true
 
   lifecycle {
     postcondition {
       condition     = self.value != ""
-      error_message = "SSM parameter /infra/region-ou-path must not be empty. This parameter must be stored as SecureString in the RC account — see docs/environment-provisioning.md."
+      error_message = "SSM parameter /infra/${var.environment}/${var.region}/ou-path must not be empty. This parameter is created by rosa-hyperfleet-internal/infra/modules/account-config."
     }
   }
 }

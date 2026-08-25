@@ -43,7 +43,7 @@ output "central_account_id" {
 
 output "deployment_region" {
   description = "AWS Region where pipelines are deployed"
-  value       = data.aws_region.current.name
+  value       = var.region
 }
 
 # =============================================================================
@@ -58,4 +58,13 @@ output "platform_ecr_repository_url" {
 output "platform_image_tag" {
   description = "Tag of the platform image (based on Dockerfile hash)"
   value       = module.platform_image.image_tag
+}
+
+# =============================================================================
+# MC Shared Role
+# =============================================================================
+
+output "mc_codebuild_role_arn" {
+  description = "ARN of the shared IAM role used by all MC pipeline CodeBuild projects (empty when enable_shared_mc_role=false)"
+  value       = var.enable_shared_mc_role ? aws_iam_role.mc_codebuild_role[0].arn : ""
 }

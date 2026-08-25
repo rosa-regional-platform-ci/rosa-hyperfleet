@@ -47,13 +47,14 @@ module "pipeline_provisioner" {
   codebuild_image       = module.platform_image.container_image
   platform_ecr_repo     = module.platform_image.ecr_repository_url
   name_prefix           = var.name_prefix
+  mc_codebuild_role_arn = var.enable_shared_mc_role ? aws_iam_role.mc_codebuild_role[0].arn : ""
 }
 
 # Pipeline Failure Notifications
-# Only enable for specific environments (staging, production, integration)
+# Gated by an explicit feature flag (see var.enable_slack_notifications).
 module "pipeline_notifications" {
   source = "../../modules/pipeline-notifications"
-  count  = contains(["stage", "staging", "production", "integration"], var.environment) ? 1 : 0
+  count  = var.enable_slack_notifications ? 1 : 0
 
   slack_webhook_ssm_param = var.slack_webhook_ssm_param
   name_prefix             = var.name_prefix

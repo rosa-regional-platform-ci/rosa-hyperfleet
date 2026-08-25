@@ -16,10 +16,18 @@ data "aws_elb_service_account" "current" {}
 
 # -----------------------------------------------------------------------------
 # S3 Bucket
+#
+# MIGRATION NOTE: Bucket name was changed from regional-sre-alb-logs to
+# regional-sre-alb-logs-${account_id} for global uniqueness. For existing
+# deployments with the old bucket:
+# 1. The old bucket will be destroyed and recreated with force_destroy=true
+# 2. Historical logs will be deleted unless manually copied first
+# 3. For production: manually create new bucket, copy logs, update ALB config,
+#    then remove old bucket after retention period
 # -----------------------------------------------------------------------------
 
 resource "aws_s3_bucket" "access_logs" {
-  bucket        = "${var.regional_id}-sre-alb-logs"
+  bucket        = "${var.regional_id}-sre-alb-logs-${data.aws_caller_identity.current.account_id}"
   force_destroy = true
 
   tags = {

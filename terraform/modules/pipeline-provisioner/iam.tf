@@ -160,10 +160,13 @@ resource "aws_iam_role_policy" "codebuild_state_bootstrap" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid      = "AssumeTargetAccountRole"
-        Effect   = "Allow"
-        Action   = "sts:AssumeRole"
-        Resource = "arn:aws:iam::*:role/OrganizationAccountAccessRole"
+        Sid    = "AssumeTargetAccountRole"
+        Effect = "Allow"
+        Action = "sts:AssumeRole"
+        Resource = [
+          "arn:aws:iam::*:role/OrganizationAccountAccessRole",
+          "arn:aws:iam::*:role/rosa-hyperfleet-account-admin"
+        ]
       },
       {
         Sid      = "DescribeOrganization"
