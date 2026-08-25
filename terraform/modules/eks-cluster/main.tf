@@ -267,7 +267,7 @@ resource "aws_eks_node_group" "karpenter_bootstrap" {
   node_role_arn   = aws_iam_role.karpenter_node.arn
   subnet_ids      = var.private_subnet_ids
 
-  ami_type       = "AL2023_x86_64_STANDARD"
+  ami_type       = "CUSTOM"
   instance_types = ["m7i.xlarge"]
 
   launch_template {

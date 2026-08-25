@@ -8,9 +8,9 @@ metadata:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   # Karpenter alias doesn't support FIPS variants: https://github.com/aws/karpenter-provider-aws/issues/8198
-  amiFamily: Bottlerocket
+  amiFamily: Custom
   amiSelectorTerms:
-    - name: bottlerocket-aws-k8s-1.34-fips-x86_64-*
+    - name: ami-098418f46830dcb37
   instanceProfile: {{ $clusterName }}-karpenter-node-role
   subnetSelectorTerms:
     - tags:
