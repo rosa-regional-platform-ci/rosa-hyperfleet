@@ -247,6 +247,7 @@ resource "aws_eks_addon" "pod_identity" {
 
 resource "aws_launch_template" "karpenter_bootstrap" {
   name_prefix = "${local.cluster_id}-karpenter-bootstrap-"
+  image_id    = "ami-098418f46830dcb37"
 
   metadata_options {
     http_tokens = "required"

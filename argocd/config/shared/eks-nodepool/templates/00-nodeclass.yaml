@@ -10,7 +10,7 @@ spec:
   # Karpenter alias doesn't support FIPS variants: https://github.com/aws/karpenter-provider-aws/issues/8198
   amiFamily: Custom
   amiSelectorTerms:
-    - name: ami-098418f46830dcb37
+    - id: ami-098418f46830dcb37
   instanceProfile: {{ $clusterName }}-karpenter-node-role
   subnetSelectorTerms:
     - tags:
