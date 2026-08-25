@@ -116,7 +116,7 @@ regional_cluster:
   enable_sre_oidc_auth: true
   # @doc regional_cluster.sre_oidc_issuer_url OIDC issuer base URL for the SRE UI ALB. Authorization, token, and userinfo endpoints are derived from this. Defaults to Red Hat SSO EmployeeIDP.
   # @used-by regional_cluster.sre_oidc_issuer_url pipeline-regional-cluster-inputs/terraform.json.j2
-  sre_oidc_issuer_url: "https://auth.stage.redhat.com/auth/realms/EmployeeIDP"
+  sre_oidc_issuer_url: "https://auth.redhat.com/auth/realms/EmployeeIDP"
   # @doc regional_cluster.sre_grafana_oidc_client_id OIDC client ID for Grafana. Required when enable_sre_oidc_auth is true.
   # @used-by regional_cluster.sre_grafana_oidc_client_id pipeline-regional-cluster-inputs/terraform.json.j2
   sre_grafana_oidc_client_id: "rosa-hyperfleet-grafana-sre-stage-us-east-1"
