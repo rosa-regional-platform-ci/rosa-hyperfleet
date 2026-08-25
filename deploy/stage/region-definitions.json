@@ -1,0 +1,11 @@
+{
+  "us-east-1": {
+    "aws_region": "us-east-1",
+    "environment": "stage",
+    "management_clusters": [
+      "mc01",
+      "mc02"
+    ],
+    "name": "stage"
+  }
+}

@@ -17,7 +17,7 @@ ROSA HyperFleet uses a hierarchical DNS architecture built on AWS Route 53, with
 - **Assumptions**:
   - We expect 50–100 regions total in production
   - Each cluster consumes ~4–8 DNS records
-  - For staging/integration, we use `int0.rosa.devshift.net` and `stg0.rosa.devshift.net` instead of `rosa.openshiftapps.com`. The `int0`/`stg0` suffix keeps consistent length with the production domain.
+  - For integration, we use `int0.rosa.devshift.net` and for staging we use `stg0.rosa.devshift.org` instead of `rosa.openshiftapps.com`. The `int0`/`stg0` suffix keeps consistent length with the production domain.
 
 ## Design
 
@@ -132,7 +132,7 @@ external-dns and cert-manager run on MCs (in MC accounts) but need to create rec
 
 - **MC side**: Each operator pod (external-dns, cert-manager) gets an EKS Pod Identity role in the MC account. This role has `sts:AssumeRole` permission for the regional account's cross-account role.
 - **RC side**: An IAM role in the regional account with Route 53 permissions (`route53:ChangeResourceRecordSets`, `route53:ListHostedZones`, `route53:GetChange`) scoped to zone shard HostedZones.
-- **OU-based trust**: The RC-side role's trust policy uses an `aws:PrincipalOrgPaths` condition to trust any account in the MC organizational unit. The OU path is read from SSM Parameter Store (`/infra/region-ou-path`) in the RC account. New MC accounts automatically get access when added to the OU — no RC-side IAM updates are needed when scaling MCs.
+- **OU-based trust**: The RC-side role's trust policy uses an `aws:PrincipalOrgPaths` condition to trust any account in the MC organizational unit. The OU path is read from SSM Parameter Store (`/infra/<environment>/<region>/ou-path`, e.g. `/infra/stage/us-east-1/ou-path`) in the RC account. New MC accounts automatically get access when added to the OU — no RC-side IAM updates are needed when scaling MCs.
 
 Route 53 IAM does not support scoping by record type, so external-dns and cert-manager share the same cross-account role. Operator configuration determines which record types each creates.
 

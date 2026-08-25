@@ -8,7 +8,8 @@
 #   die                   — Print error and exit
 #   resolve_creds         — Resolve AWS profile to static credentials
 #   ensure_image          — Build CI container image if not present
-#   load_accounts         — Load account IDs from a JSON file
+#   load_accounts         — Load account IDs from a JSON file (legacy flat format)
+#   load_accounts_stage   — Load account IDs from stage nested JSON format
 #   init_aws_config       — Create temp AWS config dir + EXIT trap
 #   write_container_config — Resolve profiles to static creds for container mount
 #   bastion_run_task      — Core ECS bastion task launch and readiness logic
@@ -84,7 +85,7 @@ ensure_image() {
     fi
 }
 
-# Load account IDs from a JSON file.
+# Load account IDs from a JSON file (legacy flat format: dev/int).
 # Args: $1 = path to accounts.json, $2... = keys to extract
 # Each key sets an uppercase variable: e.g. "rc" → RC_ACCOUNT
 load_accounts() {
@@ -101,6 +102,47 @@ load_accounts() {
         [[ "$val" != "null" ]] || die "Missing '$key' in $json_file"
         printf -v "${upper_key}_ACCOUNT" '%s' "$val"
     done
+}
+
+# Load account IDs from stage nested JSON format (Terragrunt multi-region structure).
+# Args: $1 = path to accounts.json, $2 = region (default: us-east-1)
+# Sets: CENTRAL_ACCOUNT, RC_ACCOUNT, MC01_ACCOUNT, MC02_ACCOUNT, DR_ACCOUNT, LOG_ACCOUNT
+load_accounts_stage() {
+    local json_file="$1"
+    local region="${2:-us-east-1}"
+
+    [[ -f "$json_file" ]] || die "Account IDs file not found: $json_file"
+
+    local val
+    val=$(jq -r ".control_account_id" "$json_file") \
+        || die "Failed to parse control_account_id from $json_file"
+    [[ "$val" != "null" ]] || die "Missing control_account_id in $json_file"
+    CENTRAL_ACCOUNT="$val"
+
+    val=$(jq -r ".[\"$region\"].rc_account_id" "$json_file") \
+        || die "Failed to parse region '$region' from $json_file"
+    [[ "$val" != "null" ]] || die "Missing RC account ID for region '$region' in $json_file"
+    RC_ACCOUNT="$val"
+
+    val=$(jq -r ".[\"$region\"].mc_account_ids.mc01" "$json_file") \
+        || die "Failed to parse mc01 from $json_file"
+    [[ "$val" != "null" ]] || die "Missing MC01 account ID in $json_file"
+    MC01_ACCOUNT="$val"
+
+    val=$(jq -r ".[\"$region\"].mc_account_ids.mc02" "$json_file") \
+        || die "Failed to parse mc02 from $json_file"
+    [[ "$val" != "null" ]] || die "Missing MC02 account ID in $json_file"
+    MC02_ACCOUNT="$val"
+
+    val=$(jq -r ".[\"$region\"].dr_account_id" "$json_file") \
+        || die "Failed to parse DR from $json_file"
+    [[ "$val" != "null" ]] || die "Missing DR account ID in $json_file"
+    DR_ACCOUNT="$val"
+
+    val=$(jq -r ".[\"$region\"].log_account_id" "$json_file") \
+        || die "Failed to parse log from $json_file"
+    [[ "$val" != "null" ]] || die "Missing log account ID in $json_file"
+    LOG_ACCOUNT="$val"
 }
 
 # Create temporary AWS config directory and set up EXIT trap.

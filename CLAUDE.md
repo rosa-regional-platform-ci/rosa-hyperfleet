@@ -143,6 +143,38 @@ docs/
 4. Management Clusters auto-provision as needed
 5. Run `make pre-push` before pushing to validate all rendered files and documentation
 
+#### For Config File Changes
+
+**IMPORTANT**: Files in `deploy/` are **generated** from `config/` templates. Never edit them directly.
+
+When you modify any file in `config/<environment>/` (e.g., `config/stage/defaults.yaml`, `config/integration/us-east-1.yaml`):
+
+1. **Automatically regenerate** rendered files by running:
+
+   ```bash
+   uv run scripts/render.py
+   ```
+
+   This regenerates all files in `deploy/<environment>/`, including:
+   - `_merged_config.yaml` — merged view of the config hierarchy
+   - `argocd-values-*.yaml` — ArgoCD Helm values
+   - `argocd-bootstrap-*/applicationset.yaml` — ApplicationSet templates
+   - `pipeline-*-inputs/terraform.json` — Terraform input variables
+
+2. **Verify changes** with `make check-rendered-files` or `make pre-push`
+3. **Commit both** the config source files and the regenerated deploy files together
+
+The render script merges config from the inheritance chain:
+
+```mermaid
+flowchart TD
+    A[config/defaults.yaml] --> B["config/&lt;env&gt;/defaults.yaml"]
+    B --> C["config/&lt;env&gt;/&lt;region&gt;.yaml"]
+    C --> D["deploy/&lt;env&gt;/&lt;region&gt;/*"]
+```
+
+**Never commit** changes to `deploy/` files without regenerating them from `config/` sources.
+
 #### Ephemeral Environments
 
 See [`docs/development-environment.md`](docs/development-environment.md) for full usage — provisioning, resync, E2E, teardown, and port forwarding.

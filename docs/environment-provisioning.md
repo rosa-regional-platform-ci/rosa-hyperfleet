@@ -68,17 +68,13 @@ aws ssm put-parameter --name "/infra/${ENV}/${REGION}/mc01/account_id" \
   --value "$MC_ACCOUNT_ID" --type String
 ```
 
-### 2.2 Store MC OU path in SSM (RC account)
+### 2.2 MC OU path SSM parameter (auto-provisioned)
 
-The DNS zone operator trust policy uses `aws:PrincipalOrgPaths` to allow MC accounts to assume the cross-account role. Store the OU path for MC accounts in SSM Parameter Store **in the RC account**.
+The DNS zone operator trust policy uses `aws:PrincipalOrgPaths` to allow MC accounts to assume the cross-account role. The OU path is stored in SSM Parameter Store **in the RC account** at `/infra/<environment>/<region>/ou-path`.
 
-The OU path format is `o-<org-id>/r-<root-id>/ou-<parent-id>/ou-<child-id>/` (trailing `/`, no wildcard — Terraform appends `*` automatically). You can find it by walking the OU tree with `aws organizations list-parents`.
+**This parameter is automatically created** by `rosa-hyperfleet-internal/infra/modules/account-config` when the RC account is minted. No manual creation is needed.
 
-```bash
-# Run with RC account credentials
-aws ssm put-parameter --name "/infra/region-ou-path" \
-  --value "o-xxxxx/r-xxxx/ou-xxxx-xxxxxxxx/ou-xxxx-xxxxxxxx/" --type SecureString
-```
+Example path: `/infra/stage/us-east-1/ou-path`
 
 ### 2.3 Add the environment configuration
 
