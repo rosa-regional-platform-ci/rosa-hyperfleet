@@ -9,9 +9,9 @@ eksNodePool:
   instanceFamilies:
   - m8i-flex
   - m7i-flex
-baseDomain: us-east-1.dev0.rosa.devshift.net
+baseDomain: us-east-1-eph-4f87d5f1.dev0.rosa.devshift.net
 hyperfleet:
-  oidcS3Bucket: hypershift--regional-oidc-ssm:///infra/ephemeral/us-east-1/account_id
+  oidcS3Bucket: hypershift-eph-4f87d5f1-regional-oidc-599476212575
   oidcIssuerBaseUrl: https://hyperfleet-oidc-us-east-1.s3.us-east-1.amazonaws.com
 pagerduty:
   enabled: false
