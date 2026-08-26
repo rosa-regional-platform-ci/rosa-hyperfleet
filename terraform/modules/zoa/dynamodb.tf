@@ -110,6 +110,7 @@ resource "aws_dynamodb_resource_policy" "executions_cross_account" {
         "dynamodb:PutItem",
         "dynamodb:UpdateItem",
         "dynamodb:Query",
+        "dynamodb:Scan",
         "dynamodb:DescribeTable",
       ]
       Resource = [
@@ -133,6 +134,7 @@ resource "aws_dynamodb_resource_policy" "executions_cross_account" {
 # =============================================================================
 # Stores API call audit entries for compliance and observability
 # PK: accountId, SK: timestamp
+# GSI: target-index (targetCluster + timestamp) for cross-cluster visibility
 # TTL: 365-day automatic expiration
 
 resource "aws_dynamodb_table" "audit_log" {
@@ -150,6 +152,18 @@ resource "aws_dynamodb_table" "audit_log" {
   attribute {
     name = "timestamp"
     type = "S"
+  }
+
+  attribute {
+    name = "targetCluster"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "target-index"
+    hash_key        = "targetCluster"
+    range_key       = "timestamp"
+    projection_type = "ALL"
   }
 
   server_side_encryption {
@@ -175,14 +189,14 @@ resource "aws_dynamodb_table" "audit_log" {
   )
 }
 
-# Cross-account access for MC Lambda roles (audit writes)
+# Cross-account access for MC Lambda roles (audit writes + cross-cluster reads)
 resource "aws_dynamodb_resource_policy" "audit_cross_account" {
   resource_arn = aws_dynamodb_table.audit_log.arn
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Sid    = "AllowCrossAccountLambdaAuditWrite"
+      Sid    = "AllowCrossAccountLambdaAuditAccess"
       Effect = "Allow"
       Principal = {
         AWS = "*"
@@ -190,6 +204,7 @@ resource "aws_dynamodb_resource_policy" "audit_cross_account" {
       Action = [
         "dynamodb:PutItem",
         "dynamodb:Query",
+        "dynamodb:Scan",
       ]
       Resource = [
         aws_dynamodb_table.audit_log.arn,
