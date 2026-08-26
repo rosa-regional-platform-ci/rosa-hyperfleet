@@ -473,3 +473,17 @@ variable "zoa_image_tag" {
   type        = string
   default     = "2c0a088"
 }
+
+# =============================================================================
+# OU Path (Backward-Compatible Read)
+# =============================================================================
+
+variable "region_ou_path" {
+  description = "AWS Organizations OU path for the region. Resolved in buildspec with backward-compatible fallback (new nested path → legacy flat path) and passed via TF_VAR_region_ou_path."
+  type        = string
+
+  validation {
+    condition     = var.region_ou_path != ""
+    error_message = "region_ou_path must not be empty. Set via buildspec (scripts/buildspec/provision-infra-rc.sh) from SSM parameter /infra/<env>/<region>/ou-path or /infra/region-ou-path (legacy)."
+  }
+}
