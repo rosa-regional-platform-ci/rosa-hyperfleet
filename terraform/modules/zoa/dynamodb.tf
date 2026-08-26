@@ -4,17 +4,40 @@
 # Stores Trusted Action execution metadata and status.
 # PK: executionId (direct Get by ID)
 #
-# GSI Index Architecture:
-#   account-index   (accountId + createdAt)    — CLI: `zoa runs` scoped to single account (pre-cross-cluster path)
-#   status-index    (status + createdAt)       — Reconciler: poll dispatched/running items (oldest first)
-#                                              — GC: find terminal items for cleanup (oldest first)
-#                                              — CLI: `zoa runs --status X` (newest first)
-#   target-index    (targetCluster + createdAt)— CLI: `zoa runs --target X` cross-cluster filter
-#                                              — Cooldown: check recent writes per target
-#   target-status-index (targetCluster + targetStatusKey) — Concurrency: count active per target
-#   date-bucket-index (dateBucket + createdAt) — CLI: `zoa runs` default path (cross-cluster, newest first)
-#                                              — Production-ready: no partition size limits (daily buckets)
-#                                              — Replaces full-table Scan which is broken at scale
+# GSI Index Architecture (4 indexes, each serving distinct access patterns):
+#
+#   status-index (PK=status, SK=createdAt)
+#     Consumers: reconciler, GC, CLI
+#     - Reconciler polls for dispatched/running items to drive state machine (oldest first)
+#     - GC finds terminal items (succeeded/failed) older than TTL for K8s resource cleanup
+#     - CLI: `zoa runs --status X` lists executions filtered by status (newest first)
+#
+#   target-index (PK=targetCluster, SK=createdAt)
+#     Consumers: CLI, cooldown check
+#     - CLI: `zoa runs --target X` for cross-cluster filtered view (newest first)
+#     - Write cooldown: ListByTargetAndAction checks recent writes on a target
+#       to prevent accidental duplicate SRE requests (time-bounded query)
+#
+#   target-status-index (PK=targetCluster, SK=targetStatusKey)
+#     Consumers: reconciler, GC, concurrency limiter
+#     - Composite sort key format: "{status}#{timestamp}" enables begins_with queries
+#     - Reconciler: find all dispatched executions for THIS target only (cluster-scoped)
+#     - GC: find all terminal executions for THIS target that need cleanup
+#     - Concurrency limiter: CountActiveByTarget counts dispatched+approved items
+#       per target to enforce MaxConcurrentPerTarget without reading the entire table
+#     - Why not use status-index + target-index separately? DynamoDB cannot join indexes.
+#       Without this composite, finding "dispatched items on target X" requires reading
+#       ALL dispatched items across the fleet (O(fleet)) or ALL items on a target (O(history)).
+#       This index makes it O(result_set) — cost proportional to active items only.
+#
+#   date-bucket-index (PK=dateBucket, SK=createdAt)
+#     Consumers: CLI default path
+#     - CLI: `zoa runs` (no --target, no --status) for cross-cluster listing (newest first)
+#     - Daily partition key (e.g. "2026-08-26") with no partition size limits at scale
+#     - Iterates backwards through daily buckets from today until --since boundary
+#     - CLI enforces --since 24h default, guaranteeing bounded queries
+#     - Items written before this index was deployed lack dateBucket and are only
+#       accessible via --target or --status filters
 
 resource "aws_dynamodb_table" "executions" {
   name                        = local.table_name
@@ -24,11 +47,6 @@ resource "aws_dynamodb_table" "executions" {
 
   attribute {
     name = "executionId"
-    type = "S"
-  }
-
-  attribute {
-    name = "accountId"
     type = "S"
   }
 
@@ -55,13 +73,6 @@ resource "aws_dynamodb_table" "executions" {
   attribute {
     name = "dateBucket"
     type = "S"
-  }
-
-  global_secondary_index {
-    name            = "account-index"
-    hash_key        = "accountId"
-    range_key       = "createdAt"
-    projection_type = "ALL"
   }
 
   global_secondary_index {
@@ -154,13 +165,23 @@ resource "aws_dynamodb_resource_policy" "executions_cross_account" {
 # DynamoDB Table for ZOA Audit Log
 # =============================================================================
 # Stores API call audit entries for compliance and observability.
-# PK: accountId, SK: timestamp (per-account listing)
+# PK: accountId, SK: timestamp (per-account listing from the Lambda's own account)
 # TTL: 365-day automatic expiration
 #
-# GSI Index Architecture:
-#   target-index      (targetCluster + timestamp) — CLI: `zoa audit --target X` cross-cluster filter
-#   date-bucket-index (dateBucket + timestamp)    — CLI: `zoa audit` default path (cross-cluster, newest first)
-#                                                 — Production-ready: no partition size limits (daily buckets)
+# GSI Index Architecture (2 indexes):
+#
+#   target-index (PK=targetCluster, SK=timestamp)
+#     Consumers: CLI
+#     - CLI: `zoa audit --target X` for cross-cluster filtered view (newest first)
+#     - Each Lambda writes audit entries with its own targetCluster, enabling
+#       filtering by which cluster processed the request
+#
+#   date-bucket-index (PK=dateBucket, SK=timestamp)
+#     Consumers: CLI default path
+#     - CLI: `zoa audit` (no --target) for cross-cluster listing (newest first)
+#     - Daily partition key (e.g. "2026-08-26") with no partition size limits at scale
+#     - Iterates backwards through daily buckets from today until --since boundary
+#     - CLI enforces --since 24h default, guaranteeing bounded queries
 
 resource "aws_dynamodb_table" "audit_log" {
   name                        = local.audit_table_name
