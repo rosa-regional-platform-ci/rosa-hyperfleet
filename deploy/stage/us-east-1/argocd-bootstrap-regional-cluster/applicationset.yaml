@@ -99,6 +99,9 @@ spec:
                 bucketName: '{{ .metadata.annotations.zoa_bucket_name }}'
               rateLimit:
                 redisEndpoint: '{{ .metadata.annotations.redis_endpoint }}'
+            # HyperFleet Operator values (keys must match chart's values.yaml structure)
+            hyperfleet:
+              oidcS3Bucket: '{{ .metadata.annotations.oidc_bucket_name }}'
             # Thanos Operator values (keys must match chart's values.yaml structure)
             thanos:
               kmsKeyArn: '{{ .metadata.annotations.thanos_kms_key_arn }}'

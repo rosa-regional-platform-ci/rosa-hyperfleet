@@ -74,6 +74,7 @@ if [[ "$CLUSTER_TYPE" == "regional-cluster" ]]; then
     ZOA_TABLE_NAME=$(echo "$OUTPUTS" | jq -r '.zoa_table_name.value // ""')
     ZOA_AUDIT_TABLE_NAME=$(echo "$OUTPUTS" | jq -r '.zoa_audit_table_name.value // ""')
     ZOA_BUCKET_NAME=$(echo "$OUTPUTS" | jq -r '.zoa_bucket_name.value // ""')
+    OIDC_BUCKET_NAME=$(echo "$OUTPUTS" | jq -r '.oidc_bucket_name.value // ""')
     OIDC_CLOUDFRONT_DOMAIN=$(echo "$OUTPUTS" | jq -r '.oidc_cloudfront_domain.value // ""')
     SRE_GRAFANA_TARGET_GROUP_ARN=$(echo "$OUTPUTS" | jq -r '.sre_grafana_target_group_arn.value // ""')
     SRE_ARGOCD_TARGET_GROUP_ARN=$(echo "$OUTPUTS" | jq -r '.sre_argocd_target_group_arn.value // ""')
@@ -98,6 +99,7 @@ else
     ZOA_TABLE_NAME=""
     ZOA_AUDIT_TABLE_NAME=""
     ZOA_BUCKET_NAME=""
+    OIDC_BUCKET_NAME=""
     OIDC_CLOUDFRONT_DOMAIN=""
     SRE_GRAFANA_TARGET_GROUP_ARN=""
     SRE_ARGOCD_TARGET_GROUP_ARN=""
@@ -131,6 +133,7 @@ OVERRIDES_JSON=$(jq -nc \
   --arg zoa_table_name "$ZOA_TABLE_NAME" \
   --arg zoa_audit_table_name "$ZOA_AUDIT_TABLE_NAME" \
   --arg zoa_bucket_name "$ZOA_BUCKET_NAME" \
+  --arg oidc_bucket_name "$OIDC_BUCKET_NAME" \
   --arg oidc_cloudfront_domain "$OIDC_CLOUDFRONT_DOMAIN" \
   --arg sre_grafana_target_group_arn "$SRE_GRAFANA_TARGET_GROUP_ARN" \
   --arg sre_argocd_target_group_arn "$SRE_ARGOCD_TARGET_GROUP_ARN" \
@@ -162,6 +165,7 @@ OVERRIDES_JSON=$(jq -nc \
         {name: "ZOA_TABLE_NAME", value: $zoa_table_name},
         {name: "ZOA_AUDIT_TABLE_NAME", value: $zoa_audit_table_name},
         {name: "ZOA_BUCKET_NAME", value: $zoa_bucket_name},
+        {name: "OIDC_BUCKET_NAME", value: $oidc_bucket_name},
         {name: "OIDC_CLOUDFRONT_DOMAIN", value: $oidc_cloudfront_domain},
         {name: "SRE_GRAFANA_TARGET_GROUP_ARN", value: $sre_grafana_target_group_arn},
         {name: "SRE_ARGOCD_TARGET_GROUP_ARN", value: $sre_argocd_target_group_arn},
