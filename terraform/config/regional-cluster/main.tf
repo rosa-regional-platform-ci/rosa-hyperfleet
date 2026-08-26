@@ -397,18 +397,9 @@ resource "aws_route53_record" "zone_shard_delegation" {
 # DNS Zone Operator (Cross-Account IAM for MC operators)
 # =============================================================================
 
-data "aws_ssm_parameter" "region_ou_path" {
-  count           = var.environment_domain != null ? 1 : 0
-  name            = "/infra/${var.environment}/${var.region}/ou-path"
-  with_decryption = true
-
-  lifecycle {
-    postcondition {
-      condition     = self.value != ""
-      error_message = "SSM parameter /infra/${var.environment}/${var.region}/ou-path must not be empty. This parameter is created by rosa-hyperfleet-internal/infra/modules/account-config."
-    }
-  }
-}
+# OU path is resolved in the buildspec (scripts/buildspec/provision-infra-rc.sh) with
+# backward-compatible fallback (new nested path → legacy flat path) and passed via TF_VAR_region_ou_path.
+# This avoids terraform hard-failing on ParameterNotFound for ephemeral/integration envs that still use the old path.
 
 module "dns_zone_operator" {
   count  = var.environment_domain != null ? 1 : 0
@@ -417,7 +408,7 @@ module "dns_zone_operator" {
   regional_id                = var.regional_id
   regional_hosted_zone_id    = aws_route53_zone.regional[0].zone_id
   zone_shard_hosted_zone_ids = aws_route53_zone.zone_shard[*].zone_id
-  region_ou_path             = data.aws_ssm_parameter.region_ou_path[0].value
+  region_ou_path             = var.region_ou_path
 }
 
 # =============================================================================

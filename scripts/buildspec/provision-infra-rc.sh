@@ -128,19 +128,35 @@ if [ "$TF_VAR_enable_sre_oidc_auth" = "true" ]; then
     done
 fi
 
-# MC OU path from SSM (provisioned by account-minter in rosa-hyperfleet-internal)
+# MC OU path from SSM - backward-compatible: try new nested path first, fall back to legacy flat path
 TF_VAR_mc_ou_path=$(aws ssm get-parameter \
     --name "/infra/${ENVIRONMENT}/${TARGET_REGION}/ou-path" \
     --with-decryption \
     --query 'Parameter.Value' \
     --output text \
     --region "${TARGET_REGION}" 2>/dev/null || true)
+
 if [ -z "${TF_VAR_mc_ou_path}" ]; then
-    echo "ERROR: SSM parameter /infra/${ENVIRONMENT}/${TARGET_REGION}/ou-path not found in account ${TARGET_ACCOUNT_ID} region ${TARGET_REGION}" >&2
-    echo "This parameter is created by rosa-hyperfleet-internal/infra/modules/account-config" >&2
+    echo "INFO: New SSM path /infra/${ENVIRONMENT}/${TARGET_REGION}/ou-path not found, trying legacy path..." >&2
+    TF_VAR_mc_ou_path=$(aws ssm get-parameter \
+        --name "/infra/region-ou-path" \
+        --with-decryption \
+        --query 'Parameter.Value' \
+        --output text \
+        --region "${TARGET_REGION}" 2>/dev/null || true)
+    if [ -n "${TF_VAR_mc_ou_path}" ]; then
+        echo "INFO: Using legacy SSM path /infra/region-ou-path" >&2
+    fi
+fi
+
+if [ -z "${TF_VAR_mc_ou_path}" ]; then
+    echo "ERROR: SSM parameter not found at either /infra/${ENVIRONMENT}/${TARGET_REGION}/ou-path or /infra/region-ou-path in account ${TARGET_ACCOUNT_ID} region ${TARGET_REGION}" >&2
+    echo "For stage: parameter is created by rosa-hyperfleet-internal/infra/modules/account-config" >&2
+    echo "For ephemeral/integration: manually create at /infra/region-ou-path (legacy) or /infra/${ENVIRONMENT}/${TARGET_REGION}/ou-path (new)" >&2
     exit 1
 fi
 export TF_VAR_mc_ou_path
+export TF_VAR_region_ou_path="${TF_VAR_mc_ou_path}"  # Pass through to terraform
 
 if [ -n "${ENVIRONMENT_DOMAIN:-}" ]; then
     export TF_VAR_environment_domain="${ENVIRONMENT_DOMAIN}"
