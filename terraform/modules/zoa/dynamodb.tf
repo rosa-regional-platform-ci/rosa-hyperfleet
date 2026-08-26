@@ -1,10 +1,20 @@
 # =============================================================================
 # DynamoDB Table for ZOA Executions
 # =============================================================================
-# Stores Trusted Action execution metadata and status
-# PK: executionId
-# GSI: account-index (accountId + createdAt) for listing by account
-# GSI: status-index (status + createdAt) for reconciler polling
+# Stores Trusted Action execution metadata and status.
+# PK: executionId (direct Get by ID)
+#
+# GSI Index Architecture:
+#   account-index   (accountId + createdAt)    — CLI: `zoa runs` scoped to single account (pre-cross-cluster path)
+#   status-index    (status + createdAt)       — Reconciler: poll dispatched/running items (oldest first)
+#                                              — GC: find terminal items for cleanup (oldest first)
+#                                              — CLI: `zoa runs --status X` (newest first)
+#   target-index    (targetCluster + createdAt)— CLI: `zoa runs --target X` cross-cluster filter
+#                                              — Cooldown: check recent writes per target
+#   target-status-index (targetCluster + targetStatusKey) — Concurrency: count active per target
+#   date-bucket-index (dateBucket + createdAt) — CLI: `zoa runs` default path (cross-cluster, newest first)
+#                                              — Production-ready: no partition size limits (daily buckets)
+#                                              — Replaces full-table Scan which is broken at scale
 
 resource "aws_dynamodb_table" "executions" {
   name                        = local.table_name
@@ -42,6 +52,11 @@ resource "aws_dynamodb_table" "executions" {
     type = "S"
   }
 
+  attribute {
+    name = "dateBucket"
+    type = "S"
+  }
+
   global_secondary_index {
     name            = "account-index"
     hash_key        = "accountId"
@@ -67,6 +82,13 @@ resource "aws_dynamodb_table" "executions" {
     name            = "target-status-index"
     hash_key        = "targetCluster"
     range_key       = "targetStatusKey"
+    projection_type = "ALL"
+  }
+
+  global_secondary_index {
+    name            = "date-bucket-index"
+    hash_key        = "dateBucket"
+    range_key       = "createdAt"
     projection_type = "ALL"
   }
 
@@ -110,7 +132,6 @@ resource "aws_dynamodb_resource_policy" "executions_cross_account" {
         "dynamodb:PutItem",
         "dynamodb:UpdateItem",
         "dynamodb:Query",
-        "dynamodb:Scan",
         "dynamodb:DescribeTable",
       ]
       Resource = [
@@ -132,10 +153,14 @@ resource "aws_dynamodb_resource_policy" "executions_cross_account" {
 # =============================================================================
 # DynamoDB Table for ZOA Audit Log
 # =============================================================================
-# Stores API call audit entries for compliance and observability
-# PK: accountId, SK: timestamp
-# GSI: target-index (targetCluster + timestamp) for cross-cluster visibility
+# Stores API call audit entries for compliance and observability.
+# PK: accountId, SK: timestamp (per-account listing)
 # TTL: 365-day automatic expiration
+#
+# GSI Index Architecture:
+#   target-index      (targetCluster + timestamp) — CLI: `zoa audit --target X` cross-cluster filter
+#   date-bucket-index (dateBucket + timestamp)    — CLI: `zoa audit` default path (cross-cluster, newest first)
+#                                                 — Production-ready: no partition size limits (daily buckets)
 
 resource "aws_dynamodb_table" "audit_log" {
   name                        = local.audit_table_name
@@ -159,9 +184,21 @@ resource "aws_dynamodb_table" "audit_log" {
     type = "S"
   }
 
+  attribute {
+    name = "dateBucket"
+    type = "S"
+  }
+
   global_secondary_index {
     name            = "target-index"
     hash_key        = "targetCluster"
+    range_key       = "timestamp"
+    projection_type = "ALL"
+  }
+
+  global_secondary_index {
+    name            = "date-bucket-index"
+    hash_key        = "dateBucket"
     range_key       = "timestamp"
     projection_type = "ALL"
   }
@@ -204,7 +241,6 @@ resource "aws_dynamodb_resource_policy" "audit_cross_account" {
       Action = [
         "dynamodb:PutItem",
         "dynamodb:Query",
-        "dynamodb:Scan",
       ]
       Resource = [
         aws_dynamodb_table.audit_log.arn,
