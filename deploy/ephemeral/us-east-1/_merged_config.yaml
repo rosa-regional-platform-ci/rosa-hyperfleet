@@ -185,6 +185,9 @@ applications:
     hyperfleet:
       # @doc applications.regional-cluster.hyperfleet.oidcS3Bucket S3 bucket name the HyperFleet Operator writes OIDC discovery documents to.
       # @used-by applications.regional-cluster.hyperfleet.oidcS3Bucket _context
+      # NOTE: This value is overridden in the ApplicationSet valuesObject (config/templates/argocd-bootstrap/applicationset.yaml.j2)
+      # with the actual bucket name from terraform output (oidc_bucket_name), threaded through cluster secret annotations.
+      # The placeholder below is kept for documentation but is not used.
       oidcS3Bucket: "hypershift-{{ eph_prefix }}-regional-oidc-{{ account_id }}"
       # @doc applications.regional-cluster.hyperfleet.oidcIssuerBaseUrl OIDC issuer base URL the HyperFleet Operator advertises for discovery documents.
       # @used-by applications.regional-cluster.hyperfleet.oidcIssuerBaseUrl _context

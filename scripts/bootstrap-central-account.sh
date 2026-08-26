@@ -137,16 +137,34 @@ GITHUB_BRANCH="${GITHUB_BRANCH:-main}"
 TARGET_ENVIRONMENT="${TARGET_ENVIRONMENT:-staging}"
 
 # Determine region from source config files (true source of truth)
-# Priority: 1) Source config filename (config/<env>/<region>.yaml), 2) AWS_REGION env var, 3) AWS CLI config, 4) us-east-1
+# Priority: 1) Source config filename (config/<env>/<region>.yaml), 2) AWS_REGION env var, 3) AWS CLI config
 # Region is encoded in the config filename stem (e.g., config/stage/us-east-1.yaml → us-east-1)
 REGION=""
-FIRST_REGION_FILE=$(find "config/${TARGET_ENVIRONMENT}" -maxdepth 1 -type f -name "*.yaml" ! -name "defaults.yaml" 2>/dev/null | head -1)
-if [ -n "$FIRST_REGION_FILE" ] && [ -f "$FIRST_REGION_FILE" ]; then
-    # Extract region from filename stem (e.g., config/stage/us-east-1.yaml → us-east-1)
-    REGION=$(basename "$FIRST_REGION_FILE" .yaml)
+REGION_FILES=($(find "config/${TARGET_ENVIRONMENT}" -maxdepth 1 -type f -name "*.yaml" ! -name "defaults.yaml" 2>/dev/null | sort))
+REGION_COUNT=${#REGION_FILES[@]}
+
+if [ "$REGION_COUNT" -eq 0 ]; then
+    echo "❌ Error: No region config files found in config/${TARGET_ENVIRONMENT}/" >&2
+    echo "   Expected: config/${TARGET_ENVIRONMENT}/<region>.yaml" >&2
+    exit 1
+elif [ "$REGION_COUNT" -gt 1 ]; then
+    echo "⚠️  Warning: Multiple region configs found in config/${TARGET_ENVIRONMENT}/:" >&2
+    printf '  %s\n' "${REGION_FILES[@]}" | sed 's|^|   - |' >&2
+    echo "   Using first: $(basename "${REGION_FILES[0]}" .yaml)" >&2
 fi
+
+# Extract region from the first config filename
+REGION=$(basename "${REGION_FILES[0]}" .yaml)
+
+# Allow AWS_REGION or AWS CLI config to override if explicitly set
 configured_region=$(aws configure get region 2>/dev/null || true)
-REGION="${REGION:-${AWS_REGION:-${configured_region:-us-east-1}}}"
+REGION="${AWS_REGION:-${configured_region:-$REGION}}"
+
+if [ -z "$REGION" ]; then
+    echo "❌ Error: Could not determine AWS region" >&2
+    echo "   Set AWS_REGION env var or configure 'aws configure set region <region>'" >&2
+    exit 1
+fi
 
 # Validate: all rendered pipeline configs should use the same region
 # This prevents pipelines from being scattered across different regions

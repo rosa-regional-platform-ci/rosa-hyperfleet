@@ -190,6 +190,7 @@ resource "aws_ecs_task_definition" "bootstrap" {
               zoa_table_name: "$ZOA_TABLE_NAME"
               zoa_audit_table_name: "$ZOA_AUDIT_TABLE_NAME"
               zoa_bucket_name: "$ZOA_BUCKET_NAME"
+              oidc_bucket_name: "$OIDC_BUCKET_NAME"
               oidc_cloudfront_domain: "$OIDC_CLOUDFRONT_DOMAIN"
               sre_grafana_target_group_arn: "$SRE_GRAFANA_TARGET_GROUP_ARN"
               sre_argocd_target_group_arn: "$SRE_ARGOCD_TARGET_GROUP_ARN"
