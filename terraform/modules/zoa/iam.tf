@@ -361,6 +361,7 @@ resource "aws_iam_role_policy" "data_access_dynamodb" {
         "dynamodb:PutItem",
         "dynamodb:UpdateItem",
         "dynamodb:Query",
+        "dynamodb:Scan",
         "dynamodb:DescribeTable",
       ]
       Resource = [
