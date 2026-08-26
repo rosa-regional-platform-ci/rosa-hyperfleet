@@ -146,6 +146,8 @@ for svc in $SERVICES_LIST; do
     read -rs -p "    Paste the OIDC client secret (input hidden): " secret_value
     echo ""
 
+# Strip leading/trailing whitespace and newlines that might get appended when copying the value
+secret_value=$(printf '%s' "$secret_value" | tr -d '\n\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     if [ -z "$secret_value" ]; then
         echo "    ⚠️  Skipping (empty value)"
         continue
