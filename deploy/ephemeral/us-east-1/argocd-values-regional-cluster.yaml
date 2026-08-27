@@ -9,9 +9,9 @@ eksNodePool:
   instanceFamilies:
   - m8i-flex
   - m7i-flex
-baseDomain: us-east-1.dev0.rosa.devshift.net
+baseDomain: us-east-1-eph-2510ab12.dev0.rosa.devshift.net
 hyperfleet:
-  oidcS3Bucket: hypershift--regional-oidc-ssm:///infra/ephemeral/us-east-1/account_id
+  oidcS3Bucket: hypershift-eph-2510ab12-regional-oidc-599476212575
 pagerduty:
   enabled: false
 grafana:
