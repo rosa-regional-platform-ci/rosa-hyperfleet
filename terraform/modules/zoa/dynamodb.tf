@@ -3,41 +3,38 @@
 # =============================================================================
 # Stores Trusted Action execution metadata and status.
 # PK: executionId (direct Get by ID)
+# TTL: 365 days (DYNAMODB_TTL_DAYS env var)
 #
-# GSI Index Architecture (4 indexes, each serving distinct access patterns):
+# Operation → Index mapping:
 #
-#   status-index (PK=status, SK=createdAt)
-#     Consumers: reconciler, GC, CLI
-#     - Reconciler polls for dispatched/running items to drive state machine (oldest first)
-#     - GC finds terminal items (succeeded/failed) older than TTL for K8s resource cleanup
-#     - CLI: `zoa runs --status X` lists executions filtered by status (newest first)
+#   | Operation (code path)                | Index              | Frequency          |
+#   |--------------------------------------|--------------------|--------------------|
+#   | Reconciler: QueryByTargetAndStatus   | target-status-index| Every 5-30s/cluster|
+#   | GC: QueryTerminalByTarget            | target-status-index| Every 60s/cluster  |
+#   | Concurrency limiter: CountActiveByTarget | target-status-index| Per dispatch   |
+#   | Dispatch cooldown: ListByTargetAndAction  | date-bucket-index  | Per write-TA only |
+#   | CLI: zoa runs [filters]              | date-bucket-index  | Human-driven       |
+#   | Get by ID: Get                       | Table PK           | Per dispatch/get   |
 #
-#   target-index (PK=targetCluster, SK=createdAt)
-#     Consumers: CLI, cooldown check
-#     - CLI: `zoa runs --target X` for cross-cluster filtered view (newest first)
-#     - Write cooldown: ListByTargetAndAction checks recent writes on a target
-#       to prevent accidental duplicate SRE requests (time-bounded query)
+# GSI Architecture (2 indexes):
 #
 #   target-status-index (PK=targetCluster, SK=targetStatusKey)
-#     Consumers: reconciler, GC, concurrency limiter
-#     - Composite sort key format: "{status}#{timestamp}" enables begins_with queries
-#     - Reconciler: find all dispatched executions for THIS target only (cluster-scoped)
-#     - GC: find all terminal executions for THIS target that need cleanup
-#     - Concurrency limiter: CountActiveByTarget counts dispatched+approved items
-#       per target to enforce MaxConcurrentPerTarget without reading the entire table
-#     - Why not use status-index + target-index separately? DynamoDB cannot join indexes.
-#       Without this composite, finding "dispatched items on target X" requires reading
-#       ALL dispatched items across the fleet (O(fleet)) or ALL items on a target (O(history)).
-#       This index makes it O(result_set) — cost proportional to active items only.
+#     Machine-driven hot path. Runs every 5-30 seconds per cluster.
+#     Composite sort key format: "{status}#{timestamp}" enables begins_with queries.
+#     - Reconciler: finds dispatched/approved executions for THIS cluster only
+#     - GC: finds terminal executions (succeeded/failed) older than cleanup threshold
+#     - Concurrency limiter: counts active (dispatched+approved) items per target
+#     Cost: O(active_items_on_target) — typically 0-5 items per query.
 #
 #   date-bucket-index (PK=dateBucket, SK=createdAt)
-#     Consumers: CLI default path
-#     - CLI: `zoa runs` (no --target, no --status) for cross-cluster listing (newest first)
-#     - Daily partition key (e.g. "2026-08-26") with no partition size limits at scale
-#     - Iterates backwards through daily buckets from today until --since boundary
+#     Human-driven + cooldown path. Latency tolerance: seconds.
+#     Daily partition key (e.g. "2026-08-27") with createdAt as sort key.
+#     - CLI listing: iterates daily buckets backwards until --since boundary,
+#       non-key filters (target, status, action, operator) as FilterExpressions
+#     - Dispatch cooldown: queries only today's bucket (SK >= 300s ago) with
+#       target+action as FilterExpression. Only triggered for write TAs without
+#       force=true. At 1K/day, reads ~3-4 items in a 5min window.
 #     - CLI enforces --since 24h default, guaranteeing bounded queries
-#     - Items written before this index was deployed lack dateBucket and are only
-#       accessible via --target or --status filters
 
 resource "aws_dynamodb_table" "executions" {
   name                        = local.table_name
@@ -56,11 +53,6 @@ resource "aws_dynamodb_table" "executions" {
   }
 
   attribute {
-    name = "status"
-    type = "S"
-  }
-
-  attribute {
     name = "targetCluster"
     type = "S"
   }
@@ -73,20 +65,6 @@ resource "aws_dynamodb_table" "executions" {
   attribute {
     name = "dateBucket"
     type = "S"
-  }
-
-  global_secondary_index {
-    name            = "status-index"
-    hash_key        = "status"
-    range_key       = "createdAt"
-    projection_type = "ALL"
-  }
-
-  global_secondary_index {
-    name            = "target-index"
-    hash_key        = "targetCluster"
-    range_key       = "createdAt"
-    projection_type = "ALL"
   }
 
   global_secondary_index {
@@ -166,22 +144,23 @@ resource "aws_dynamodb_resource_policy" "executions_cross_account" {
 # =============================================================================
 # Stores API call audit entries for compliance and observability.
 # PK: accountId, SK: timestamp (per-account listing from the Lambda's own account)
-# TTL: 365-day automatic expiration
+# TTL: 365 days (DYNAMODB_TTL_DAYS env var)
 #
-# GSI Index Architecture (2 indexes):
+# Operation → Index mapping:
 #
-#   target-index (PK=targetCluster, SK=timestamp)
-#     Consumers: CLI
-#     - CLI: `zoa audit --target X` for cross-cluster filtered view (newest first)
-#     - Each Lambda writes audit entries with its own targetCluster, enabling
-#       filtering by which cluster processed the request
+#   | Operation (code path)               | Index             | Frequency     |
+#   |-------------------------------------|-------------------|---------------|
+#   | CLI: zoa audit [filters]            | date-bucket-index | Human-driven  |
+#   | Record (write): Record              | Table PK          | Per API call  |
+#
+# GSI Architecture (1 index):
 #
 #   date-bucket-index (PK=dateBucket, SK=timestamp)
-#     Consumers: CLI default path
-#     - CLI: `zoa audit` (no --target) for cross-cluster listing (newest first)
-#     - Daily partition key (e.g. "2026-08-26") with no partition size limits at scale
-#     - Iterates backwards through daily buckets from today until --since boundary
+#     Human-driven path. Only consumer is `zoa audit` CLI command.
+#     - Iterates daily buckets backwards from today until --since boundary
+#     - Non-key filters (target, action, operator, method) as FilterExpressions
 #     - CLI enforces --since 24h default, guaranteeing bounded queries
+#     - Daily partition key (e.g. "2026-08-27") with no hot-partition risk at any scale
 
 resource "aws_dynamodb_table" "audit_log" {
   name                        = local.audit_table_name
@@ -201,20 +180,8 @@ resource "aws_dynamodb_table" "audit_log" {
   }
 
   attribute {
-    name = "targetCluster"
-    type = "S"
-  }
-
-  attribute {
     name = "dateBucket"
     type = "S"
-  }
-
-  global_secondary_index {
-    name            = "target-index"
-    hash_key        = "targetCluster"
-    range_key       = "timestamp"
-    projection_type = "ALL"
   }
 
   global_secondary_index {
