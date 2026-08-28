@@ -1,2 +1,17 @@
 provision_mcs:
   mc01: {}
+
+applications:
+  regional-cluster:
+    platformApi:
+      app:
+        image:
+           repository: quay.io/cdoan0/rosa-hyperfleet-api
+           tag: "ROSAENG-64871"
+#          tag: "5c82380e5df47fe722543931f821b096ed81fc9b"
+    hyperfleet:
+      helmValues:
+        image:
+           repository: quay.io/cdoan0/rosa-hyperfleet-operator
+           tag: "ROSAENG-64871"
+#          tag: "75f8c649801382cdb06b901a0085d61317d4f6e6"

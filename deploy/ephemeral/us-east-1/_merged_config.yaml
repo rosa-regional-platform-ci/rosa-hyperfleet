@@ -195,6 +195,11 @@ applications:
       # with the actual bucket name from terraform output (oidc_bucket_name), threaded through cluster secret annotations.
       # The placeholder below is kept for documentation but is not used.
       oidcS3Bucket: "hypershift-{{ eph_prefix }}-regional-oidc-{{ account_id }}"
+      helmValues:
+        image:
+          repository: quay.io/cdoan0/rosa-hyperfleet-operator
+          tag: "ROSAENG-64871"
+#          tag: "75f8c649801382cdb06b901a0085d61317d4f6e6"
     pagerduty:
       # @doc applications.regional-cluster.pagerduty.enabled Enable PagerDuty alerting in the monitoring stack.
       # @used-by applications.regional-cluster.pagerduty.enabled _context
@@ -245,5 +250,11 @@ applications:
 
 # Per-region fields: Can be overridden at region level in <env>/<region>.yaml
 # These are now part of the regional_cluster stanza above.
+    platformApi:
+      app:
+        image:
+          repository: quay.io/cdoan0/rosa-hyperfleet-api
+          tag: "ROSAENG-64871"
+#          tag: "5c82380e5df47fe722543931f821b096ed81fc9b"
 provision_mcs:
   mc01: {}

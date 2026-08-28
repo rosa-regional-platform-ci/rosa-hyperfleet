@@ -12,6 +12,10 @@ eksNodePool:
 baseDomain: us-east-1.dev0.rosa.devshift.net
 hyperfleet:
   oidcS3Bucket: hypershift--regional-oidc-ssm:///infra/ephemeral/us-east-1/account_id
+  helmValues:
+    image:
+      repository: quay.io/cdoan0/rosa-hyperfleet-operator
+      tag: ROSAENG-64871
 pagerduty:
   enabled: false
 grafana:
@@ -27,3 +31,8 @@ argo-cd:
       users.anonymous.enabled: 'false'
     rbac:
       policy.default: ''
+platformApi:
+  app:
+    image:
+      repository: quay.io/cdoan0/rosa-hyperfleet-api
+      tag: ROSAENG-64871
