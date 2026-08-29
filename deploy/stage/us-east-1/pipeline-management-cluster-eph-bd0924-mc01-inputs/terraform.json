@@ -4,10 +4,10 @@
   "service_phase": "stage",
   "cost_center": "732",
   "environment": "stage",
-  "account_id": "ssm:///infra/stage/us-east-1/mc02/account_id",
+  "account_id": "ssm:///infra/stage/us-east-1/mc01/account_id",
   "region": "us-east-1",
-  "alias": "mc02",
-  "management_id": "mc02",
+  "alias": "eph-bd0924-mc01",
+  "management_id": "eph-bd0924-mc01",
   "regional_aws_account_id": "ssm:///infra/stage/us-east-1/rc/account_id",
   "enable_bastion": true
 }
