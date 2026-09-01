@@ -255,4 +255,6 @@ applications:
           repository: quay.io/cdoan0/rosa-hyperfleet-api
           tag: ROSAENG-64871
 provision_mcs:
-  mc01: {}
+  mc01:
+    delete: true
+delete: true
