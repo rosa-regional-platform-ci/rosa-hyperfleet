@@ -55,12 +55,13 @@ else
   echo "WARNING: RHOBS_API_URL not available — observability tests will be skipped"
 fi
 
-# ZOA RC/MC API URLs, for the light "zoa"-labeled smoke tests bundled into
-# test-e2e-api (rosa-hyperfleet-api/test/e2e-api/zoa_smoke_test.go). Same
+# ZOA RC/MC API URLs, consumed further down by the rosa-hyperfleet-zoa clone
+# that runs its own `Label("smoke")` specs (see that repo's test/e2e/). Same
 # resolution order as RHOBS_API_URL above; local wrapper scripts
 # (ephemeral-env.sh) already export these directly, so this is mainly for
-# CI-triggered runs (Prow). MC may legitimately be absent — management
-# clusters provision dynamically, so the smoke suite just runs RC-only then.
+# CI-triggered runs (Prow). ZOA_MC_API_URL is only absent if this environment
+# genuinely has no MC (empty provision_mcs) — ephemeral envs provision one
+# MC by default, so in the common case both resolve and both get tested.
 if [[ -z "${ZOA_RC_API_URL:-}" ]]; then
   if [[ -r "${CREDS_DIR}/zoa_rc_api_url" ]]; then
     ZOA_RC_API_URL="$(cat "${CREDS_DIR}/zoa_rc_api_url")"
@@ -138,11 +139,15 @@ make test-e2e-api || platform_rc=$?
 # (test/e2e/), including the "smoke" label used here — cheap, --dry-run/
 # read-only checks (discovery + one read TA + one write TA dry-run) meant to
 # catch infra/platform changes that silently break ZOA, without duplicating
-# that test logic in this repo. Cloning+running is best-effort so a zoa
-# checkout/build hiccup never fails the platform API e2e run above. Deep ZOA
-# validation (including real delete_pod/rollout_restart execution) lives in
-# rosa-hyperfleet-zoa's own on-demand-e2e/nightly (or `make ephemeral-zoa-e2e`
-# locally) — never run from here.
+# that test logic in this repo. Same "capture the exit code, don't abort"
+# pattern used for platform_rc/hcp_rc/monitoring_rc above/below: a zoa
+# failure (including a checkout/build hiccup) does NOT stop this script or
+# skip the platform API / HCP / monitoring tests that run alongside it, but
+# it DOES fail the overall job (see the combined exit check at the bottom) —
+# ZOA gets exactly the same treatment as every other test bucket here, not
+# a free pass. Deep ZOA validation (including real delete_pod/rollout_restart
+# execution) lives in rosa-hyperfleet-zoa's own on-demand-e2e/nightly (or
+# `make ephemeral-zoa-e2e` locally) — never run from here.
 zoa_rc=0
 if [[ -n "${ZOA_RC_API_URL:-}" ]]; then
   if git clone --depth 1 --branch "${ZOA_REF}" "${ZOA_REPO}" "${WORK_DIR}/zoa"; then
