@@ -40,18 +40,18 @@ variable "output_retention_days" {
 variable "zoa_lambda_source_image" {
   description = "Source registry image for ZOA Lambda (mirrored to ECR at deploy time)"
   type        = string
-  default     = "quay.io/slopezz/zoa-lambda"
+  default     = "quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda"
 }
 
 variable "zoa_runner_source_image" {
   description = "Source registry image for ZOA Runner (K8s pulls directly, no ECR mirror)"
   type        = string
-  default     = "quay.io/slopezz/zoa-runner"
+  default     = "quay.io/redhat-user-workloads/rosa-tenant/zoa-runner"
 }
 
 variable "zoa_image_tag" {
-  description = "Immutable image tag (git SHA). Used for source→ECR mirroring and runner image ref."
+  description = "Immutable image tag (git SHA). Used for source→ECR mirroring and runner image ref. Defaults to the Konflux zoa-lambda/zoa-runner on-push build tag for the pinned rosa-hyperfleet-zoa main commit; override to test another commit/PR build (e.g. an `on-pr-<sha>` Konflux tag)."
   type        = string
-  default     = "latest"
+  default     = "8af92e65fd57562f898515c70148fe9aa75a52b1"
 }
 

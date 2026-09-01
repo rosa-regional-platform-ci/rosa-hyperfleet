@@ -438,11 +438,13 @@ module "authz" {
 module "zoa" {
   source = "../../modules/zoa"
 
-  regional_id      = var.regional_id
-  eks_cluster_name = module.regional_cluster.cluster_name
-  mc_ou_path       = var.mc_ou_path
-  environment      = var.environment
-  zoa_image_tag    = var.zoa_image_tag
+  regional_id             = var.regional_id
+  eks_cluster_name        = module.regional_cluster.cluster_name
+  mc_ou_path              = var.mc_ou_path
+  environment             = var.environment
+  zoa_image_tag           = var.zoa_image_tag
+  zoa_lambda_source_image = var.zoa_lambda_source_image
+  zoa_runner_source_image = var.zoa_runner_source_image
 }
 
 module "zoa_lambda" {

@@ -469,9 +469,21 @@ variable "management_clusters" {
 # =============================================================================
 
 variable "zoa_image_tag" {
-  description = "ZOA image tag for Quay→ECR mirroring and runner ref."
+  description = "ZOA image tag for Quay→ECR mirroring and runner ref. Defaults to a known-good Konflux on-push build tag (full commit SHA) for rosa-hyperfleet-zoa@main. Override with an `on-pr-<sha>` Konflux tag to validate a zoa PR against this environment before merge."
   type        = string
-  default     = "48b14ce"
+  default     = "8af92e65fd57562f898515c70148fe9aa75a52b1"
+}
+
+variable "zoa_lambda_source_image" {
+  description = "Source registry image for ZOA Lambda (mirrored to ECR at deploy time). Override together with zoa_image_tag to point at a fork or scratch registry."
+  type        = string
+  default     = "quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda"
+}
+
+variable "zoa_runner_source_image" {
+  description = "Source registry image for ZOA Runner (K8s pulls directly, no ECR mirror). Override together with zoa_image_tag to point at a fork or scratch registry."
+  type        = string
+  default     = "quay.io/redhat-user-workloads/rosa-tenant/zoa-runner"
 }
 
 # =============================================================================

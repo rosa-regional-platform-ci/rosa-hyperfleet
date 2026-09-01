@@ -129,6 +129,15 @@ regional_cluster:
   # @doc regional_cluster.sre_thanos_oidc_client_id OIDC client ID for Thanos. Required when enable_sre_oidc_auth is true.
   # @used-by regional_cluster.sre_thanos_oidc_client_id pipeline-regional-cluster-inputs/terraform.json.j2
   sre_thanos_oidc_client_id: "rrp-thanos-sre-int-us-east-1"
+  # @doc regional_cluster.zoa_image_tag Immutable tag (Konflux build) shared by the ZOA Lambda and Runner images. Defaults to a known-good rosa-hyperfleet-zoa@main Konflux on-push build. Override per-environment (or via --provision-override-file for ephemeral e2e) with a Konflux `on-pr-<full-sha>` tag to validate a rosa-hyperfleet-zoa PR before merge — see rosa-hyperfleet-zoa/docs/e2e-testing-plan.md.
+  # @used-by regional_cluster.zoa_image_tag pipeline-regional-cluster-inputs/terraform.json.j2
+  zoa_image_tag: "8af92e65fd57562f898515c70148fe9aa75a52b1"
+  # @doc regional_cluster.zoa_lambda_source_image Source registry image for the ZOA Lambda (mirrored to ECR at deploy time). Only override together with zoa_image_tag when pointing at a fork or scratch registry.
+  # @used-by regional_cluster.zoa_lambda_source_image pipeline-regional-cluster-inputs/terraform.json.j2
+  zoa_lambda_source_image: "quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda"
+  # @doc regional_cluster.zoa_runner_source_image Source registry image for the ZOA Runner (pulled directly by K8s, no ECR mirror). Only override together with zoa_image_tag when pointing at a fork or scratch registry.
+  # @used-by regional_cluster.zoa_runner_source_image pipeline-regional-cluster-inputs/terraform.json.j2
+  zoa_runner_source_image: "quay.io/redhat-user-workloads/rosa-tenant/zoa-runner"
 
 management_cluster_defaults:
   # @doc management_cluster_defaults.enable_bastion Default enable bastion for management clusters.
