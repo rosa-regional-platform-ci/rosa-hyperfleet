@@ -299,20 +299,27 @@ make ephemeral-e2e ID=6bd2d3d7 E2E_SKIP_CLEANUP=1
 
 This skips both the cleanup-labeled ginkgo specs and the `DeferCleanup` safety net, so the HCP cluster, VPC, IAM, and OIDC resources survive for investigation. Remember to tear them down manually afterwards with `make ephemeral-teardown` or by re-running without the flag.
 
-### ZOA deep e2e suite
+### ZOA testing
 
-`rosa-hyperfleet-zoa` has its own deep Trusted Action e2e suite (`test/e2e/` in that repo) that `make ephemeral-e2e` above does not run. To iterate on it locally against an already-provisioned ephemeral env's ZOA Lambda URLs, without pushing a commit or waiting on a Konflux image build:
+`make ephemeral-e2e` above already includes a **light ZOA smoke check** for free: if the environment has a ZOA RC Lambda URL, `ci/e2e-tests.sh` clones `rosa-hyperfleet-zoa@main`, builds the `zoa` CLI, and `test-e2e-api`'s `Label("zoa")` spec (`rosa-hyperfleet-api/test/e2e-api/zoa_smoke_test.go`) runs a handful of Trusted Actions (discovery, one read, one write dry-run) against RC and, if present, MC. Nothing to opt into — it's skipped automatically when a ZOA URL isn't available.
+
+For **deep** validation of every Trusted Action (including real, non-dry-run `delete_pod`/`rollout_restart` execution) use `rosa-hyperfleet-zoa`'s own suite (`test/e2e/` in that repo):
 
 ```bash
-# Assumes rosa-hyperfleet-zoa is checked out as a sibling directory
-# (~/github/rosa-hyperfleet-zoa); override with ZOA_DIR otherwise.
+# Zero setup — clones rosa-hyperfleet-zoa@main inside the container
 make ephemeral-zoa-e2e ID=6bd2d3d7
 
-# Different checkout location
-make ephemeral-zoa-e2e ID=6bd2d3d7 ZOA_DIR=/path/to/rosa-hyperfleet-zoa
+# A branch/fork you've pushed
+make ephemeral-zoa-e2e ID=6bd2d3d7 ZOA_REF=my-feature-branch
+make ephemeral-zoa-e2e ID=6bd2d3d7 ZOA_REPO=https://github.com/my-fork/rosa-hyperfleet-zoa.git ZOA_REF=my-feature-branch
+
+# Your own local checkout, uncommitted changes included — only use this on
+# your own machine; it's a personal convenience, not something to depend on
+# in shared docs/scripts, since it assumes a directory only you have.
+make ephemeral-zoa-e2e ID=6bd2d3d7 ZOA_DIR=/path/to/your/rosa-hyperfleet-zoa
 ```
 
-This mounts your local `rosa-hyperfleet-zoa` checkout read-write into the same test container `ephemeral-e2e` uses (same dev-account credentials, same `rrp-rc`/`rrp-mc` profile remapping) and runs `ci/e2e-tests.sh` from it, which builds the `zoa` CLI from your current source (including uncommitted changes) and runs `make test-e2e`. It never touches the ZOA Lambda images actually deployed in the environment — it's purely for validating the test suite itself (adding/changing specs) against real infrastructure.
+`ZOA_DIR`, when set, mounts that checkout read-write into the same test container `ephemeral-e2e` uses (same dev-account credentials, same `rrp-rc`/`rrp-mc` profile remapping) instead of cloning, so `ci/e2e-tests.sh` builds the `zoa` CLI from your current (possibly uncommitted) source. Either way this never touches the ZOA Lambda images actually deployed in the environment — it's purely for validating the test suite against real infrastructure.
 
 ## Dump Environment
 

@@ -5,6 +5,9 @@
 #   1. BASE_URL env var            — set by local wrapper scripts (ephemeral-env.sh, int-env.sh)
 #   2. CREDS_DIR/api_url file — Prow-mounted secret for the standing int environment
 #   3. SHARED_DIR terraform output — written by ephemeral-provider during CI provisioning
+#
+# RHOBS_API_URL and ZOA_RC_API_URL/ZOA_MC_API_URL follow the same resolution
+# order and are optional — their tests are skipped (not failed) when absent.
 
 set -euo pipefail
 
@@ -52,6 +55,34 @@ else
   echo "WARNING: RHOBS_API_URL not available — observability tests will be skipped"
 fi
 
+# ZOA RC/MC API URLs, for the light "zoa"-labeled smoke tests bundled into
+# test-e2e-api (rosa-hyperfleet-api/test/e2e-api/zoa_smoke_test.go). Same
+# resolution order as RHOBS_API_URL above; local wrapper scripts
+# (ephemeral-env.sh) already export these directly, so this is mainly for
+# CI-triggered runs (Prow). MC may legitimately be absent — management
+# clusters provision dynamically, so the smoke suite just runs RC-only then.
+if [[ -z "${ZOA_RC_API_URL:-}" ]]; then
+  if [[ -r "${CREDS_DIR}/zoa_rc_api_url" ]]; then
+    ZOA_RC_API_URL="$(cat "${CREDS_DIR}/zoa_rc_api_url")"
+  elif [[ -n "${TF_OUTPUTS:-}" && -r "${TF_OUTPUTS:-}" ]]; then
+    ZOA_RC_API_URL="$(jq -r '.zoa_api_function_url.value // empty' "${TF_OUTPUTS}")"
+  fi
+fi
+if [[ -z "${ZOA_MC_API_URL:-}" ]]; then
+  if [[ -r "${CREDS_DIR}/zoa_mc_api_url" ]]; then
+    ZOA_MC_API_URL="$(cat "${CREDS_DIR}/zoa_mc_api_url")"
+  elif [[ -n "${SHARED_DIR:-}" && -r "${SHARED_DIR}/management-terraform-outputs.json" ]]; then
+    ZOA_MC_API_URL="$(jq -r '.zoa_api_function_url.value // empty' "${SHARED_DIR}/management-terraform-outputs.json")"
+  fi
+fi
+if [[ -n "${ZOA_RC_API_URL:-}" ]]; then
+  export ZOA_RC_API_URL
+  echo "ZOA RC API URL: ${ZOA_RC_API_URL}"
+else
+  echo "ZOA_RC_API_URL not available — ZOA smoke tests will be skipped"
+fi
+[[ -n "${ZOA_MC_API_URL:-}" ]] && export ZOA_MC_API_URL && echo "ZOA MC API URL: ${ZOA_MC_API_URL}"
+
 # Use the regional account profile for authenticated API calls
 export AWS_PROFILE="rrp-rc"
 export AWS_DEFAULT_REGION="${AWS_REGION:-us-east-1}"
@@ -79,6 +110,8 @@ E2E_REF="${E2E_REF:-main}"
 E2E_REPO="${E2E_REPO:-https://github.com/openshift-online/rosa-hyperfleet-api.git}"
 CLI_REF="${CLI_REF:-main}"
 CLI_REPO="${CLI_REPO:-https://github.com/openshift-online/rosa-hyperfleet-cli.git}"
+ZOA_REF="${ZOA_REF:-main}"
+ZOA_REPO="${ZOA_REPO:-https://github.com/openshift-online/rosa-hyperfleet-zoa.git}"
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "${WORK_DIR}"' EXIT
 echo ""
@@ -95,6 +128,23 @@ echo "working commit $(git rev-parse HEAD)"
 
 go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
 export PATH="$(go env GOPATH)/bin:${PATH}"
+
+# Light ZOA smoke coverage (test/e2e-api/zoa_smoke_test.go, label "zoa") only
+# runs if ZOA_RC_API_URL and a built zoa CLI are available — both are
+# best-effort here so a zoa checkout/build hiccup never blocks the platform
+# API e2e run it's bundled into. Deep ZOA validation lives in
+# rosa-hyperfleet-zoa's own e2e suite (make ephemeral-zoa-e2e).
+if [[ -n "${ZOA_RC_API_URL:-}" ]]; then
+  if git clone --depth 1 --branch "${ZOA_REF}" "${ZOA_REPO}" "${WORK_DIR}/zoa" \
+      && make -C "${WORK_DIR}/zoa" build; then
+    export ZOA_BIN="${WORK_DIR}/zoa/bin/zoa"
+    echo "ZOA CLI built from ${ZOA_REPO}@${ZOA_REF}: ${ZOA_BIN}"
+  else
+    echo "WARNING: failed to build zoa CLI from ${ZOA_REPO}@${ZOA_REF} — ZOA smoke tests will be skipped"
+  fi
+else
+  echo "ZOA_RC_API_URL not set — ZOA smoke tests will be skipped"
+fi
 
 platform_rc=0
 hcp_rc=0
