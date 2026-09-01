@@ -3,8 +3,8 @@
     "aws_region": "us-east-1",
     "environment": "stage",
     "management_clusters": [
-      "mc01",
-      "mc02"
+      "eph-53e9be-mc01",
+      "eph-53e9be-mc02"
     ],
     "name": "stage"
   }
