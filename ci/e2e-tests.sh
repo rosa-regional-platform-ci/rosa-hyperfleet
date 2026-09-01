@@ -129,27 +129,31 @@ echo "working commit $(git rev-parse HEAD)"
 go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
 export PATH="$(go env GOPATH)/bin:${PATH}"
 
-# Light ZOA smoke coverage (test/e2e-api/zoa_smoke_test.go, label "zoa") only
-# runs if ZOA_RC_API_URL and a built zoa CLI are available — both are
-# best-effort here so a zoa checkout/build hiccup never blocks the platform
-# API e2e run it's bundled into. Deep ZOA validation lives in
-# rosa-hyperfleet-zoa's own e2e suite (make ephemeral-zoa-e2e).
-if [[ -n "${ZOA_RC_API_URL:-}" ]]; then
-  if git clone --depth 1 --branch "${ZOA_REF}" "${ZOA_REPO}" "${WORK_DIR}/zoa" \
-      && make -C "${WORK_DIR}/zoa" build; then
-    export ZOA_BIN="${WORK_DIR}/zoa/bin/zoa"
-    echo "ZOA CLI built from ${ZOA_REPO}@${ZOA_REF}: ${ZOA_BIN}"
-  else
-    echo "WARNING: failed to build zoa CLI from ${ZOA_REPO}@${ZOA_REF} — ZOA smoke tests will be skipped"
-  fi
-else
-  echo "ZOA_RC_API_URL not set — ZOA smoke tests will be skipped"
-fi
-
 platform_rc=0
 hcp_rc=0
 monitoring_rc=0
 make test-e2e-api || platform_rc=$?
+
+# Light ZOA smoke coverage: rosa-hyperfleet-zoa owns its own e2e suite
+# (test/e2e/), including the "smoke" label used here — cheap, --dry-run/
+# read-only checks (discovery + one read TA + one write TA dry-run) meant to
+# catch infra/platform changes that silently break ZOA, without duplicating
+# that test logic in this repo. Cloning+running is best-effort so a zoa
+# checkout/build hiccup never fails the platform API e2e run above. Deep ZOA
+# validation (including real delete_pod/rollout_restart execution) lives in
+# rosa-hyperfleet-zoa's own on-demand-e2e/nightly (or `make ephemeral-zoa-e2e`
+# locally) — never run from here.
+zoa_rc=0
+if [[ -n "${ZOA_RC_API_URL:-}" ]]; then
+  if git clone --depth 1 --branch "${ZOA_REF}" "${ZOA_REPO}" "${WORK_DIR}/zoa"; then
+    make -C "${WORK_DIR}/zoa" test-e2e-smoke || zoa_rc=$?
+  else
+    echo "WARNING: failed to clone zoa from ${ZOA_REPO}@${ZOA_REF} — ZOA smoke tests skipped" >&2
+    zoa_rc=1
+  fi
+else
+  echo "ZOA_RC_API_URL not set — ZOA smoke tests will be skipped"
+fi
 
 # Get regional account ID for CLI tests
 if [[ -z "${E2E_ACCOUNT_ID:-}" ]]; then
@@ -238,7 +242,7 @@ if [[ $platform_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]]; then
 fi
 
 echo ""
-echo "E2E results: platform=$platform_rc hcp=$hcp_rc monitoring=$monitoring_rc"
-if [[ $platform_rc -ne 0 ]] || [[ $hcp_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]]; then
+echo "E2E results: platform=$platform_rc hcp=$hcp_rc monitoring=$monitoring_rc zoa_smoke=$zoa_rc"
+if [[ $platform_rc -ne 0 ]] || [[ $hcp_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]] || [[ $zoa_rc -ne 0 ]]; then
     exit 1
 fi

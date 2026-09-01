@@ -301,7 +301,7 @@ This skips both the cleanup-labeled ginkgo specs and the `DeferCleanup` safety n
 
 ### ZOA testing
 
-`make ephemeral-e2e` above already includes a **light ZOA smoke check** for free: if the environment has a ZOA RC Lambda URL, `ci/e2e-tests.sh` clones `rosa-hyperfleet-zoa@main`, builds the `zoa` CLI, and `test-e2e-api`'s `Label("zoa")` spec (`rosa-hyperfleet-api/test/e2e-api/zoa_smoke_test.go`) runs a handful of Trusted Actions (discovery, one read, one write dry-run) against RC and, if present, MC. Nothing to opt into — it's skipped automatically when a ZOA URL isn't available.
+`make ephemeral-e2e` above already includes a **light ZOA smoke check** for free: if the environment has a ZOA RC Lambda URL, `ci/e2e-tests.sh` clones `rosa-hyperfleet-zoa@main` and runs `make test-e2e-smoke` from that checkout — a handful of `Label("smoke")` specs (discovery, one read TA, one write TA dry-run) from ZOA's own e2e suite, against RC and, if present, MC. Nothing to opt into — it's skipped automatically when a ZOA URL isn't available, and a zoa clone/build hiccup only skips this check rather than failing the platform API run. ZOA owns this test logic itself (`rosa-hyperfleet-zoa/test/e2e/`); this repo doesn't duplicate it.
 
 For **deep** validation of every Trusted Action (including real, non-dry-run `delete_pod`/`rollout_restart` execution) use `rosa-hyperfleet-zoa`'s own suite (`test/e2e/` in that repo):
 
