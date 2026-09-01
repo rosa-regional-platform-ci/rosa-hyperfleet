@@ -303,7 +303,7 @@ This skips both the cleanup-labeled ginkgo specs and the `DeferCleanup` safety n
 
 `make ephemeral-e2e` above already includes a **light ZOA smoke check** for free: if the environment has a ZOA RC Lambda URL, `ci/e2e-tests.sh` clones `rosa-hyperfleet-zoa@main` and runs `make test-e2e-smoke` from that checkout — a handful of `Label("smoke")` specs (discovery, one read TA, one write TA dry-run) from ZOA's own e2e suite, against RC and, if present, MC. Nothing to opt into — it's skipped automatically when a ZOA URL isn't available, and a zoa clone/build hiccup only skips this check rather than failing the platform API run. ZOA owns this test logic itself (`rosa-hyperfleet-zoa/test/e2e/`); this repo doesn't duplicate it.
 
-For **deep** validation of every Trusted Action (including real, non-dry-run `delete_pod`/`rollout_restart` execution) use `rosa-hyperfleet-zoa`'s own suite (`test/e2e/` in that repo):
+For **deep** validation of every Trusted Action (including real, non-dry-run `delete_pod`/`rollout_restart` execution) use `rosa-hyperfleet-zoa`'s own suite (`test/e2e/` in that repo). This follows the exact same clone-by-ref pattern as `ephemeral-e2e` above (`E2E_REF`/`E2E_REPO`) and the CLI (`CLI_REF`/`CLI_REPO`) — no new mechanism, just `ZOA_REF`/`ZOA_REPO`:
 
 ```bash
 # Zero setup — clones rosa-hyperfleet-zoa@main inside the container
@@ -312,14 +312,9 @@ make ephemeral-zoa-e2e ID=6bd2d3d7
 # A branch/fork you've pushed
 make ephemeral-zoa-e2e ID=6bd2d3d7 ZOA_REF=my-feature-branch
 make ephemeral-zoa-e2e ID=6bd2d3d7 ZOA_REPO=https://github.com/my-fork/rosa-hyperfleet-zoa.git ZOA_REF=my-feature-branch
-
-# Your own local checkout, uncommitted changes included — only use this on
-# your own machine; it's a personal convenience, not something to depend on
-# in shared docs/scripts, since it assumes a directory only you have.
-make ephemeral-zoa-e2e ID=6bd2d3d7 ZOA_DIR=/path/to/your/rosa-hyperfleet-zoa
 ```
 
-`ZOA_DIR`, when set, mounts that checkout read-write into the same test container `ephemeral-e2e` uses (same dev-account credentials, same `rrp-rc`/`rrp-mc` profile remapping) instead of cloning, so `ci/e2e-tests.sh` builds the `zoa` CLI from your current (possibly uncommitted) source. Either way this never touches the ZOA Lambda images actually deployed in the environment — it's purely for validating the test suite against real infrastructure.
+This never touches the ZOA Lambda images actually deployed in the environment — it's purely for validating the test suite against real infrastructure. As with `ephemeral-e2e`, to test uncommitted local changes push them to a branch first; there's no local-checkout-mount option here, consistent with how `ephemeral-e2e`/`E2E_REF` work for `rosa-hyperfleet-api`.
 
 For the full picture (test tiers, CI wiring, image management, PR-image testing) see [`rosa-hyperfleet-zoa/docs/e2e-testing.md`](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/e2e-testing.md).
 

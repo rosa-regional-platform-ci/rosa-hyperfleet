@@ -1146,20 +1146,18 @@ cmd_e2e() {
 }
 
 # Runs rosa-hyperfleet-zoa's deep e2e suite (test/e2e/) against an
-# already-provisioned ephemeral env's ZOA Lambda URLs.
-#
-# By default (no ZOA_DIR) this clones ZOA_REPO@ZOA_REF inside the container,
-# exactly like cmd_e2e clones rosa-hyperfleet-api — zero setup, no directory
-# layout assumed, safe for any teammate to run as-is. Set ZOA_DIR to instead
-# mount a local checkout read-write (uncommitted changes included), for
-# iterating on the e2e suite itself without pushing a commit first. Either
-# way this never touches the ZOA images actually deployed in the
-# environment — it's purely for validating the test suite against real
-# infrastructure.
+# already-provisioned ephemeral env's ZOA Lambda URLs. Clones ZOA_REPO@ZOA_REF
+# inside the container and runs its ci/e2e-tests.sh (which builds the zoa CLI
+# and runs `make test-e2e`) — the exact same clone-by-ref pattern cmd_e2e
+# uses for rosa-hyperfleet-api (E2E_REF/E2E_REPO) and rosa-hyperfleet-cli
+# (CLI_REF/CLI_REPO), and the same ZOA_REF/ZOA_REPO vars ci/e2e-tests.sh's
+# own (smoke-only) zoa clone already uses. To test a branch/fork, push it
+# and set ZOA_REF/ZOA_REPO — same as you would for E2E_REF/E2E_REPO. Never
+# touches the ZOA images actually deployed in the environment — purely for
+# validating the test suite against real infrastructure.
 cmd_zoa_e2e() {
     local zoa_ref="${ZOA_REF:-main}"
     local zoa_repo="${ZOA_REPO:-https://github.com/openshift-online/rosa-hyperfleet-zoa.git}"
-    local zoa_dir="${ZOA_DIR:-}"
 
     select_env "STATE=ready" \
         "Select environment for ZOA e2e tests:" \
@@ -1180,31 +1178,17 @@ cmd_zoa_e2e() {
     echo "  ZOA_RC_API_URL: $zoa_rc_api_url"
     echo "  ZOA_MC_API_URL: ${zoa_mc_api_url:-<not set — MC specs will be skipped>}"
     echo "  REGION:         $region"
-
-    local -a mount_flags=()
-    local run_cmd
-
-    if [[ -n "$zoa_dir" ]]; then
-        zoa_dir="$(cd "$zoa_dir" 2>/dev/null && pwd)" || die "ZOA_DIR not found: ${ZOA_DIR}"
-        [[ -f "${zoa_dir}/ci/e2e-tests.sh" ]] \
-            || die "${zoa_dir} doesn't look like a rosa-hyperfleet-zoa checkout (missing ci/e2e-tests.sh)"
-        echo "  Source:         local checkout at $zoa_dir (uncommitted changes included)"
-        mount_flags=(-v "${zoa_dir}:/workspace:z" -w /workspace)
-        run_cmd="bash ci/e2e-tests.sh"
-    else
-        echo "  Source:         ${zoa_repo}@${zoa_ref} (set ZOA_DIR=/path/to/checkout to test local/uncommitted changes instead)"
-        run_cmd="git clone --depth 1 --branch '${zoa_ref}' '${zoa_repo}' /tmp/zoa-e2e && cd /tmp/zoa-e2e && bash ci/e2e-tests.sh"
-    fi
+    echo "  ZOA_REF:        $zoa_ref"
+    echo "  ZOA_REPO:       $zoa_repo"
 
     $CONTAINER_ENGINE run --rm \
         $_CONTAINER_AWS_FLAGS \
-        "${mount_flags[@]}" \
         -e "ZOA_RC_API_URL=$zoa_rc_api_url" \
         -e "ZOA_MC_API_URL=${zoa_mc_api_url:-}" \
         -e "AWS_DEFAULT_REGION=$region" \
         -e "AWS_REGION=$region" \
         "$CI_IMAGE" \
-        bash -c "$run_cmd"
+        bash -c "git clone --depth 1 --branch '${zoa_ref}' '${zoa_repo}' /tmp/zoa-e2e && cd /tmp/zoa-e2e && bash ci/e2e-tests.sh"
 }
 
 cmd_dump_env() {
