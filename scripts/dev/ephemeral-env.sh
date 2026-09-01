@@ -45,7 +45,7 @@ usage() {
     echo "  port-forward    Forward ports through RC/MC bastion in an ephemeral env"
     echo "  sre-ui          Tunnel SRE UI tools through the internal ALB via bastion"
     echo "  e2e             Run e2e tests against an ephemeral env"
-    echo "  zoa-e2e         Run zoa's deep e2e suite from a local zoa checkout against an ephemeral env"
+    echo "  zoa-e2e         Run rosa-hyperfleet-zoa's deep e2e suite against an ephemeral env"
     echo "  dump-env        Dump EKS must-gather and DB state from RC/MC in an ephemeral env"
 }
 
