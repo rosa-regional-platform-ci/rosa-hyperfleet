@@ -3,5 +3,5 @@
   "region": "us-east-1",
   "account_id": "ssm:///infra/stage/us-east-1/mc02/account_id",
   "child_admin_role_name": "rosa-hyperfleet-account-admin",
-  "management_id": "mc02"
+  "management_id": "eph-8d8ec7c9-mc02"
 }
