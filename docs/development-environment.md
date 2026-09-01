@@ -321,6 +321,8 @@ make ephemeral-zoa-e2e ID=6bd2d3d7 ZOA_DIR=/path/to/your/rosa-hyperfleet-zoa
 
 `ZOA_DIR`, when set, mounts that checkout read-write into the same test container `ephemeral-e2e` uses (same dev-account credentials, same `rrp-rc`/`rrp-mc` profile remapping) instead of cloning, so `ci/e2e-tests.sh` builds the `zoa` CLI from your current (possibly uncommitted) source. Either way this never touches the ZOA Lambda images actually deployed in the environment — it's purely for validating the test suite against real infrastructure.
 
+For the full picture (test tiers, CI wiring, image management, PR-image testing) see [`rosa-hyperfleet-zoa/docs/e2e-testing.md`](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/e2e-testing.md).
+
 ## Dump Environment
 
 Collect Kubernetes diagnostic logs (`oc adm inspect`) and PostgreSQL database state from the RC and/or MC clusters in an ephemeral environment. Data is gathered by the log-collector ECS Fargate task, uploaded to S3, and downloaded locally.
