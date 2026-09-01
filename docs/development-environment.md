@@ -301,7 +301,7 @@ This skips both the cleanup-labeled ginkgo specs and the `DeferCleanup` safety n
 
 ### ZOA testing
 
-`make ephemeral-e2e` above already includes a **light ZOA smoke check** for free: if the environment has a ZOA RC Lambda URL, `ci/e2e-tests.sh` clones `rosa-hyperfleet-zoa@main` and runs `make test-e2e-smoke` from that checkout — a handful of `Label("smoke")` specs (discovery, one read TA, one write TA dry-run) from ZOA's own e2e suite, against RC and, if present, MC. Nothing to opt into — it's skipped automatically when a ZOA URL isn't available, and a zoa clone/build hiccup only skips this check rather than failing the platform API run. ZOA owns this test logic itself (`rosa-hyperfleet-zoa/test/e2e/`); this repo doesn't duplicate it.
+`make ephemeral-e2e` above already includes a **light ZOA smoke check** for free: if the environment has a ZOA RC Lambda URL, `ci/e2e-tests.sh` clones `rosa-hyperfleet-zoa@main` and runs `make test-e2e-smoke` from that checkout — a handful of `Label("smoke")` specs (discovery, one read TA, one write TA dry-run) from ZOA's own e2e suite, against RC and, if present, MC. Nothing to opt into — it's skipped automatically when a ZOA URL isn't available. A zoa clone/build/test failure is tracked the same way as the platform API/HCP/monitoring results in that script (doesn't abort them, but **does** fail the overall `make ephemeral-e2e` run — no special treatment). ZOA owns this test logic itself (`rosa-hyperfleet-zoa/test/e2e/`); this repo doesn't duplicate it.
 
 For **deep** validation of every Trusted Action (including real, non-dry-run `delete_pod`/`rollout_restart` execution) use `rosa-hyperfleet-zoa`'s own suite (`test/e2e/` in that repo). This follows the exact same clone-by-ref pattern as `ephemeral-e2e` above (`E2E_REF`/`E2E_REPO`) and the CLI (`CLI_REF`/`CLI_REPO`) — no new mechanism, just `ZOA_REF`/`ZOA_REPO`:
 
@@ -317,6 +317,26 @@ make ephemeral-zoa-e2e ID=6bd2d3d7 ZOA_REPO=https://github.com/my-fork/rosa-hype
 This never touches the ZOA Lambda images actually deployed in the environment — it's purely for validating the test suite against real infrastructure. As with `ephemeral-e2e`, to test uncommitted local changes push them to a branch first; there's no local-checkout-mount option here, consistent with how `ephemeral-e2e`/`E2E_REF` work for `rosa-hyperfleet-api`.
 
 For the full picture (test tiers, CI wiring, image management, PR-image testing) see [`rosa-hyperfleet-zoa/docs/e2e-testing.md`](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/e2e-testing.md).
+
+### Credentials matrix: what's automatic vs what you set yourself
+
+Both e2e suites (`rosa-hyperfleet-api`'s and `rosa-hyperfleet-zoa`'s) sign requests with AWS
+SigV4, which needs a valid `AWS_PROFILE` in scope. Whether that's handled for you depends on
+*how* you invoke the suite, not which suite it is:
+
+| How you run it | AWS creds | What you need to pass |
+|---|---|---|
+| `make ephemeral-e2e ID=...` (this repo) | Automatic — `ci/e2e-tests.sh` (which this target runs inside the container) does `export AWS_PROFILE="rrp-rc"` itself before calling `make test-e2e-api` | Just `ID` (+ optional `E2E_REF`/`E2E_REPO`) |
+| `make ephemeral-zoa-e2e ID=...` (this repo) | Automatic — `rosa-hyperfleet-zoa`'s own `test/e2e/` sets `AWS_PROFILE` per-subprocess (`rrp-rc`/`rrp-mc`, one call at a time) | Just `ID` (+ optional `ZOA_REF`/`ZOA_REPO`) |
+| CI (`nightly-ephemeral`, `on-demand-e2e`, `rosa-regionality-compatibility-e2e`) | Automatic — same `ci/e2e-tests.sh` runs, with `AWS_CONFIG_FILE` pointed at the Vault-mounted `rosa-regional-platform-ephemeral-creds` secret instead of your dev-account creds; the profile *names* (`rrp-rc`/`rrp-mc`) and the export logic are identical | Nothing — this is what Prow triggers |
+| `make test-e2e-api` directly, from `rosa-hyperfleet-api` (bypassing this repo entirely) | **Manual** — nobody sets `AWS_PROFILE` for you; `config.LoadDefaultConfig()` uses whatever's already in your shell | `export AWS_PROFILE=rrp-rc` (or your own profile that can reach the target account) yourself, then `BASE_URL=<api-gateway-url> make test-e2e-api` |
+| `make test-e2e` directly, from `rosa-hyperfleet-zoa` (bypassing this repo entirely) | **Manual, but overridable** — needs `rrp-rc`/`rrp-mc` profiles reachable from your host; override the profile *names* with `ZOA_RC_AWS_PROFILE`/`ZOA_MC_AWS_PROFILE` if yours differ | `export ZOA_RC_API_URL=... ZOA_MC_API_URL=...` (+ have `rrp-rc`/`rrp-mc` resolvable), then `make test-e2e` |
+
+The two "directly, bypassing this repo" rows are the only cases where you're on your own —
+they exist for fast iteration on the test code itself (no container, no clone-by-ref indirection),
+not as the primary way to run these suites. If you're not actively editing `test/e2e-api/*.go` or
+`test/e2e/*.go`, prefer the `make ephemeral-*` targets above; credentials are then never your
+problem.
 
 ## Dump Environment
 
