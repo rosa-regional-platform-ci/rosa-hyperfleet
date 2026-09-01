@@ -1,39 +1,27 @@
-# Default values for platform-api
-
 global:
-  git_revision: "unknown"
-
+  git_revision: unknown
 platformApi:
-  # Namespace to deploy into
   namespace: platform-api
-
-  # Service Account configuration
   serviceAccount:
     create: true
     name: platform-api-sa
     annotations: {}
-
-  # Application configuration
   app:
     name: platform-api
     image:
-      repository: quay.io/redhat-user-workloads/rosa-tenant/platform-api
-      tag: "3d4ff46c8fe366e0863214d9c89e83e932781e2d"
+      repository: quay.io/rrp-dev-ci/platform-api
+      tag: ci-161-2094726709013123072
       pullPolicy: Always
-
-    # Application arguments
     args:
       logLevel: info
       logFormat: json
-      allowedAccounts: "123456789012"
+      allowedAccounts: '123456789012'
       dynamodbRegion: us-east-2
       dynamodbPrefix: rosa
-      oidcIssuerBaseURL: ""
+      oidcIssuerBaseURL: ''
       apiPort: 8000
       healthPort: 8081
       metricsPort: 9090
-
-    # Resources for the main app container
     resources:
       requests:
         cpu: 100m
@@ -41,19 +29,13 @@ platformApi:
       limits:
         cpu: 500m
         memory: 512Mi
-
-  # HyperfleetDB connection (pgruntime-backed Postgres)
   hyperfleetdb:
     secretName: hyperfleet-db-dsn
     secretKey: dsn
-
-  # Envoy sidecar configuration
   envoy:
     image:
       repository: envoyproxy/envoy
       tag: v1.31-latest
-
-    # Resources for the Envoy sidecar
     resources:
       requests:
         cpu: 50m
@@ -61,12 +43,8 @@ platformApi:
       limits:
         cpu: 200m
         memory: 256Mi
-
-  # Deployment configuration
   deployment:
     replicas: 2
-
-  # Service configuration
   service:
     type: ClusterIP
     ports:
@@ -74,73 +52,30 @@ platformApi:
       api: 8000
       health: 8081
       metrics: 9090
-
-  # Target Group configuration
   targetGroup:
-    arn: "PLACEHOLDER"
+    arn: PLACEHOLDER
     targetType: ip
-
-  # ServiceMonitor for Prometheus scraping
   serviceMonitor:
     enabled: true
     interval: 30s
     scrapeTimeout: 10s
     labels: {}
-
-  # Rate Limiting configuration
   rateLimit:
     enabled: true
-    redisEndpoint: ""
-    config: |
-      enabled: true
-      redisTimeout: 20 # milliseconds — fail open faster than the 50ms code default if Valkey is degraded
-      exemptAccounts: []
-      default:
-        rate: 20
-        burst: 40
-      routes:
-        - path: "/api/v0/clusters"
-          method: POST
-          rate: 5
-          burst: 10
-        - path: "/api/v0/clusters"
-          method: GET
-          rate: 20
-          burst: 40
-        - path: "/api/v0/clusters/*"
-          method: GET
-          rate: 30
-          burst: 60
-        - path: "/api/v0/clusters/*"
-          method: PATCH
-          rate: 10
-          burst: 20
-        - path: "/api/v0/clusters/*"
-          method: DELETE
-          rate: 5
-          burst: 10
-        - path: "/api/v0/nodepools"
-          method: POST
-          rate: 10
-          burst: 20
-        - path: "/api/v0/nodepools"
-          method: GET
-          rate: 20
-          burst: 40
-        - path: "/api/v0/nodepools/*"
-          method: GET
-          rate: 30
-          burst: 60
-        - path: "/api/v0/nodepools/*"
-          method: PATCH
-          rate: 10
-          burst: 20
-        - path: "/api/v0/trusted-actions/*/run"
-          method: POST
-          rate: 20
-          burst: 30
-
-  # Health probe configuration
+    redisEndpoint: ''
+    config: "enabled: true\nredisTimeout: 20 # milliseconds — fail open faster than\
+      \ the 50ms code default if Valkey is degraded\nexemptAccounts: []\ndefault:\n\
+      \  rate: 20\n  burst: 40\nroutes:\n  - path: \"/api/v0/clusters\"\n    method:\
+      \ POST\n    rate: 5\n    burst: 10\n  - path: \"/api/v0/clusters\"\n    method:\
+      \ GET\n    rate: 20\n    burst: 40\n  - path: \"/api/v0/clusters/*\"\n    method:\
+      \ GET\n    rate: 30\n    burst: 60\n  - path: \"/api/v0/clusters/*\"\n    method:\
+      \ PATCH\n    rate: 10\n    burst: 20\n  - path: \"/api/v0/clusters/*\"\n   \
+      \ method: DELETE\n    rate: 5\n    burst: 10\n  - path: \"/api/v0/nodepools\"\
+      \n    method: POST\n    rate: 10\n    burst: 20\n  - path: \"/api/v0/nodepools\"\
+      \n    method: GET\n    rate: 20\n    burst: 40\n  - path: \"/api/v0/nodepools/*\"\
+      \n    method: GET\n    rate: 30\n    burst: 60\n  - path: \"/api/v0/nodepools/*\"\
+      \n    method: PATCH\n    rate: 10\n    burst: 20\n  - path: \"/api/v0/trusted-actions/*/run\"\
+      \n    method: POST\n    rate: 20\n    burst: 30\n"
   probes:
     liveness:
       initialDelaySeconds: 10
