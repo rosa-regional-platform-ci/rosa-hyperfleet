@@ -45,6 +45,7 @@ usage() {
     echo "  port-forward    Forward ports through RC/MC bastion in an ephemeral env"
     echo "  sre-ui          Tunnel SRE UI tools through the internal ALB via bastion"
     echo "  e2e             Run e2e tests against an ephemeral env"
+    echo "  zoa-e2e         Run zoa's deep e2e suite from a local zoa checkout against an ephemeral env"
     echo "  dump-env        Dump EKS must-gather and DB state from RC/MC in an ephemeral env"
 }
 
@@ -1144,6 +1145,55 @@ cmd_e2e() {
         bash ci/e2e-tests.sh
 }
 
+# Runs rosa-hyperfleet-zoa's deep e2e suite (test/e2e/) against an
+# already-provisioned ephemeral env's ZOA Lambda URLs, mounting a local zoa
+# checkout read-write so it can `go build` the CLI from your current
+# (possibly uncommitted) source. Unlike cmd_e2e (which git-clones a ref of
+# rosa-hyperfleet-api), this is meant for iterating on zoa's e2e tests
+# themselves without pushing a commit or waiting on a Konflux image build —
+# it never touches the images actually running in the environment.
+cmd_zoa_e2e() {
+    local zoa_dir
+    zoa_dir="$(cd "${ZOA_DIR:-${REPO_ROOT}/../rosa-hyperfleet-zoa}" 2>/dev/null && pwd)" \
+        || die "ZOA_DIR not found: ${ZOA_DIR:-${REPO_ROOT}/../rosa-hyperfleet-zoa}
+    Either clone rosa-hyperfleet-zoa as a sibling directory,
+    or set ZOA_DIR=/path/to/your/rosa-hyperfleet-zoa checkout."
+    [[ -f "${zoa_dir}/ci/e2e-tests.sh" ]] \
+        || die "${zoa_dir} doesn't look like a rosa-hyperfleet-zoa checkout (missing ci/e2e-tests.sh)"
+
+    select_env "STATE=ready" \
+        "Select environment for ZOA e2e tests:" \
+        "No ready environments found."
+
+    local zoa_rc_api_url zoa_mc_api_url region
+    zoa_rc_api_url=$(get_field "$ENV_LINE" ZOA_RC_API_URL)
+    zoa_mc_api_url=$(get_field "$ENV_LINE" ZOA_MC_API_URL)
+    region=$(get_field "$ENV_LINE" REGION)
+    [[ -n "$zoa_rc_api_url" ]] \
+        || die "No ZOA_RC_API_URL found for ID $BUILD_ID. Was it captured during provision?"
+
+    setup_aws_config
+    write_eph_container_config
+
+    echo "Running zoa e2e suite from local checkout (uncommitted changes included)..."
+    echo "  ID:             $BUILD_ID"
+    echo "  ZOA_DIR:        $zoa_dir"
+    echo "  ZOA_RC_API_URL: $zoa_rc_api_url"
+    echo "  ZOA_MC_API_URL: ${zoa_mc_api_url:-<not set — MC specs will be skipped>}"
+    echo "  REGION:         $region"
+
+    $CONTAINER_ENGINE run --rm \
+        $_CONTAINER_AWS_FLAGS \
+        -v "${zoa_dir}:/workspace:z" \
+        -w /workspace \
+        -e "ZOA_RC_API_URL=$zoa_rc_api_url" \
+        -e "ZOA_MC_API_URL=${zoa_mc_api_url:-}" \
+        -e "AWS_DEFAULT_REGION=$region" \
+        -e "AWS_REGION=$region" \
+        "$CI_IMAGE" \
+        bash ci/e2e-tests.sh
+}
+
 cmd_dump_env() {
     local cluster_type="${1:-all}"
     # Accept short aliases
@@ -1266,7 +1316,7 @@ case "${1:-help}" in
             command -v "$tool" >/dev/null 2>&1 || die "Missing required tool: $tool"
         done
         ;;
-    shell|e2e|post-account)
+    shell|e2e|zoa-e2e|post-account)
         preflight
         ensure_image
         ;;
@@ -1288,6 +1338,7 @@ case "${1:-help}" in
     port-forward)   shift; cmd_bastion_port_forward "$@" ;;
     sre-ui)         cmd_sre_tunnel ;;
     e2e)            cmd_e2e ;;
+    zoa-e2e)        cmd_zoa_e2e ;;
     dump-env)       shift; cmd_dump_env "$@" ;;
     help|*)
         usage

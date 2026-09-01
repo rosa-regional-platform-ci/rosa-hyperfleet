@@ -299,6 +299,21 @@ make ephemeral-e2e ID=6bd2d3d7 E2E_SKIP_CLEANUP=1
 
 This skips both the cleanup-labeled ginkgo specs and the `DeferCleanup` safety net, so the HCP cluster, VPC, IAM, and OIDC resources survive for investigation. Remember to tear them down manually afterwards with `make ephemeral-teardown` or by re-running without the flag.
 
+### ZOA deep e2e suite
+
+`rosa-hyperfleet-zoa` has its own deep Trusted Action e2e suite (`test/e2e/` in that repo) that `make ephemeral-e2e` above does not run. To iterate on it locally against an already-provisioned ephemeral env's ZOA Lambda URLs, without pushing a commit or waiting on a Konflux image build:
+
+```bash
+# Assumes rosa-hyperfleet-zoa is checked out as a sibling directory
+# (~/github/rosa-hyperfleet-zoa); override with ZOA_DIR otherwise.
+make ephemeral-zoa-e2e ID=6bd2d3d7
+
+# Different checkout location
+make ephemeral-zoa-e2e ID=6bd2d3d7 ZOA_DIR=/path/to/rosa-hyperfleet-zoa
+```
+
+This mounts your local `rosa-hyperfleet-zoa` checkout read-write into the same test container `ephemeral-e2e` uses (same dev-account credentials, same `rrp-rc`/`rrp-mc` profile remapping) and runs `ci/e2e-tests.sh` from it, which builds the `zoa` CLI from your current source (including uncommitted changes) and runs `make test-e2e`. It never touches the ZOA Lambda images actually deployed in the environment — it's purely for validating the test suite itself (adding/changing specs) against real infrastructure.
+
 ## Dump Environment
 
 Collect Kubernetes diagnostic logs (`oc adm inspect`) and PostgreSQL database state from the RC and/or MC clusters in an ephemeral environment. Data is gathered by the log-collector ECS Fargate task, uploaded to S3, and downloaded locally.

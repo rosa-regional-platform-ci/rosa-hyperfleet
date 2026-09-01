@@ -233,6 +233,9 @@ ephemeral-sre-ui: ## Tunnel SRE UI tools (Grafana, ArgoCD, Prometheus, Thanos, L
 ephemeral-e2e: ## Run e2e tests against an ephemeral env
 	@ID="$(ID)" E2E_REF="$(or $(E2E_REF),main)" E2E_REPO="$(E2E_REPO)" ./scripts/dev/ephemeral-env.sh e2e
 
+ephemeral-zoa-e2e: ## Run zoa's deep e2e suite against an ephemeral env, from a local zoa checkout (ZOA_DIR, default ../rosa-hyperfleet-zoa)
+	@ID="$(ID)" ZOA_DIR="$(ZOA_DIR)" ./scripts/dev/ephemeral-env.sh zoa-e2e
+
 ephemeral-dump-env: ## Dump EKS must-gather and DB state from an ephemeral env (CLUSTER=rc|mc)
 	@ID="$(ID)" ./scripts/dev/ephemeral-env.sh dump-env $(CLUSTER)
 
