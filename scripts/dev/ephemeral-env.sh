@@ -1187,6 +1187,7 @@ cmd_zoa_e2e() {
         -e "ZOA_MC_API_URL=${zoa_mc_api_url:-}" \
         -e "AWS_DEFAULT_REGION=$region" \
         -e "AWS_REGION=$region" \
+        -e "SMOKE_ONLY=${SMOKE_ONLY:-}" \
         "$CI_IMAGE" \
         bash -c "git clone --depth 1 --branch '${zoa_ref}' '${zoa_repo}' /tmp/zoa-e2e && cd /tmp/zoa-e2e && bash ci/e2e-tests.sh"
 }

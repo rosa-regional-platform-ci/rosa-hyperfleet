@@ -236,6 +236,9 @@ ephemeral-e2e: ## Run e2e tests against an ephemeral env
 ephemeral-zoa-e2e: ## Run zoa's deep e2e suite against an ephemeral env (ZOA_REF/ZOA_REPO to target a branch/fork)
 	@ID="$(ID)" ZOA_REF="$(or $(ZOA_REF),main)" ZOA_REPO="$(ZOA_REPO)" ./scripts/dev/ephemeral-env.sh zoa-e2e
 
+ephemeral-zoa-e2e-smoke: ## Run zoa's smoke e2e suite (fast ~2min) against an ephemeral env
+	@ID="$(ID)" ZOA_REF="$(or $(ZOA_REF),main)" ZOA_REPO="$(ZOA_REPO)" SMOKE_ONLY=true ./scripts/dev/ephemeral-env.sh zoa-e2e
+
 ephemeral-dump-env: ## Dump EKS must-gather and DB state from an ephemeral env (CLUSTER=rc|mc)
 	@ID="$(ID)" ./scripts/dev/ephemeral-env.sh dump-env $(CLUSTER)
 
