@@ -309,12 +309,20 @@ For **deep** validation of every Trusted Action (including real, non-dry-run `de
 # Zero setup — clones rosa-hyperfleet-zoa@main inside the container
 make ephemeral-zoa-e2e ID=6bd2d3d7
 
-# A branch/fork you've pushed
-make ephemeral-zoa-e2e ID=6bd2d3d7 ZOA_REF=my-feature-branch
-make ephemeral-zoa-e2e ID=6bd2d3d7 ZOA_REPO=https://github.com/my-fork/rosa-hyperfleet-zoa.git ZOA_REF=my-feature-branch
+# A branch/fork you've pushed (most common pattern for iterating on a PR)
+make ephemeral-zoa-e2e \
+  ID=6bd2d3d7 \
+  ZOA_REF=my-feature-branch \
+  ZOA_REPO=https://github.com/my-fork/rosa-hyperfleet-zoa.git
+
+# Smoke only (~2min) — fast subset, good for infra PRs or sanity checks
+make ephemeral-zoa-e2e-smoke ID=6bd2d3d7
+make ephemeral-zoa-e2e-smoke ID=6bd2d3d7 ZOA_REF=my-feature-branch
 ```
 
 This never touches the ZOA Lambda images actually deployed in the environment — it's purely for validating the test suite against real infrastructure. As with `ephemeral-e2e`, to test uncommitted local changes push them to a branch first; there's no local-checkout-mount option here, consistent with how `ephemeral-e2e`/`E2E_REF` work for `rosa-hyperfleet-api`.
+
+The **smoke target** (`ephemeral-zoa-e2e-smoke`) runs the same `Label("smoke")` subset that `make ephemeral-e2e` runs automatically as part of the platform e2e. Use it for a quick ZOA health check without waiting for the full deep suite.
 
 For the full picture (test tiers, CI wiring, image management, PR-image testing) see [`rosa-hyperfleet-zoa/docs/e2e-testing.md`](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/e2e-testing.md).
 
