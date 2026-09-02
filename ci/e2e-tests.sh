@@ -136,18 +136,24 @@ monitoring_rc=0
 make test-e2e-api || platform_rc=$?
 
 # Light ZOA smoke coverage: rosa-hyperfleet-zoa owns its own e2e suite
-# (test/e2e/), including the "smoke" label used here — cheap, --dry-run/
-# read-only checks (discovery + one read TA + one write TA dry-run) meant to
-# catch infra/platform changes that silently break ZOA, without duplicating
-# that test logic in this repo. Same "capture the exit code, don't abort"
-# pattern used for platform_rc/hcp_rc/monitoring_rc above/below: a zoa
-# failure (including a checkout/build hiccup) does NOT stop this script or
-# skip the platform API / HCP / monitoring tests that run alongside it, but
-# it DOES fail the overall job (see the combined exit check at the bottom) —
-# ZOA gets exactly the same treatment as every other test bucket here, not
-# a free pass. Deep ZOA validation (including real delete_pod/rollout_restart
-# execution) lives in rosa-hyperfleet-zoa's own on-demand-e2e/nightly (or
-# `make ephemeral-zoa-e2e` locally) — never run from here.
+# (test/e2e/), including the "smoke" label used here. 6 specs (~2min):
+#   - zoa version (health check)
+#   - zoa actions (discovery)
+#   - get_resource --resource nodes (kube-api read)
+#   - list_eks_clusters (aws-api read)
+#   - rollout_restart --dry-run (write preview)
+#   - async execution with --wait (async path, ~60s)
+#
+# The test suite handles AWS_PROFILE switching per-subprocess (rrp-rc for RC,
+# rrp-mc for MC) — the global AWS_PROFILE=rrp-rc set above for API tests is
+# overridden by the ZOA test framework for each CLI invocation. Both profiles
+# must exist in AWS_CONFIG_FILE for MC tests to pass.
+#
+# Same "capture the exit code, don't abort" pattern used for platform_rc/
+# hcp_rc/monitoring_rc: a zoa failure does NOT stop this script or skip the
+# platform API / HCP / monitoring tests, but DOES fail the overall job.
+# Deep ZOA validation lives in rosa-hyperfleet-zoa's own on-demand-e2e/nightly
+# (or `make ephemeral-zoa-e2e` locally) — never run from here.
 zoa_rc=0
 if [[ -n "${ZOA_RC_API_URL:-}" ]]; then
   if git clone --depth 1 --branch "${ZOA_REF}" "${ZOA_REPO}" "${WORK_DIR}/zoa"; then
