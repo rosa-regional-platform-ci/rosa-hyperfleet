@@ -15,4 +15,4 @@ hypershift:
     name: hypershift-mc-us-east-1
     region: us-east-1
   externalDns:
-    domain: us-east-1.dev0.rosa.devshift.net
+    domain: us-east-1-eph-edc0e5.ci00.rosa.devshift.net
