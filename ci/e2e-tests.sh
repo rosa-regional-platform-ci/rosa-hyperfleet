@@ -80,7 +80,7 @@ if [[ -n "${ZOA_RC_API_URL:-}" ]]; then
   export ZOA_RC_API_URL
   echo "ZOA RC API URL: ${ZOA_RC_API_URL}"
 else
-  echo "ZOA_RC_API_URL not available — ZOA smoke tests will be skipped"
+  echo "ZOA_RC_API_URL not available — ZOA RC tests will target MC only (if available)"
 fi
 [[ -n "${ZOA_MC_API_URL:-}" ]] && export ZOA_MC_API_URL && echo "ZOA MC API URL: ${ZOA_MC_API_URL}"
 
@@ -144,24 +144,27 @@ make test-e2e-api || platform_rc=$?
 # are set. The test suite handles AWS_PROFILE switching per-subprocess (rrp-rc
 # for RC, rrp-mc for MC) — both profiles must exist in AWS_CONFIG_FILE.
 #
+# Runs if at least one of ZOA_RC_API_URL or ZOA_MC_API_URL is available — the
+# Makefile handles missing URLs gracefully (tests only the available targets).
+#
 # Same "capture the exit code, don't abort" pattern used for platform_rc/
 # hcp_rc/monitoring_rc: a zoa failure does NOT stop this script or skip the
 # platform API / HCP / monitoring tests, but DOES fail the overall job.
-zoa_rc=0
-if [[ -n "${ZOA_RC_API_URL:-}" ]]; then
+zoa_exit=0
+if [[ -n "${ZOA_RC_API_URL:-}" ]] || [[ -n "${ZOA_MC_API_URL:-}" ]]; then
   if git clone --depth 1 --branch "${ZOA_REF}" "${ZOA_REPO}" "${WORK_DIR}/zoa"; then
     if [[ "${JOB_TYPE:-}" == "periodic" ]]; then
       echo "Nightly run — executing full ZOA e2e suite"
-      make -C "${WORK_DIR}/zoa" test-e2e || zoa_rc=$?
+      make -C "${WORK_DIR}/zoa" test-e2e || zoa_exit=$?
     else
-      make -C "${WORK_DIR}/zoa" test-e2e-smoke || zoa_rc=$?
+      make -C "${WORK_DIR}/zoa" test-e2e-smoke || zoa_exit=$?
     fi
   else
     echo "WARNING: failed to clone zoa from ${ZOA_REPO}@${ZOA_REF} — ZOA e2e tests skipped" >&2
-    zoa_rc=1
+    zoa_exit=1
   fi
 else
-  echo "ZOA_RC_API_URL not set — ZOA e2e tests will be skipped"
+  echo "Neither ZOA_RC_API_URL nor ZOA_MC_API_URL set — ZOA e2e tests will be skipped"
 fi
 
 # Get regional account ID for CLI tests
@@ -251,7 +254,7 @@ if [[ $platform_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]]; then
 fi
 
 echo ""
-echo "E2E results: platform=$platform_rc hcp=$hcp_rc monitoring=$monitoring_rc zoa_smoke=$zoa_rc"
-if [[ $platform_rc -ne 0 ]] || [[ $hcp_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]] || [[ $zoa_rc -ne 0 ]]; then
+echo "E2E results: platform=$platform_rc hcp=$hcp_rc monitoring=$monitoring_rc zoa=$zoa_exit"
+if [[ $platform_rc -ne 0 ]] || [[ $hcp_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]] || [[ $zoa_exit -ne 0 ]]; then
     exit 1
 fi
