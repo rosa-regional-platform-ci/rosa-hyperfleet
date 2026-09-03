@@ -52,12 +52,12 @@ variable "zoa_runner_source_image" {
 variable "zoa_lambda_image_tag" {
   description = "Immutable image tag for the ZOA Lambda. Used for source→ECR mirroring."
   type        = string
-  default     = ""
+  default     = "67ef089"
 }
 
 variable "zoa_runner_image_tag" {
   description = "Immutable image tag for the ZOA Runner (K8s Job)."
   type        = string
-  default     = ""
+  default     = "67ef089"
 }
 

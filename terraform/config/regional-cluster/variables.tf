@@ -471,13 +471,13 @@ variable "management_clusters" {
 variable "zoa_lambda_image_tag" {
   description = "Immutable tag for the ZOA Lambda image (Quay→ECR mirroring). Override with a CI-built tag to validate a zoa PR."
   type        = string
-  default     = ""
+  default     = "67ef089"
 }
 
 variable "zoa_runner_image_tag" {
   description = "Immutable tag for the ZOA Runner image (K8s Job). Defaults to same build as Lambda but can be overridden independently."
   type        = string
-  default     = ""
+  default     = "67ef089"
 }
 
 variable "zoa_lambda_source_image" {

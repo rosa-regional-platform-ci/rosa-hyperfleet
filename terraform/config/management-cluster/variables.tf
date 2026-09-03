@@ -122,13 +122,13 @@ variable "zoa_lambda_ecr_url" {
 variable "zoa_lambda_image_tag" {
   description = "Immutable tag for the ZOA Lambda image (used with ECR URL from RC output)."
   type        = string
-  default     = ""
+  default     = "67ef089"
 }
 
 variable "zoa_runner_image_tag" {
   description = "Immutable tag for the ZOA Runner image. Defaults to same build as Lambda."
   type        = string
-  default     = ""
+  default     = "67ef089"
 }
 
 variable "zoa_runner_source_image" {
