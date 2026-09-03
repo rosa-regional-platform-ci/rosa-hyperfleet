@@ -33,7 +33,8 @@
   "hyperfleet_db_skip_final_snapshot": {{ regional_cluster.hyperfleet_db_skip_final_snapshot | default(false) | tojson }},
   "hyperfleet_db_performance_insights_enabled": {{ regional_cluster.hyperfleet_db_performance_insights_enabled | default(true) | tojson }},
   "hyperfleet_db_monitoring_interval": {{ regional_cluster.hyperfleet_db_monitoring_interval | default(60) | tojson }},
-  "zoa_image_tag": {{ regional_cluster.zoa_image_tag | default('8af92e65fd57562f898515c70148fe9aa75a52b1') | tojson }},
+  "zoa_lambda_image_tag": {{ regional_cluster.zoa_lambda_image_tag | default('8af92e65fd57562f898515c70148fe9aa75a52b1') | tojson }},
+  "zoa_runner_image_tag": {{ regional_cluster.zoa_runner_image_tag | default('8af92e65fd57562f898515c70148fe9aa75a52b1') | tojson }},
   "zoa_lambda_source_image": {{ regional_cluster.zoa_lambda_source_image | default('quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda') | tojson }},
   "zoa_runner_source_image": {{ regional_cluster.zoa_runner_source_image | default('quay.io/redhat-user-workloads/rosa-tenant/zoa-runner') | tojson }}
 {%- set _mc_info = [] %}

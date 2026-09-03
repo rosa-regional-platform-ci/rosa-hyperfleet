@@ -468,20 +468,26 @@ variable "management_clusters" {
 # ZOA Lambda
 # =============================================================================
 
-variable "zoa_image_tag" {
-  description = "ZOA image tag for Quay→ECR mirroring and runner ref. Defaults to a known-good Konflux on-push build tag (full commit SHA) for rosa-hyperfleet-zoa@main. Override with an `on-pr-<sha>` Konflux tag to validate a zoa PR against this environment before merge."
+variable "zoa_lambda_image_tag" {
+  description = "Immutable tag for the ZOA Lambda image (Quay→ECR mirroring). Override with a CI-built tag to validate a zoa PR."
+  type        = string
+  default     = "8af92e65fd57562f898515c70148fe9aa75a52b1"
+}
+
+variable "zoa_runner_image_tag" {
+  description = "Immutable tag for the ZOA Runner image (K8s Job). Defaults to same build as Lambda but can be overridden independently."
   type        = string
   default     = "8af92e65fd57562f898515c70148fe9aa75a52b1"
 }
 
 variable "zoa_lambda_source_image" {
-  description = "Source registry image for ZOA Lambda (mirrored to ECR at deploy time). Override together with zoa_image_tag to point at a fork or scratch registry."
+  description = "Source registry image for ZOA Lambda (mirrored to ECR at deploy time). Override together with zoa_lambda_image_tag to point at a fork or CI registry."
   type        = string
   default     = "quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda"
 }
 
 variable "zoa_runner_source_image" {
-  description = "Source registry image for ZOA Runner (K8s pulls directly, no ECR mirror). Override together with zoa_image_tag to point at a fork or scratch registry."
+  description = "Source registry image for ZOA Runner (K8s pulls directly, no ECR mirror). Override together with zoa_runner_image_tag to point at a fork or CI registry."
   type        = string
   default     = "quay.io/redhat-user-workloads/rosa-tenant/zoa-runner"
 }

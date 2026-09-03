@@ -135,35 +135,33 @@ hcp_rc=0
 monitoring_rc=0
 make test-e2e-api || platform_rc=$?
 
-# Light ZOA smoke coverage: rosa-hyperfleet-zoa owns its own e2e suite
-# (test/e2e/), including the "smoke" label used here. 6 specs (~2min):
-#   - zoa version (health check)
-#   - zoa actions (discovery)
-#   - get_resource --resource nodes (kube-api read)
-#   - list_eks_clusters (aws-api read)
-#   - rollout_restart --dry-run (write preview)
-#   - async execution with --wait (async path, ~60s)
+# ZOA e2e coverage: rosa-hyperfleet-zoa owns its own e2e suite (test/e2e/).
 #
-# The test suite handles AWS_PROFILE switching per-subprocess (rrp-rc for RC,
-# rrp-mc for MC) — the global AWS_PROFILE=rrp-rc set above for API tests is
-# overridden by the ZOA test framework for each CLI invocation. Both profiles
-# must exist in AWS_CONFIG_FILE for MC tests to pass.
+# - On PRs (JOB_TYPE=presubmit or unset): smoke only (~2min, 6 specs per target)
+# - On nightlies (JOB_TYPE=periodic): full deep suite (~4min with parallel RC+MC)
+#
+# Both test-e2e and test-e2e-smoke auto-parallelize RC and MC when both URLs
+# are set. The test suite handles AWS_PROFILE switching per-subprocess (rrp-rc
+# for RC, rrp-mc for MC) — both profiles must exist in AWS_CONFIG_FILE.
 #
 # Same "capture the exit code, don't abort" pattern used for platform_rc/
 # hcp_rc/monitoring_rc: a zoa failure does NOT stop this script or skip the
 # platform API / HCP / monitoring tests, but DOES fail the overall job.
-# Deep ZOA validation lives in rosa-hyperfleet-zoa's own on-demand-e2e/nightly
-# (or `make ephemeral-zoa-e2e` locally) — never run from here.
 zoa_rc=0
 if [[ -n "${ZOA_RC_API_URL:-}" ]]; then
   if git clone --depth 1 --branch "${ZOA_REF}" "${ZOA_REPO}" "${WORK_DIR}/zoa"; then
-    make -C "${WORK_DIR}/zoa" test-e2e-smoke || zoa_rc=$?
+    if [[ "${JOB_TYPE:-}" == "periodic" ]]; then
+      echo "Nightly run — executing full ZOA e2e suite"
+      make -C "${WORK_DIR}/zoa" test-e2e || zoa_rc=$?
+    else
+      make -C "${WORK_DIR}/zoa" test-e2e-smoke || zoa_rc=$?
+    fi
   else
-    echo "WARNING: failed to clone zoa from ${ZOA_REPO}@${ZOA_REF} — ZOA smoke tests skipped" >&2
+    echo "WARNING: failed to clone zoa from ${ZOA_REPO}@${ZOA_REF} — ZOA e2e tests skipped" >&2
     zoa_rc=1
   fi
 else
-  echo "ZOA_RC_API_URL not set — ZOA smoke tests will be skipped"
+  echo "ZOA_RC_API_URL not set — ZOA e2e tests will be skipped"
 fi
 
 # Get regional account ID for CLI tests

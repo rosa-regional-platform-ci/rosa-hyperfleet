@@ -49,8 +49,14 @@ variable "zoa_runner_source_image" {
   default     = "quay.io/redhat-user-workloads/rosa-tenant/zoa-runner"
 }
 
-variable "zoa_image_tag" {
-  description = "Immutable image tag (git SHA). Used for source→ECR mirroring and runner image ref. Defaults to the Konflux zoa-lambda/zoa-runner on-push build tag for the pinned rosa-hyperfleet-zoa main commit; override to test another commit/PR build (e.g. an `on-pr-<sha>` Konflux tag)."
+variable "zoa_lambda_image_tag" {
+  description = "Immutable image tag for the ZOA Lambda. Used for source→ECR mirroring. Defaults to a known-good Konflux on-push build."
+  type        = string
+  default     = "8af92e65fd57562f898515c70148fe9aa75a52b1"
+}
+
+variable "zoa_runner_image_tag" {
+  description = "Immutable image tag for the ZOA Runner (K8s Job). Defaults to same build as Lambda but can be overridden independently."
   type        = string
   default     = "8af92e65fd57562f898515c70148fe9aa75a52b1"
 }
