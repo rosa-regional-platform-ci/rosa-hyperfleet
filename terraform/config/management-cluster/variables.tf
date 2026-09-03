@@ -122,19 +122,19 @@ variable "zoa_lambda_ecr_url" {
 variable "zoa_lambda_image_tag" {
   description = "Immutable tag for the ZOA Lambda image (used with ECR URL from RC output)."
   type        = string
-  default     = "8af92e65fd57562f898515c70148fe9aa75a52b1"
+  default     = ""
 }
 
 variable "zoa_runner_image_tag" {
   description = "Immutable tag for the ZOA Runner image. Defaults to same build as Lambda."
   type        = string
-  default     = "8af92e65fd57562f898515c70148fe9aa75a52b1"
+  default     = ""
 }
 
 variable "zoa_runner_source_image" {
   description = "Source registry image for ZOA Runner (K8s pulls directly, no ECR mirror)"
   type        = string
-  default     = "quay.io/redhat-user-workloads/rosa-tenant/zoa-runner"
+  default     = "quay.io/rrp-dev-ci/zoa-runner"
 }
 
 variable "zoa_table_name" {

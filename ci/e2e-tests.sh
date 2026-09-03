@@ -5,9 +5,6 @@
 #   1. BASE_URL env var            — set by local wrapper scripts (ephemeral-env.sh, int-env.sh)
 #   2. CREDS_DIR/api_url file — Prow-mounted secret for the standing int environment
 #   3. SHARED_DIR terraform output — written by ephemeral-provider during CI provisioning
-#
-# RHOBS_API_URL and ZOA_RC_API_URL/ZOA_MC_API_URL follow the same resolution
-# order and are optional — their tests are skipped (not failed) when absent.
 
 set -euo pipefail
 
