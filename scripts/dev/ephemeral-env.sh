@@ -1145,16 +1145,11 @@ cmd_e2e() {
         bash ci/e2e-tests.sh
 }
 
-# Runs rosa-hyperfleet-zoa's deep e2e suite (test/e2e/) against an
-# already-provisioned ephemeral env's ZOA Lambda URLs. Clones ZOA_REPO@ZOA_REF
-# inside the container and runs its ci/e2e-tests.sh (which builds the zoa CLI
-# and runs `make test-e2e`) — the exact same clone-by-ref pattern cmd_e2e
-# uses for rosa-hyperfleet-api (E2E_REF/E2E_REPO) and rosa-hyperfleet-cli
-# (CLI_REF/CLI_REPO), and the same ZOA_REF/ZOA_REPO vars ci/e2e-tests.sh's
-# own (smoke-only) zoa clone already uses. To test a branch/fork, push it
-# and set ZOA_REF/ZOA_REPO — same as you would for E2E_REF/E2E_REPO. Never
-# touches the ZOA images actually deployed in the environment — purely for
-# validating the test suite against real infrastructure.
+# Runs rosa-hyperfleet-zoa e2e tests against an already-provisioned ephemeral
+# env's ZOA Lambda URLs. Clones ZOA_REPO@ZOA_REF inside the container and runs
+# `make $ZOA_MAKE_TARGET` (default: test-e2e; set to test-e2e-smoke for smoke).
+# Same clone-by-ref pattern cmd_e2e uses for rosa-hyperfleet-api. To test a
+# branch/fork, push it and set ZOA_REF/ZOA_REPO.
 cmd_zoa_e2e() {
     local zoa_ref="${ZOA_REF:-main}"
     local zoa_repo="${ZOA_REPO:-https://github.com/openshift-online/rosa-hyperfleet-zoa.git}"
@@ -1187,10 +1182,10 @@ cmd_zoa_e2e() {
         -e "ZOA_MC_API_URL=${zoa_mc_api_url:-}" \
         -e "AWS_DEFAULT_REGION=$region" \
         -e "AWS_REGION=$region" \
-        -e "SMOKE_ONLY=${SMOKE_ONLY:-}" \
+        -e "ZOA_MAKE_TARGET=${ZOA_MAKE_TARGET:-test-e2e}" \
         -e "GINKGO_FLAGS=${GINKGO_FLAGS:-}" \
         "$CI_IMAGE" \
-        bash -c "git clone --depth 1 --branch '${zoa_ref}' '${zoa_repo}' /tmp/zoa-e2e && cd /tmp/zoa-e2e && bash ci/e2e-tests.sh"
+        bash -c 'git clone --depth 1 --branch "'"${zoa_ref}"'" "'"${zoa_repo}"'" /tmp/zoa-e2e && cd /tmp/zoa-e2e && make ${ZOA_MAKE_TARGET} GINKGO_FLAGS="${GINKGO_FLAGS:-}"'
 }
 
 cmd_dump_env() {
