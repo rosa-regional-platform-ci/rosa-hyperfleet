@@ -110,8 +110,17 @@ fi
 
 # ── Phase 1b: ZOA Lambda image reference ──────────────────────────────────────
 # Lambda image lives in RC's ECR (cross-account pull via OU policy).
-# Runner image (Quay) and tag are hardcoded in Terraform defaults for dev phase.
+# Runner image is pulled directly from Quay by K8s nodes.
 export TF_VAR_zoa_lambda_ecr_url=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_lambda_ecr_url 2>/dev/null || echo "")
+
+# ZOA image tags and source registries — read from RC deploy config
+# (MC doesn't have its own ZOA config; it shares the RC's image pins)
+_RC_DEPLOY_CONFIG="deploy/${ENVIRONMENT}/${TARGET_REGION}/pipeline-regional-cluster-inputs/terraform.json"
+if [ -f "$_RC_DEPLOY_CONFIG" ]; then
+    export TF_VAR_zoa_lambda_image_tag=$(jq -r '.zoa_lambda_image_tag // ""' "$_RC_DEPLOY_CONFIG")
+    export TF_VAR_zoa_runner_image_tag=$(jq -r '.zoa_runner_image_tag // ""' "$_RC_DEPLOY_CONFIG")
+    export TF_VAR_zoa_runner_source_image=$(jq -r '.zoa_runner_source_image // ""' "$_RC_DEPLOY_CONFIG")
+fi
 
 # ── Phase 2: Apply/Destroy MC infrastructure ─────────────────────────────────
 use_mc_account
