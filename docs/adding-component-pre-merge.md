@@ -153,30 +153,43 @@ On any PR in the component repo:
 
 Components that deploy through **Terraform** (not ArgoCD Helm) and/or have **multiple images** require a modified approach. ZOA is the canonical example:
 
-### Key differences
+### Key Differences
 
-| Aspect          | Standard (API)                         | Terraform (ZOA)                                                   |
-| --------------- | -------------------------------------- | ----------------------------------------------------------------- |
-| Image count     | 1                                      | 2 (Lambda + Runner)                                               |
-| Override target | `argocd/config/.../values.yaml` (Helm) | `config/defaults.yaml` (Terraform via render.py)                  |
-| Image push step | Generic `rosa-hyperfleet-image-push`   | ZOA-specific script (`ci/zoa-image-push.sh`)                      |
-| Placeholders    | `IMAGE_REPO`, `IMAGE_TAG`              | `IMAGE_REPO`, `IMAGE_TAG` (lambda) + `RUNNER_IMAGE_REPO` (runner) |
+| Aspect          | Standard (API)                         | Terraform (ZOA)                                      |
+| --------------- | -------------------------------------- | ---------------------------------------------------- |
+| Image count     | 1 (or 2 for API)                       | 2 (Lambda + Runner)                                  |
+| Override target | `argocd/config/.../values.yaml` (Helm) | `config/defaults.yaml` (Terraform via render.py)     |
+| Image push step | `rosa-hyperfleet-image-push` (shared)  | Same step — uses `ROSA_REGIONAL_EXTRA_COMPONENTS`    |
+| Placeholders    | `IMAGE_REPO`, `IMAGE_TAG`              | `IMAGE_REPO`, `IMAGE_TAG` (per-image, same tag)      |
 
-### Override YAML for ZOA
+### `ROSA_REGIONAL_EXTRA_COMPONENTS` for ZOA
+
+ZOA uses the same `ROSA_REGIONAL_EXTRA_COMPONENTS` mechanism as the API repo but targets
+`config/defaults.yaml` (Terraform) instead of ArgoCD Helm values files:
 
 ```yaml
-ROSA_REGIONAL_HELM_VALUES_FILE: "config/defaults.yaml"
-ROSA_REGIONAL_HELM_OVERRIDE_YAML: |
-  regional_cluster:
-    zoa_lambda_image_tag: IMAGE_TAG
-    zoa_runner_image_tag: IMAGE_TAG
-    zoa_lambda_source_image: IMAGE_REPO
-    zoa_runner_source_image: RUNNER_IMAGE_REPO
+ROSA_REGIONAL_EXTRA_COMPONENTS: |
+  - image: CI_ZOA_LAMBDA_IMAGE
+    repo: quay.io/rrp-dev-ci/zoa-lambda
+    target: config/defaults.yaml
+    override:
+      regional_cluster:
+        zoa_lambda_image_tag: IMAGE_TAG
+        zoa_lambda_source_image: IMAGE_REPO
+  - image: CI_ZOA_RUNNER_IMAGE
+    repo: quay.io/rrp-dev-ci/zoa-runner
+    target: config/defaults.yaml
+    override:
+      regional_cluster:
+        zoa_runner_image_tag: IMAGE_TAG
+        zoa_runner_source_image: IMAGE_REPO
 ```
 
-The override deep-merges into `config/defaults.yaml`. The ephemeral provider then runs `render.py`, which regenerates `deploy/.../terraform.json` with the CI-built image tags. Terraform picks them up during provisioning.
+Both entries target the same file (`config/defaults.yaml`) — the provision step applies them
+sequentially via deep-merge. The ephemeral provider then runs `render.py`, which regenerates
+`deploy/.../terraform.json` with the CI-built image tags. Terraform picks them up during
+provisioning.
 
-### Reference files
+### Reference
 
-- **Image push script**: [`ci/zoa-image-push.sh`](../ci/zoa-image-push.sh) — mirrors both Lambda and Runner images to `quay.io/rrp-dev-ci/`
-- **CI config reference**: [`ci/openshift-release-zoa-config.yaml`](../ci/openshift-release-zoa-config.yaml) — ready-to-copy openshift/release config
+- **CI config**: [`openshift/release` — `ci-operator/config/openshift-online/rosa-hyperfleet-zoa/`](https://github.com/openshift/release/blob/master/ci-operator/config/openshift-online/rosa-hyperfleet-zoa/openshift-online-rosa-hyperfleet-zoa-main.yaml)

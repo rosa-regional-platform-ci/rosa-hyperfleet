@@ -164,7 +164,8 @@ if [[ -n "${ZOA_RC_API_URL:-}" ]] || [[ -n "${ZOA_MC_API_URL:-}" ]]; then
     zoa_exit=1
   fi
 else
-  echo "Neither ZOA_RC_API_URL nor ZOA_MC_API_URL set — ZOA e2e tests will be skipped"
+  echo "ERROR: neither ZOA_RC_API_URL nor ZOA_MC_API_URL resolved — ZOA e2e tests cannot run" >&2
+  zoa_exit=1
 fi
 
 # Get regional account ID for CLI tests
