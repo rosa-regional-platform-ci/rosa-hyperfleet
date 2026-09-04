@@ -9,7 +9,7 @@ hyperfleet:
 
   source:
     repoURL: https://github.com/willkutler/rosa-hyperfleet-api.git
-    targetRevision: 0b88a96e1d51b55cb24e1f75253565c6636dd75e
+    targetRevision: 5259960759828890fd902b8ffa46da6578abaa23
     path: hyperfleet-operator/charts
 
   syncPolicy:
@@ -20,7 +20,7 @@ hyperfleet:
   helmValues:
     image:
       repository: quay.io/willkutler/hyperfleet-operator
-      tag: "dev-0b88a96e"
+      tag: "dev-52599607"
       pullPolicy: Always
 
     replicaCount: 2
