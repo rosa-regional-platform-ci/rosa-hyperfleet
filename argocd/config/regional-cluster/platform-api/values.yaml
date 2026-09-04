@@ -18,7 +18,7 @@ platformApi:
     name: platform-api
     image:
       repository: quay.io/willkutler/rosa-hyperfleet-api
-      tag: "dev-d5ce6156"
+      tag: "dev-188e0107"
       pullPolicy: Always
 
     # Application arguments
