@@ -26,8 +26,8 @@
   "sre_prometheus_oidc_client_id": "rosa-hyperfleet-prometheus-sre-stage-us-east-1",
   "sre_thanos_oidc_client_id": "rosa-hyperfleet-thanos-sre-stage-us-east-1",
   "environment_domain": "stg0.rosa.devshift.org",
-  "regional_id": "regional",
-  "eph_prefix": "",
+  "regional_id": "eph-2b8071-regional",
+  "eph_prefix": "eph-2b8071",
   "hyperfleet_db_instance_class": "db.r6g.large",
   "hyperfleet_db_deletion_protection": true,
   "hyperfleet_db_skip_final_snapshot": false,
@@ -37,5 +37,5 @@
   "zoa_runner_image_tag": "dd76a96",
   "zoa_lambda_source_image": "quay.io/rrp-dev-ci/zoa-lambda",
   "zoa_runner_source_image": "quay.io/rrp-dev-ci/zoa-runner",
-  "management_clusters_info": [{"account_id": "ssm:///infra/stage/us-east-1/mc01/account_id", "id": "mc01"}]
+  "management_clusters_info": [{"account_id": "ssm:///infra/stage/us-east-1/mc01/account_id", "id": "eph-2b8071-mc01"}]
 }
