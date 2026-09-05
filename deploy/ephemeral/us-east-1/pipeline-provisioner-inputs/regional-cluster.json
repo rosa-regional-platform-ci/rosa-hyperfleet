@@ -3,5 +3,6 @@
   "region": "us-east-1",
   "account_id": "599476212575",
   "child_admin_role_name": "OrganizationAccountAccessRole",
-  "regional_id": "eph-3ca02cb4-regional"
+  "regional_id": "eph-3ca02cb4-regional",
+  "delete_pipeline": true
 }
