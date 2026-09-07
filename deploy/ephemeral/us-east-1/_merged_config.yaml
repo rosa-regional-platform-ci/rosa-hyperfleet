@@ -85,4 +85,6 @@ applications:
         rbac:
           policy.default: '{% if regional_cluster.enable_write_sre_tools %}{% else %}role:readonly{% endif %}'
 provision_mcs:
-  mc01: {}
+  mc01:
+    delete: true
+delete: true
