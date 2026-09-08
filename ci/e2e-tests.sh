@@ -315,9 +315,7 @@ if [[ $platform_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]] || [[ $rosa_cli_rc -ne
 fi
 
 echo ""
-echo "E2E results: platform=$platform_rc hcp=$hcp_rc monitoring=$monitoring_rc rosa-cli=$rosa_cli_rc"
-if [[ $platform_rc -ne 0 ]] || [[ $hcp_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]] || [[ $rosa_cli_rc -ne 0 ]]; then
-echo "E2E results: platform=$platform_rc hcp=$hcp_rc monitoring=$monitoring_rc zoa=$zoa_exit"
-if [[ $platform_rc -ne 0 ]] || [[ $hcp_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]] || [[ $zoa_exit -ne 0 ]]; then
+echo "E2E results: platform=$platform_rc hcp=$hcp_rc monitoring=$monitoring_rc rosa-cli=$rosa_cli_rc zoa=$zoa_exit"
+if [[ $platform_rc -ne 0 ]] || [[ $hcp_rc -ne 0 ]] || [[ $monitoring_rc -ne 0 ]] || [[ $rosa_cli_rc -ne 0 ]] || [[ $zoa_exit -ne 0 ]]; then
     exit 1
 fi
