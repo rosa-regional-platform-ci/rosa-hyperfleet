@@ -452,7 +452,8 @@ module "zoa_lambda" {
   count  = var.zoa_lambda_image_tag != "" ? 1 : 0
   source = "../../modules/zoa-lambda"
 
-  cluster_id = var.regional_id
+  cluster_id        = var.regional_id
+  deployment_target = "rc"
 
   lambda_image_uri = module.zoa.lambda_image_uri
   job_image_uri    = module.zoa.runner_image_uri

@@ -13,6 +13,16 @@ variable "cluster_id" {
   type        = string
 }
 
+variable "deployment_target" {
+  description = "ZOA deployment target for this Lambda: rc (regional cluster) or mc (management cluster). Passed to the runtime as ZOA_DEPLOYMENT_TARGET."
+  type        = string
+
+  validation {
+    condition     = contains(["rc", "mc"], var.deployment_target)
+    error_message = "deployment_target must be \"rc\" or \"mc\"."
+  }
+}
+
 # --- Container images ---
 
 variable "lambda_image_uri" {
