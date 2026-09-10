@@ -50,6 +50,8 @@ module "management_cluster" {
   private_subnet_ids              = module.vpc.private_subnet_ids
   cluster_security_group_id       = module.vpc.cluster_security_group_id
   vpc_endpoints_security_group_id = module.vpc.vpc_endpoints_security_group_id
+
+  worker_node_ami_id = var.worker_node_ami_id
 }
 
 # =============================================================================

@@ -56,3 +56,9 @@ variable "ami_kms_key_arn" {
   default     = ""
 }
 
+variable "worker_node_ami_id" {
+  description = "Custom AMI ID for the Karpenter bootstrap managed node group. Empty (default) uses the EKS-optimized AL2023 AMI (ami_type AL2023_x86_64_STANDARD) with EKS-managed bootstrap. When set, the node group uses ami_type CUSTOM and the launch template supplies nodeadm bootstrap user_data, so the AMI must be nodeadm-compatible (e.g. RHEL/AL2023 for EKS)."
+  type        = string
+  default     = ""
+}
+
