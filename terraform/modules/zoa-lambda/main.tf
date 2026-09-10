@@ -35,6 +35,7 @@ locals {
     KMS_KEY_ARN                       = var.kms_key_arn
     JOB_IMAGE                         = var.job_image_uri
     ZOA_JOBS_NAMESPACE                = var.zoa_jobs_namespace
+    ZOA_DEPLOYMENT_TARGET             = var.deployment_target
     DYNAMODB_TTL_DAYS                 = tostring(var.dynamodb_ttl_days)
     TARGET_CLUSTER                    = var.cluster_id
     UPLOADER_ROLE_ARN                 = var.uploader_role_arn

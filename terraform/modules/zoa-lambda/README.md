@@ -18,6 +18,7 @@ module "zoa_lambda" {
   source = "../modules/zoa-lambda"
 
   cluster_id                = "eph-abc123-regional"
+  deployment_target         = "rc" # or "mc" for management-cluster ZOA
   lambda_image_uri          = "123456789.dkr.ecr.us-east-1.amazonaws.com/zoa-lambda:abc123"
   job_image_uri             = "123456789.dkr.ecr.us-east-1.amazonaws.com/zoa-runner:abc123"
   private_subnet_ids        = module.vpc.private_subnet_ids
