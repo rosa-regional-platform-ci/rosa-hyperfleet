@@ -254,6 +254,18 @@ resource "aws_launch_template" "karpenter_bootstrap" {
   name_prefix = "${local.cluster_id}-karpenter-bootstrap-"
   tags        = local.common_tags
 
+  # When a custom AMI is pinned, EKS no longer injects node bootstrap, so the
+  # launch template must set the image and supply nodeadm user_data itself.
+  # Empty (default) leaves both unset and EKS manages the AL2023 AMI + bootstrap.
+  image_id = var.worker_node_ami_id != "" ? var.worker_node_ami_id : null
+
+  user_data = var.worker_node_ami_id != "" ? base64encode(templatefile("${path.module}/templates/bootstrap-nodeadm-userdata.tftpl", {
+    cluster_name          = aws_eks_cluster.main.name
+    api_server_endpoint   = aws_eks_cluster.main.endpoint
+    certificate_authority = aws_eks_cluster.main.certificate_authority[0].data
+    service_cidr          = aws_eks_cluster.main.kubernetes_network_config[0].service_ipv4_cidr
+  })) : null
+
   metadata_options {
     http_tokens = "required"
   }
@@ -273,7 +285,9 @@ resource "aws_eks_node_group" "karpenter_bootstrap" {
   node_role_arn   = aws_iam_role.karpenter_node.arn
   subnet_ids      = var.private_subnet_ids
 
-  ami_type       = "AL2023_x86_64_STANDARD"
+  # CUSTOM required when the launch template pins a non-EKS-optimized AMI (e.g. RHEL);
+  # otherwise use the EKS-optimized AL2023 AMI managed by the node group.
+  ami_type       = var.worker_node_ami_id != "" ? "CUSTOM" : "AL2023_x86_64_STANDARD"
   instance_types = ["m7i.xlarge"]
 
   launch_template {

@@ -19,6 +19,13 @@ deployment_name: "{{ aws_region }}{% if eph_prefix %}-{{ eph_prefix }}{% endif %
 dns:
   domain: "{% if ci %}ci00{% else %}dev0{% endif %}.rosa.devshift.net"
 
+# Pin a specific AMI for all worker nodes (RC + MC), covering both the Karpenter
+# EC2NodeClass and the Terraform bootstrap node group. ami-01040cf073f7766d9 is a
+# RHEL EKS image bootstrapped via nodeadm (AL2023 family).
+worker_node_ami:
+  family: AL2023
+  id: ami-01040cf073f7766d9
+
 regional_cluster:
   enable_bastion: true
   enable_write_sre_tools: true
@@ -39,9 +46,6 @@ applications:
 management_cluster_defaults:
   enable_bastion: true
   node_instance_families: ["m8i-flex", "m7i-flex"]
-  # Pin a specific AMI. Null uses the default bottlerocket FIPS name selector.
-  # Example: karpenter_ami: {family: Bottlerocket, id: ami-0abc123}
-  karpenter_ami: null
 
 observability:
   pagerduty:

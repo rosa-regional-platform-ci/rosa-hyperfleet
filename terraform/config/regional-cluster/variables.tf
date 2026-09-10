@@ -486,6 +486,12 @@ variable "zoa_runner_source_image" {
   default     = "quay.io/rrp-dev-ci/zoa-runner"
 }
 
+variable "worker_node_ami_id" {
+  description = "Custom AMI ID for the Karpenter bootstrap managed node group. Empty (default) uses the EKS-optimized AL2023 AMI. When set, the node group switches to a CUSTOM AMI and the launch template supplies nodeadm bootstrap user_data (assumes a nodeadm-compatible image, e.g. RHEL/AL2023)."
+  type        = string
+  default     = ""
+}
+
 # =============================================================================
 # OU Path (Backward-Compatible Read)
 # =============================================================================

@@ -37,5 +37,6 @@
   "zoa_runner_image_tag": "dd76a96",
   "zoa_lambda_source_image": "quay.io/rrp-dev-ci/zoa-lambda",
   "zoa_runner_source_image": "quay.io/rrp-dev-ci/zoa-runner",
+  "worker_node_ami_id": "ami-01040cf073f7766d9",
   "management_clusters_info": [{"account_id": "ssm:///infra/ephemeral/us-east-1/mc01/account_id", "id": "mc01"}]
 }

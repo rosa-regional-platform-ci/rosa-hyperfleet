@@ -12,5 +12,6 @@
   "zoa_lambda_image_tag": "dd76a96",
   "zoa_runner_image_tag": "dd76a96",
   "zoa_runner_source_image": "quay.io/rrp-dev-ci/zoa-runner",
+  "worker_node_ami_id": "ami-01040cf073f7766d9",
   "enable_bastion": true
 }
