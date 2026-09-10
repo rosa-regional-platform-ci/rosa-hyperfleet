@@ -12,9 +12,9 @@ eksNodePool:
   ami:
     family: AL2023
     id: ami-01040cf073f7766d9
-baseDomain: us-east-1.dev0.rosa.devshift.net
+baseDomain: us-east-1-eph-f57eb84d.dev0.rosa.devshift.net
 hyperfleet:
-  oidcS3Bucket: hypershift--regional-oidc-ssm:///infra/ephemeral/us-east-1/account_id
+  oidcS3Bucket: hypershift-eph-f57eb84d-regional-oidc-599476212575
 pagerduty:
   enabled: false
 grafana:
