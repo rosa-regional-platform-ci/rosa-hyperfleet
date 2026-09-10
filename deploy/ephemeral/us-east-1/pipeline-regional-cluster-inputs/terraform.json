@@ -37,5 +37,6 @@
   "zoa_runner_image_tag": "0926a43",
   "zoa_lambda_source_image": "quay.io/rrp-dev-ci/zoa-lambda",
   "zoa_runner_source_image": "quay.io/rrp-dev-ci/zoa-runner",
-  "management_clusters_info": [{"account_id": "129678139271", "id": "eph-403b59-mc01"}]
+  "management_clusters_info": [{"account_id": "129678139271", "id": "eph-403b59-mc01"}],
+  "delete": true
 }
