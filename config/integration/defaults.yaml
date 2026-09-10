@@ -2,6 +2,15 @@ dns:
   domain: int0.rosa.devshift.net
   create_environment_zone: true
 
+# Pin a specific AMI for all worker nodes (RC + MC), covering both the Karpenter
+# EC2NodeClass and the Terraform bootstrap node group. ami-08b502ef7dad4cd91 is a
+# RHEL EKS image bootstrapped via nodeadm. amiFamily Custom: Karpenter
+# supplies the nodeadm NodeConfig via EC2NodeClass userData rather than
+# generating AL2023 bootstrap (the node is RHEL, not AL2023).
+worker_node_ami:
+  family: Custom
+  id: ami-08b502ef7dad4cd91
+
 regional_cluster:
   enable_bastion: true
   enable_cloudtrail: true

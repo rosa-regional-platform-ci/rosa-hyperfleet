@@ -117,6 +117,7 @@ export TF_VAR_zoa_lambda_ecr_url=$(cd "$_RC_TF_DIR" && terraform output -raw zoa
 export TF_VAR_zoa_lambda_image_tag=$(jq -r '.zoa_lambda_image_tag // ""' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_zoa_runner_image_tag=$(jq -r '.zoa_runner_image_tag // ""' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_zoa_runner_source_image=$(jq -r '.zoa_runner_source_image // ""' "$DEPLOY_CONFIG_FILE")
+export TF_VAR_worker_node_ami_id=$(jq -r '.worker_node_ami_id // ""' "$DEPLOY_CONFIG_FILE")
 
 # ── Phase 2: Apply/Destroy MC infrastructure ─────────────────────────────────
 use_mc_account

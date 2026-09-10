@@ -56,3 +56,27 @@ variable "ami_kms_key_arn" {
   default     = ""
 }
 
+variable "worker_node_ami_id" {
+  description = "Custom AMI ID for the Karpenter bootstrap managed node group. Empty (default) uses the EKS-optimized AL2023 AMI (ami_type AL2023_x86_64_STANDARD) with EKS-managed bootstrap. When set, the node group uses ami_type CUSTOM and the launch template supplies nodeadm bootstrap user_data, so the AMI must be nodeadm-compatible (e.g. RHEL/AL2023 for EKS)."
+  type        = string
+  default     = ""
+}
+
+variable "worker_node_ami_type" {
+  description = "EKS managed node group ami_type for the Karpenter bootstrap group. Empty (default) auto-selects CUSTOM when worker_node_ami_id is set, otherwise AL2023_x86_64_STANDARD. Set to override."
+  type        = string
+  default     = ""
+}
+
+variable "worker_node_root_device_name" {
+  description = "Root block device name for the Karpenter bootstrap launch template. Empty (default) auto-selects /dev/sda1 when a custom AMI is pinned (RHEL roots there), otherwise /dev/xvda (AL2023). Must match the AMI's root device."
+  type        = string
+  default     = ""
+}
+
+variable "worker_node_root_volume_size" {
+  description = "Root EBS volume size (GiB) for the Karpenter bootstrap nodes."
+  type        = number
+  default     = 50
+}
+

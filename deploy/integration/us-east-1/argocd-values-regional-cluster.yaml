@@ -9,6 +9,9 @@ eksNodePool:
   instanceFamilies:
   - m8i
   - m7i
+  ami:
+    family: Custom
+    id: ami-08b502ef7dad4cd91
 baseDomain: us-east-1.int0.rosa.devshift.net
 hyperfleet:
   oidcS3Bucket: PLACEHOLDER-overridden-by-terraform-output
