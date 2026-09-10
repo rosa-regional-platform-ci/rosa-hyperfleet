@@ -103,47 +103,9 @@ spec:
             limits:
               cpu: {{ .Values.platformApi.app.resources.limits.cpu }}
               memory: {{ .Values.platformApi.app.resources.limits.memory }}
-        - name: envoy
-          image: {{ .Values.platformApi.envoy.image.repository }}:{{ .Values.platformApi.envoy.image.tag }}
-          ports:
-            - containerPort: {{ .Values.platformApi.service.ports.http }}
-              name: http
-              protocol: TCP
-          volumeMounts:
-            - name: envoy-config
-              mountPath: /etc/envoy
-              readOnly: true
-          command:
-            - envoy
-            - -c
-            - /etc/envoy/envoy.yaml
-            - --log-level
-            - info
-          livenessProbe:
-            httpGet:
-              path: /v0/live
-              port: {{ .Values.platformApi.service.ports.http }}
-            initialDelaySeconds: {{ .Values.platformApi.probes.liveness.initialDelaySeconds }}
-            periodSeconds: {{ .Values.platformApi.probes.liveness.periodSeconds }}
-          readinessProbe:
-            httpGet:
-              path: /v0/live
-              port: {{ .Values.platformApi.service.ports.http }}
-            initialDelaySeconds: {{ .Values.platformApi.probes.readiness.initialDelaySeconds }}
-            periodSeconds: {{ .Values.platformApi.probes.readiness.periodSeconds }}
-          resources:
-            requests:
-              cpu: {{ .Values.platformApi.envoy.resources.requests.cpu }}
-              memory: {{ .Values.platformApi.envoy.resources.requests.memory }}
-            limits:
-              cpu: {{ .Values.platformApi.envoy.resources.limits.cpu }}
-              memory: {{ .Values.platformApi.envoy.resources.limits.memory }}
+      {{- if .Values.platformApi.rateLimit.enabled }}
       volumes:
-        - name: envoy-config
-          configMap:
-            name: envoy-config
-        {{- if .Values.platformApi.rateLimit.enabled }}
         - name: rate-limits
           configMap:
             name: rate-limits
-        {{- end }}
+      {{- end }}

@@ -10,6 +10,6 @@ metadata:
 spec:
   serviceRef:
     name: {{ .Values.platformApi.app.name }}
-    port: {{ .Values.platformApi.service.ports.http }}
+    port: {{ .Values.platformApi.service.ports.api }}
   targetGroupARN: {{ .Values.platformApi.targetGroup.arn }}
   targetType: {{ .Values.platformApi.targetGroup.targetType }}

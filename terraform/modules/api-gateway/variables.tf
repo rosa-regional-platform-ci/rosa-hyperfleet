@@ -39,7 +39,7 @@ variable "cluster_name" {
 variable "target_port" {
   description = "Port on which the backend service receives traffic"
   type        = number
-  default     = 8080
+  default     = 8000
 
   validation {
     condition     = var.target_port >= 1 && var.target_port <= 65535
@@ -50,7 +50,7 @@ variable "target_port" {
 variable "health_check_path" {
   description = "Path for ALB health checks on the backend service"
   type        = string
-  default     = "/v0/live"
+  default     = "/api/v0/live"
 }
 
 variable "health_check_interval" {
