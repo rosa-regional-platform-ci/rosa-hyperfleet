@@ -11,7 +11,7 @@ eksNodePool:
   - m7i
   ami:
     family: AL2023
-    id: ami-08b502ef7dad4cd91
+    id: ami-08534dafc055ff299
   rootVolumeSize: 50Gi
 baseDomain: us-east-1.stg0.rosa.devshift.org
 hyperfleet:
