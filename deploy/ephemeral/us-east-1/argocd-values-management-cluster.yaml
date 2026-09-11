@@ -10,7 +10,7 @@ eksNodePool:
   - m8i-flex
   - m7i-flex
   ami:
-    family: Custom
+    family: AL2023
     id: ami-08b502ef7dad4cd91
 hypershift:
   oidcStorageS3Bucket:
