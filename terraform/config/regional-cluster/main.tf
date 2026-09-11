@@ -634,7 +634,7 @@ resource "aws_iam_role_policy" "hyperfleet_operator_secrets" {
           "secretsmanager:DescribeSecret",
           "secretsmanager:DeleteSecret",
         ]
-        Resource = "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:hyperfleet/oidc/*"
+        Resource = "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:/hyperfleet/oidc/*"
       },
     ]
   })
@@ -653,6 +653,7 @@ resource "aws_iam_role_policy" "hyperfleet_operator_assume_role" {
         Effect = "Allow"
         Action = [
           "sts:AssumeRole",
+          "sts:TagSession",
         ]
         Resource = "arn:aws:iam::*:role/*"
         Condition = {
