@@ -67,6 +67,12 @@ terraform_tags:
 # @used-by worker_node_ami pipeline-management-cluster-inputs/terraform.json.j2
 worker_node_ami: null
 
+# @doc worker_node_root_volume_size Root EBS volume size (GiB) for worker nodes. Drives both the Karpenter EC2NodeClass and the Terraform bootstrap node group.
+# @used-by worker_node_root_volume_size _context
+# @used-by worker_node_root_volume_size pipeline-regional-cluster-inputs/terraform.json.j2
+# @used-by worker_node_root_volume_size pipeline-management-cluster-inputs/terraform.json.j2
+worker_node_root_volume_size: 50
+
 regional_cluster:
   # @doc regional_cluster.enable_bastion Enable bastion host for regional cluster access.
   # @used-by regional_cluster.enable_bastion pipeline-regional-cluster-inputs/terraform.json.j2
@@ -183,6 +189,9 @@ applications:
       # @doc applications.management-cluster.eksNodePool.ami Pinned AMI for the MC Karpenter EC2NodeClass ({family, id}). Null uses the default bottlerocket FIPS name selector.
       # @used-by applications.management-cluster.eksNodePool.ami _context
       ami: "{{ worker_node_ami }}"
+      # @doc applications.management-cluster.eksNodePool.rootVolumeSize Root volume size for the MC Karpenter EC2NodeClass when a custom AMI is pinned. Only applied on the custom-AMI path.
+      # @used-by applications.management-cluster.eksNodePool.rootVolumeSize _context
+      rootVolumeSize: "{{ worker_node_root_volume_size }}Gi"
     hypershift:
       oidcStorageS3Bucket:
         # @doc applications.management-cluster.hypershift.oidcStorageS3Bucket.name OIDC S3 bucket name for HyperShift.
@@ -203,6 +212,9 @@ applications:
       # @doc applications.regional-cluster.eksNodePool.ami Pinned AMI for the regional Karpenter EC2NodeClass ({family, id}). Null uses the default bottlerocket FIPS name selector.
       # @used-by applications.regional-cluster.eksNodePool.ami _context
       ami: "{{ worker_node_ami }}"
+      # @doc applications.regional-cluster.eksNodePool.rootVolumeSize Root volume size for the regional Karpenter EC2NodeClass when a custom AMI is pinned. Only applied on the custom-AMI path.
+      # @used-by applications.regional-cluster.eksNodePool.rootVolumeSize _context
+      rootVolumeSize: "{{ worker_node_root_volume_size }}Gi"
     # @doc applications.regional-cluster.baseDomain DNS base domain for HostedClusters (deployment_name.dns.domain).
     # @used-by applications.regional-cluster.baseDomain _context
     baseDomain: "{% if dns.domain %}{{ deployment_name }}.{{ dns.domain }}{% endif %}"

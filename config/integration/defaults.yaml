@@ -4,11 +4,13 @@ dns:
 
 # Pin a specific AMI for all worker nodes (RC + MC), covering both the Karpenter
 # EC2NodeClass and the Terraform bootstrap node group. ami-08b502ef7dad4cd91 is a
-# RHEL EKS image bootstrapped via nodeadm. amiFamily Custom: Karpenter
-# supplies the nodeadm NodeConfig via EC2NodeClass userData rather than
-# generating AL2023 bootstrap (the node is RHEL, not AL2023).
+# RHEL EKS image bootstrapped via nodeadm. amiFamily AL2023: Karpenter generates
+# the nodeadm NodeConfig itself, including apiServerEndpoint, certificateAuthority,
+# and cidr. The image is nodeadm-compatible, so the AL2023-family bootstrap works
+# on RHEL. (A name-only Custom NodeConfig fails: nodeadm hard-fails validation with
+# "Apiserver endpoint is missing" rather than resolving it via eks:DescribeCluster.)
 worker_node_ami:
-  family: Custom
+  family: AL2023
   id: ami-08b502ef7dad4cd91
 
 regional_cluster:

@@ -25,31 +25,46 @@ spec:
   metadataOptions:
     httpTokens: required
     httpPutResponseHopLimit: 2
-  {{- if and .Values.eksNodePool.ami (eq .Values.eksNodePool.ami.family "Custom") }}
-  # amiFamily Custom means Karpenter generates no bootstrap, so supply the
-  # nodeadm NodeConfig ourselves. Only valid for the Custom family: other
-  # families (Bottlerocket, AL2023, ...) have Karpenter generate their own
-  # (differently formatted) bootstrap, so userData must not be set for them.
-  # Name-only: nodeadm resolves the API server endpoint, cluster CA, and service
-  # CIDR via eks:DescribeCluster (granted by AmazonEKSWorkerNodePolicy on the
-  # karpenter node role) and computes maxPods from the VPC CNI ENI limits, so no
-  # cluster facts need threading in here.
-  # NOTE: there is no eks VPC endpoint, so this DescribeCluster call reaches the
-  # EKS API via NAT egress. If the cluster ever goes fully private (no NAT),
-  # bake apiServerEndpoint/certificateAuthority/cidr into the NodeConfig below
-  # (as the Terraform bootstrap node group does) or add an eks VPC endpoint.
+  {{- if .Values.eksNodePool.ami }}
+  # BIFROST-1420 workaround: rhel-bootc-eks bakes a signature-enforcing policy for
+  # registry.redhat.io/redhat/*, which rejects the unsigned partner OLM catalog
+  # index images (certified/community/marketplace), so their catalog pods stay in
+  # Init:ImagePullBackOff. On amiFamily AL2023 Karpenter merges its generated
+  # NodeConfig with this MIME doc, so we ship only a shellscript that adds per-repo
+  # overrides for those three indexes; all other enforcement (incl. the signed
+  # redhat-operator-index) is untouched. Remove when BIFROST-1420 lands.
   userData: |
     MIME-Version: 1.0
     Content-Type: multipart/mixed; boundary="//"
 
     --//
-    Content-Type: application/node.eks.aws
+    Content-Type: text/x-shellscript
 
-    apiVersion: node.eks.aws/v1alpha1
-    kind: NodeConfig
-    spec:
-      cluster:
-        name: {{ $clusterName }}
-
+    #!/usr/bin/env bash
+    set -euo pipefail
+    python3 - <<'PY'
+    import json
+    p = "/etc/containers/policy.json"
+    d = json.load(open(p))
+    d.setdefault("transports", {}).setdefault("docker", {})
+    for r in ("registry.redhat.io/redhat/certified-operator-index",
+              "registry.redhat.io/redhat/community-operator-index",
+              "registry.redhat.io/redhat/redhat-marketplace-index"):
+        d["transports"]["docker"][r] = [{"type": "insecureAcceptAnything"}]
+    json.dump(d, open(p, "w"), indent=2)
+    PY
+    systemctl restart crio 2>/dev/null || true
     --//--
+  # A pinned custom AMI roots at /dev/sda1, not the AL2023 default /dev/xvda, so
+  # set the root mapping explicitly (mirrors the Terraform bootstrap launch
+  # template in the eks-cluster module). Without it Karpenter sizes the wrong
+  # device and the root stays at the AMI's baked-in size.
+  blockDeviceMappings:
+    - deviceName: /dev/sda1
+      rootVolume: true
+      ebs:
+        volumeSize: {{ .Values.eksNodePool.rootVolumeSize | default "50Gi" }}
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
   {{- end }}

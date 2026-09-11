@@ -13,4 +13,29 @@ spec:
     certificateAuthority: ${certificate_authority}
     cidr: ${service_cidr}
 
+--//
+Content-Type: text/x-shellscript
+
+#!/usr/bin/env bash
+set -euo pipefail
+# BIFROST-1420 workaround: rhel-bootc-eks bakes a signature-enforcing policy for
+# registry.redhat.io/redhat/*, which rejects the unsigned partner OLM catalog
+# index images (certified/community/marketplace), so their catalog pods stay in
+# Init:ImagePullBackOff. Add per-repo overrides so only those pull; all other
+# enforcement (incl. the signed redhat-operator-index) is untouched.
+# Docker-transport scopes match longest-prefix, so these per-repo entries win
+# over the broader baked requirement. Remove when BIFROST-1420 lands.
+python3 - <<'PY'
+import json
+p = "/etc/containers/policy.json"
+d = json.load(open(p))
+d.setdefault("transports", {}).setdefault("docker", {})
+for r in ("registry.redhat.io/redhat/certified-operator-index",
+          "registry.redhat.io/redhat/community-operator-index",
+          "registry.redhat.io/redhat/redhat-marketplace-index"):
+    d["transports"]["docker"][r] = [{"type": "insecureAcceptAnything"}]
+json.dump(d, open(p, "w"), indent=2)
+PY
+systemctl restart crio 2>/dev/null || true
+
 --//--

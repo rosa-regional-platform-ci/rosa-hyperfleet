@@ -274,7 +274,7 @@ resource "aws_launch_template" "karpenter_bootstrap" {
   # blank volume and requires an explicit size/snapshotId. The AL2023 EKS-optimized
   # AMI roots at /dev/xvda; the pinned RHEL AMI roots at /dev/sda1.
   block_device_mappings {
-    device_name = var.worker_node_root_device_name != "" ? var.worker_node_root_device_name : (var.worker_node_ami_id != "" ? "/dev/sda1" : "/dev/xvda")
+    device_name = var.worker_node_ami_id != "" ? "/dev/sda1" : "/dev/xvda"
     ebs {
       encrypted   = true
       volume_type = "gp3"
@@ -291,7 +291,7 @@ resource "aws_eks_node_group" "karpenter_bootstrap" {
 
   # CUSTOM required when the launch template pins a non-EKS-optimized AMI (e.g. RHEL);
   # otherwise use the EKS-optimized AL2023 AMI managed by the node group.
-  ami_type       = var.worker_node_ami_type != "" ? var.worker_node_ami_type : (var.worker_node_ami_id != "" ? "CUSTOM" : "AL2023_x86_64_STANDARD")
+  ami_type       = var.worker_node_ami_id != "" ? "CUSTOM" : "AL2023_x86_64_STANDARD"
   instance_types = ["m7i.xlarge"]
 
   launch_template {

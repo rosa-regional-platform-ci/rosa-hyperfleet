@@ -10,8 +10,9 @@ eksNodePool:
   - m8i
   - m7i
   ami:
-    family: Custom
+    family: AL2023
     id: ami-08b502ef7dad4cd91
+  rootVolumeSize: 50Gi
 baseDomain: us-east-1.stg0.rosa.devshift.org
 hyperfleet:
   oidcS3Bucket: PLACEHOLDER-overridden-by-terraform-output
