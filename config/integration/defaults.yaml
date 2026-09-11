@@ -28,6 +28,9 @@ regional_cluster:
   sre_prometheus_oidc_client_id: "rrp-prometheus-sre-int-us-east-1"
   sre_thanos_oidc_client_id: "rrp-thanos-sre-int-us-east-1"
 
+cluster_lifecycle:
+  default_expiration: "24h"
+
 management_cluster_defaults:
   enable_bastion: true
   node_instance_families: ["m8i", "m7i"]

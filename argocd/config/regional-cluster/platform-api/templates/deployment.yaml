@@ -50,6 +50,9 @@ spec:
             {{- if .Values.platformApi.app.args.oidcIssuerBaseURL }}
             - --oidc-issuer-base-url={{ .Values.platformApi.app.args.oidcIssuerBaseURL }}
             {{- end }}
+            {{- if .Values.platformApi.app.args.defaultClusterExpiration }}
+            - --default-cluster-expiration={{ .Values.platformApi.app.args.defaultClusterExpiration }}
+            {{- end }}
           env:
             - name: POSTGRES_DSN
               valueFrom:

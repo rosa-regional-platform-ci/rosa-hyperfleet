@@ -29,6 +29,10 @@ platformApi:
       dynamodbRegion: us-east-2
       dynamodbPrefix: rosa
       oidcIssuerBaseURL: ""
+      # Auto-delete clusters this long after creation when the caller does not
+      # supply an explicit spec.expirationTimestamp. Go duration (e.g. "24h").
+      # Empty = flag omitted = no default expiration (disabled).
+      defaultClusterExpiration: ""
       apiPort: 8000
       healthPort: 8081
       metricsPort: 9090

@@ -180,6 +180,11 @@ observability:
     # @used-by observability.sns_alerting.enabled pipeline-regional-cluster-inputs/terraform.json.j2
     enabled: true
 
+cluster_lifecycle:
+  # @doc cluster_lifecycle.default_expiration Auto-delete clusters this long after creation when the create request omits spec.expirationTimestamp. Go duration (e.g. "24h"). Empty disables it (flag omitted). Wired into platform-api via applications.regional-cluster.platformApi.
+  # @used-by cluster_lifecycle.default_expiration _context
+  default_expiration: ""
+
 applications:
   management-cluster:
     eksNodePool:
@@ -218,6 +223,12 @@ applications:
     # @doc applications.regional-cluster.baseDomain DNS base domain for HostedClusters (deployment_name.dns.domain).
     # @used-by applications.regional-cluster.baseDomain _context
     baseDomain: "{% if dns.domain %}{{ deployment_name }}.{{ dns.domain }}{% endif %}"
+    platformApi:
+      app:
+        args:
+          # @doc applications.regional-cluster.platformApi.app.args.defaultClusterExpiration Maps cluster_lifecycle.default_expiration into the platform-api --default-cluster-expiration flag.
+          # @used-by applications.regional-cluster.platformApi.app.args.defaultClusterExpiration _context
+          defaultClusterExpiration: "{{ cluster_lifecycle.default_expiration }}"
     hyperfleet:
       # @doc applications.regional-cluster.hyperfleet.oidcS3Bucket S3 bucket name the HyperFleet Operator writes OIDC discovery documents to.
       # @used-by applications.regional-cluster.hyperfleet.oidcS3Bucket _context
