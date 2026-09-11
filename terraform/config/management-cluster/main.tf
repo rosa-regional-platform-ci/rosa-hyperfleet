@@ -51,7 +51,8 @@ module "management_cluster" {
   cluster_security_group_id       = module.vpc.cluster_security_group_id
   vpc_endpoints_security_group_id = module.vpc.vpc_endpoints_security_group_id
 
-  worker_node_ami_id = var.worker_node_ami_id
+  worker_node_ami_id           = var.worker_node_ami_id
+  worker_node_root_volume_size = var.worker_node_root_volume_size
 }
 
 # =============================================================================

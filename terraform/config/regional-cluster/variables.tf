@@ -492,6 +492,12 @@ variable "worker_node_ami_id" {
   default     = ""
 }
 
+variable "worker_node_root_volume_size" {
+  description = "Root EBS volume size (GiB) for the Karpenter bootstrap nodes."
+  type        = number
+  default     = 50
+}
+
 # =============================================================================
 # OU Path (Backward-Compatible Read)
 # =============================================================================

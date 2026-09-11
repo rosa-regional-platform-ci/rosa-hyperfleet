@@ -25,31 +25,17 @@ spec:
   metadataOptions:
     httpTokens: required
     httpPutResponseHopLimit: 2
-  {{- if and .Values.eksNodePool.ami (eq .Values.eksNodePool.ami.family "Custom") }}
-  # amiFamily Custom means Karpenter generates no bootstrap, so supply the
-  # nodeadm NodeConfig ourselves. Only valid for the Custom family: other
-  # families (Bottlerocket, AL2023, ...) have Karpenter generate their own
-  # (differently formatted) bootstrap, so userData must not be set for them.
-  # Name-only: nodeadm resolves the API server endpoint, cluster CA, and service
-  # CIDR via eks:DescribeCluster (granted by AmazonEKSWorkerNodePolicy on the
-  # karpenter node role) and computes maxPods from the VPC CNI ENI limits, so no
-  # cluster facts need threading in here.
-  # NOTE: there is no eks VPC endpoint, so this DescribeCluster call reaches the
-  # EKS API via NAT egress. If the cluster ever goes fully private (no NAT),
-  # bake apiServerEndpoint/certificateAuthority/cidr into the NodeConfig below
-  # (as the Terraform bootstrap node group does) or add an eks VPC endpoint.
-  userData: |
-    MIME-Version: 1.0
-    Content-Type: multipart/mixed; boundary="//"
-
-    --//
-    Content-Type: application/node.eks.aws
-
-    apiVersion: node.eks.aws/v1alpha1
-    kind: NodeConfig
-    spec:
-      cluster:
-        name: {{ $clusterName }}
-
-    --//--
+  {{- if .Values.eksNodePool.ami }}
+  # A pinned custom AMI roots at /dev/sda1, not the AL2023 default /dev/xvda, so
+  # set the root mapping explicitly (mirrors the Terraform bootstrap launch
+  # template in the eks-cluster module). Without it Karpenter sizes the wrong
+  # device and the root stays at the AMI's baked-in size.
+  blockDeviceMappings:
+    - deviceName: /dev/sda1
+      rootVolume: true
+      ebs:
+        volumeSize: {{ .Values.eksNodePool.rootVolumeSize | default "50Gi" }}
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
   {{- end }}

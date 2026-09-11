@@ -25,6 +25,13 @@ vector:
   podSecurityContext:
     runAsUser: 0
     runAsGroup: 0
+    # RHEL worker nodes run SELinux in enforcing mode. The agent's hostPath
+    # data dir (/var/lib/vector) and host log reads (/var/log/pods) are labeled
+    # such that the default container_t domain is denied access (AVC, os error
+    # 13) even as root. spc_t (super-privileged, unconfined) is how node-level
+    # collectors access host paths, matching OpenShift's CLO/Vector collector.
+    seLinuxOptions:
+      type: spc_t
     seccompProfile:
       type: RuntimeDefault
 
