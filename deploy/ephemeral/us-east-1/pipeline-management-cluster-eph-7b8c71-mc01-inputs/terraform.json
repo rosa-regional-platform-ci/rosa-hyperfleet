@@ -14,5 +14,6 @@
   "zoa_runner_source_image": "quay.io/rrp-dev-ci/zoa-runner",
   "worker_node_ami_id": "ami-08b502ef7dad4cd91",
   "eph_prefix": "eph-7b8c71",
-  "enable_bastion": true
+  "enable_bastion": true,
+  "delete": true
 }

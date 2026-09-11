@@ -38,5 +38,6 @@
   "zoa_lambda_source_image": "quay.io/rrp-dev-ci/zoa-lambda",
   "zoa_runner_source_image": "quay.io/rrp-dev-ci/zoa-runner",
   "worker_node_ami_id": "ami-08b502ef7dad4cd91",
-  "management_clusters_info": [{"account_id": "129678139271", "id": "eph-7b8c71-mc01"}]
+  "management_clusters_info": [{"account_id": "129678139271", "id": "eph-7b8c71-mc01"}],
+  "delete": true
 }
