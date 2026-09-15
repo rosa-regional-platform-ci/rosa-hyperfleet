@@ -1,0 +1,165 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zoa
+  namespace: thanos
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    app.kubernetes.io/name: alerting-rules
+    app.kubernetes.io/managed-by: Helm
+    operator.thanos.io/prometheus-rule: "true"
+spec:
+  groups:
+    - name: zoa-recording-rules
+      rules:
+        # YACE CloudWatch Sum/Average/Maximum stats are gauges (period window),
+        # not Prometheus counters. Ratios use current-scrape sums, not rate().
+        - record: zoa:ta_success_rate
+          expr: |
+            sum by (cluster, dimension_Action) (zoa_execution_count_sum{dimension_Status="succeeded"})
+            / sum by (cluster, dimension_Action) (zoa_execution_count_sum)
+
+        - record: zoa:api_availability
+          expr: |
+            1 - (
+              sum by (cluster) (zoa_http_request_count_sum{dimension_StatusClass="5xx"})
+              / sum by (cluster) (zoa_http_request_count_sum)
+            )
+
+        - record: zoa:worker_error_rate
+          expr: |
+            sum by (cluster) (aws_lambda_errors_sum{dimension_FunctionName=~".*-zoa-worker"})
+            / sum by (cluster) (aws_lambda_invocations_sum{dimension_FunctionName=~".*-zoa-worker"})
+
+        # Unix seconds of the last reconciler tick (EMF ReconcilerLastRun).
+        # Used as "now - last run" without enumerating clusters.
+        - record: zoa:reconciler_last_run
+          expr: |
+            max by (cluster) (zoa_reconciler_last_run_maximum)
+
+    - name: zoa-alerts
+      rules:
+        - alert: ZOADLQMessagesVisible
+          expr: |
+            sum by (cluster) (aws_sqs_approximate_number_of_messages_visible_maximum{dimension_QueueName=~".*-zoa-dlq"}) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: ZOA DLQ has visible messages
+            description: >-
+              ZOA dead-letter queue on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has
+              {{ "{{" }} $value {{ "}}" }} visible message(s) for >5m. Investigate worker
+              Lambda failures and reconciler pipeline health.
+
+        - alert: ZOAWorkerLambdaErrorRateHigh
+          expr: zoa:worker_error_rate > 0.01
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: ZOA worker Lambda error rate elevated
+            description: >-
+              ZOA worker Lambda on cluster {{ "{{" }} $labels.cluster {{ "}}" }} error rate
+              is {{ "{{" }} $value | humanizePercentage {{ "}}" }} (>1%) for 10m.
+
+        # Heartbeat: ReconcilerLastRun is a unix timestamp emitted every tick.
+        # max_over_time keeps the last value if YACE stops exporting the series.
+        # Clusters that never ran ZOA have no series and do not page.
+        - alert: ZOAReconcilerNotRunning
+          expr: |
+            (time() - max by (cluster) (max_over_time(zoa:reconciler_last_run[1h]))) > 300
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: ZOA reconciler not invoking
+            description: >-
+              No ZOA reconciler tick on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
+              for >5m. Check EventBridge schedule and worker Lambda health.
+
+        - alert: ZOAApiErrorRateHigh
+          expr: |
+            (1 - zoa:api_availability) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA API 5xx rate elevated
+            description: >-
+              ZOA API on cluster {{ "{{" }} $labels.cluster {{ "}}" }} is returning 5xx
+              for {{ "{{" }} $value | humanizePercentage {{ "}}" }} of requests (>5%) for 10m.
+
+        - alert: ZOAApiAvailabilityBelowSLO
+          expr: |
+            zoa:api_availability < {{ .Values.sla.zoa.apiAvailability.target }}
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA API availability below SLO
+            description: >-
+              ZOA API on cluster {{ "{{" }} $labels.cluster {{ "}}" }} availability is
+              {{ "{{" }} $value | humanizePercentage {{ "}}" }} (target {{ .Values.sla.zoa.apiAvailability.target }}) for 30m.
+
+        - alert: ZOATAFailureRateHigh
+          expr: zoa:ta_success_rate < 0.90
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA TA failure rate elevated
+            description: >-
+              ZOA action {{ "{{" }} $labels.dimension_Action {{ "}}" }} on cluster
+              {{ "{{" }} $labels.cluster {{ "}}" }} success rate is
+              {{ "{{" }} $value | humanizePercentage {{ "}}" }} (<90%) for 30m.
+
+        - alert: ZOALambdaThrottled
+          expr: |
+            sum by (cluster) (aws_lambda_throttles_sum{dimension_FunctionName=~".*-zoa-(api|worker)"}) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA Lambda throttled
+            description: >-
+              ZOA Lambda functions on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
+              are being throttled.
+
+        - alert: ZOADynamoDBThrottled
+          expr: |
+            sum by (cluster) (aws_dynamodb_throttled_requests_sum{dimension_TableName=~".*zoa.*"}) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA DynamoDB throttled
+            description: >-
+              DynamoDB throttles detected on ZOA tables for cluster
+              {{ "{{" }} $labels.cluster {{ "}}" }}.
+
+        - alert: ZOAGCErrors
+          expr: |
+            sum by (cluster) (zoa_gc_errors_sum) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA GC errors detected
+            description: >-
+              ZOA garbage collector on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
+              reported errors in the last 15m.
+
+        - alert: ZOACircuitBreakerOpen
+          expr: |
+            sum by (cluster) (zoa_circuit_breaker_state_change_sum{dimension_State="open"}) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA circuit breaker opening
+            description: >-
+              ZOA EKS circuit breaker on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
+              is opening repeatedly. Per-container, not global — at least one Lambda
+              container cannot reach EKS.

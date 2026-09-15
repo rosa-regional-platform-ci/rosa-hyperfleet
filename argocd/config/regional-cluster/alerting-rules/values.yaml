@@ -9,3 +9,9 @@ sla:
   hcpAvailability:
     # 99.95% availability target — 0.05% error budget over 30 days
     target: 0.9995
+  zoa:
+    apiAvailability:
+      # 99% starting target for internal ZOA API — tighten after baseline
+      target: 0.99
+    taSuccessRate:
+      target: 0.95

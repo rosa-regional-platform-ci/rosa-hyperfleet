@@ -1,0 +1,137 @@
+evaluation_interval: 1m
+
+rule_files:
+  - rules.yaml
+
+tests:
+  # Recording: aggregate-then-ratio API availability (not per-series 1-ratio summed)
+  - interval: 1m
+    input_series:
+      - series: 'zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="2xx"}'
+        values: "80x10"
+      - series: 'zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="5xx"}'
+        values: "20x10"
+    promql_expr_test:
+      - expr: zoa:api_availability{cluster="mc-01"}
+        eval_time: 5m
+        exp_samples:
+          - labels: 'zoa:api_availability{cluster="mc-01"}'
+            value: 0.8
+
+  - interval: 1m
+    input_series:
+      - series: 'zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="succeeded"}'
+        values: "9x10"
+      - series: 'zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="failed"}'
+        values: "1x10"
+    promql_expr_test:
+      - expr: zoa:ta_success_rate{cluster="mc-01",dimension_Action="must_gather"}
+        eval_time: 5m
+        exp_samples:
+          - labels: 'zoa:ta_success_rate{cluster="mc-01",dimension_Action="must_gather"}'
+            value: 0.9
+
+  # DLQ: mc-05 fires, mc-01 stays quiet
+  - interval: 1m
+    input_series:
+      - series: 'aws_sqs_approximate_number_of_messages_visible_maximum{cluster="mc-05",dimension_QueueName="eph-mc05-zoa-dlq"}'
+        values: "0+1x10"
+      - series: 'aws_sqs_approximate_number_of_messages_visible_maximum{cluster="mc-01",dimension_QueueName="eph-mc01-zoa-dlq"}'
+        values: "0+0x10"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: ZOADLQMessagesVisible
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              cluster: mc-05
+            exp_annotations:
+              summary: ZOA DLQ has visible messages
+              description: ZOA dead-letter queue on cluster mc-05 has 6 visible message(s) for >5m. Investigate worker Lambda failures and reconciler pipeline health.
+
+  - interval: 1m
+    input_series:
+      - series: 'aws_sqs_approximate_number_of_messages_visible_maximum{cluster="mc-01",dimension_QueueName="eph-mc01-zoa-dlq"}'
+        values: "0+0x10"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: ZOADLQMessagesVisible
+        exp_alerts: []
+
+  # Worker error rate gauges (not counters): 2 / 100 = 2%
+  - interval: 1m
+    input_series:
+      - series: 'aws_lambda_errors_sum{cluster="mc-05",dimension_FunctionName="eph-mc05-zoa-worker"}'
+        values: "2x20"
+      - series: 'aws_lambda_invocations_sum{cluster="mc-05",dimension_FunctionName="eph-mc05-zoa-worker"}'
+        values: "100x20"
+      - series: 'aws_lambda_errors_sum{cluster="mc-01",dimension_FunctionName="eph-mc01-zoa-worker"}'
+        values: "0x20"
+      - series: 'aws_lambda_invocations_sum{cluster="mc-01",dimension_FunctionName="eph-mc01-zoa-worker"}'
+        values: "100x20"
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: ZOAWorkerLambdaErrorRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              cluster: mc-05
+            exp_annotations:
+              summary: ZOA worker Lambda error rate elevated
+              description: ZOA worker Lambda on cluster mc-05 error rate is 2% (>1%) for 10m.
+
+  # Reconciler last-run: values are unix-seconds in the promtool time domain (t=0).
+  # Healthy cluster tracks time; stuck cluster freezes at t=2m (120s).
+  - interval: 1m
+    input_series:
+      - series: 'zoa_reconciler_last_run_maximum{cluster="mc-01"}'
+        values: "0+60x20"
+      - series: 'zoa_reconciler_last_run_maximum{cluster="mc-05"}'
+        values: "0 60 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120"
+    alert_rule_test:
+      - eval_time: 13m
+        alertname: ZOAReconcilerNotRunning
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              cluster: mc-05
+            exp_annotations:
+              summary: ZOA reconciler not invoking
+              description: No ZOA reconciler tick on cluster mc-05 for >5m. Check EventBridge schedule and worker Lambda health.
+
+  - interval: 1m
+    input_series:
+      - series: 'zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="succeeded"}'
+        values: "1x40"
+      - series: 'zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="failed"}'
+        values: "9x40"
+    alert_rule_test:
+      - eval_time: 31m
+        alertname: ZOATAFailureRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              cluster: mc-01
+              dimension_Action: must_gather
+            exp_annotations:
+              summary: ZOA TA failure rate elevated
+              description: ZOA action must_gather on cluster mc-01 success rate is 10% (<90%) for 30m.
+
+  - interval: 1m
+    input_series:
+      - series: 'zoa_http_request_count_sum{cluster="mc-05",dimension_StatusClass="5xx"}'
+        values: "10x20"
+      - series: 'zoa_http_request_count_sum{cluster="mc-05",dimension_StatusClass="2xx"}'
+        values: "90x20"
+      - series: 'zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="2xx"}'
+        values: "100x20"
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: ZOAApiErrorRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              cluster: mc-05
+            exp_annotations:
+              summary: ZOA API 5xx rate elevated
+              description: ZOA API on cluster mc-05 is returning 5xx for 10% of requests (>5%) for 10m.
