@@ -157,6 +157,8 @@ Grafana on the RC queries Thanos Query Frontend for a unified view of all cluste
 | RDS                           | RC      | CPU, burst balance, connections, IOPS, storage (CW)                              |
 | ALB                           | RC      | Request count, response time, healthy hosts (CW)                                 |
 | DynamoDB                      | RC      | Read/write capacity, latency, throttled requests (CW)                            |
+| Lambda                        | RC + MC | Lambda invocations/errors/throttles/duration/concurrency, SQS DLQ depth (CW)    |
+| ZOA                           | RC + MC | Unified: SLIs, TA executions, HTTP API, worker pipeline + Lambda/DLQ/DynamoDB   |
 | Platform Services             | RC      | ACM certificate expiry (CW)                                                      |
 | HCP Health                    | RC + MC | Hosted control plane status                                                      |
 | ArgoCD Application Overview   | RC      | Application sync status, health                                                  |
@@ -166,6 +168,8 @@ Grafana on the RC queries Thanos Query Frontend for a unified view of all cluste
 Additionally, three community dashboards are imported from grafana.com: Node Exporter Full (1860), Kubernetes Cluster Monitoring (7249), and Kubernetes Pods (6417).
 
 Dashboards are provisioned as ConfigMaps via Helm templates and loaded by the Grafana sidecar.
+
+ZOA CloudWatch metrics (native `AWS/Lambda` / `AWS/SQS` plus custom namespace `ZOA` from EMF) are scraped by YACE on both RC and MC. YACE exports CloudWatch statistics as **gauges** for the scrape period (120s); PromQL must not use `rate()` / `increase()` on those series. Alerts live in `alerting-rules/templates/zoa.yaml` and use `sum by (cluster)` so a broken MC pages with its own `cluster` label. Reconciler liveness is `time() - last ReconcilerLastRun` (unix seconds emitted each tick), not cluster enumeration.
 
 ## Data Retention
 

@@ -11,7 +11,8 @@ argocd/config/regional-cluster/alerting-rules/
 ├── Chart.yaml
 ├── values.yaml
 └── templates/
-    └── hcp-sla.yaml      # example: HCP availability SLA rules
+    ├── hcp-sla.yaml      # example: HCP availability SLA rules
+    └── zoa.yaml          # ZOA Lambda/EMF alerts (YACE gauges, not rate())
 ```
 
 Each template renders a `PrometheusRule` CR (`monitoring.coreos.com/v1`). You can group related rules in a single file or create separate files — one file per logical concern is the convention.

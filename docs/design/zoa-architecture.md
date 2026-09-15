@@ -1,6 +1,6 @@
 # Zero Operator Access (ZOA) — Architecture
 
-**Last Updated Date**: 2026-08-21
+**Last Updated Date**: 2026-09-14
 
 ## Summary
 
@@ -283,16 +283,21 @@ terraform apply → updates Lambda functions and K8s Job runner to use new image
 
 ## Monitoring
 
-| Signal                   | Source               | Status      | How                                                            |
-| ------------------------ | -------------------- | ----------- | -------------------------------------------------------------- |
-| Invocation errors        | AWS/Lambda namespace | Available   | Auto-published: `Errors`, `Throttles` metrics                  |
-| Duration P50/P99         | AWS/Lambda namespace | Available   | Auto-published: `Duration` metric                              |
-| Cold starts              | AWS/Lambda namespace | Available   | `Init Duration` in REPORT log lines                            |
-| Business metrics         | ZOA/Custom namespace | Available   | EMF logs from Go code → CloudWatch Metrics automatically       |
-| Execution outcomes       | DynamoDB             | Available   | Queryable via `zoa runs --status failed --target X`            |
-| Logs                     | CloudWatch Logs      | Available   | 365-day retention, JSON structured, filterable via CW Insights |
-| CW Exporter → Prometheus | —                    | **Planned** | YACE scrapes CloudWatch metrics into Prometheus                |
-| PrometheusRules alerting | —                    | **Planned** | Alert on error rates, execution failures, DLQ depth            |
+| Signal                   | Source               | Status    | How                                                                                          |
+| ------------------------ | -------------------- | --------- | -------------------------------------------------------------------------------------------- |
+| Invocation errors        | AWS/Lambda namespace | Available | YACE scrape → Prometheus/Thanos; Grafana **Lambda** + **ZOA** dashboards                     |
+| Duration P50/P99         | AWS/Lambda namespace | Available | YACE `Duration` Average + p99                                                                |
+| Throttles / concurrency  | AWS/Lambda namespace | Available | YACE `Throttles`, `ConcurrentExecutions`                                                     |
+| DLQ depth                | AWS/SQS              | Available | YACE `ApproximateNumberOfMessagesVisible` on `*-zoa-dlq`; pages if > 0 for 5m                |
+| Business metrics         | ZOA custom namespace | Available | EMF from Go (`ExecutionCount`, HTTP, rejections, reconciler/GC, circuit breaker)             |
+| Execution outcomes       | DynamoDB             | Available | Queryable via `zoa runs --status failed --target X` (forensics, not SLIs)                    |
+| Logs                     | CloudWatch Logs      | Available | 365-day retention, JSON structured, filterable via CW Insights                               |
+| CW Exporter → Prometheus | YACE on RC + MC      | Available | Discovery: `AWS/Lambda`, `AWS/SQS`; top-level `customNamespace` job for `ZOA`                |
+| PrometheusRules alerting | Thanos Ruler (RC)    | Available | `alerting-rules/templates/zoa.yaml` — DLQ, worker errors, reconciler heartbeat, TA/API rates |
+
+Grafana: **Lambda** (infra) and **ZOA** (unified service dashboard). Starting SLOs: API availability 99%/30d, TA success 95%/7d, DLQ depth 0. Tune after baseline.
+
+Reconciler “not running” is `time() - ReconcilerLastRun` (unix seconds emitted every tick). That avoids Helm loops over MCs and does not use Prometheus `timestamp()` on YACE scrapes (those timestamps stay fresh even when Invocations=0).
 
 ## Cost
 
@@ -313,29 +318,6 @@ Graviton/arm64 migration planned for ~20% Lambda cost reduction.
 > **Everything above this line is implemented and deployed.** Sections below describe features that are designed and validated but not yet built. As each feature ships, it will be moved into the main body of this document.
 
 ## Future Considerations
-
-### Observability & SLO Framework
-
-Full observability stack for ZOA, moving from "metrics exist" to "metrics are collected, visualized, alerted on, and tied to SLOs":
-
-1. **Validate/extend EMF metrics** — audit existing CloudWatch EMF emissions from Go code; add missing business metrics (execution success/failure by action, latency percentiles, circuit breaker trips, write cooldown hits)
-2. **Configure CloudWatch Exporter (YACE)** — scrape all relevant CloudWatch namespaces into Prometheus:
-   - `AWS/Lambda`: Errors, Throttles, Duration, ConcurrentExecutions, IteratorAge
-   - `AWS/SQS`: ApproximateNumberOfMessagesVisible (DLQ depth)
-   - `AWS/DynamoDB`: ThrottledRequests, SystemErrors, SuccessfulRequestLatency
-   - `ZOA` (custom namespace): all EMF-emitted business metrics
-3. **Grafana dashboard** — operational dashboard covering: execution pipeline health, per-target success rates, latency distributions, DLQ depth, circuit breaker state, cold start frequency
-4. **PrometheusRules** — alerting on:
-   - Execution failure rate > threshold per target (5m window)
-   - DLQ messages > 0 (any dead-lettered Worker invocation)
-   - P99 latency exceeding execution deadline headroom
-   - Circuit breaker open for > 2 consecutive reconciler ticks
-   - Reconciler/GC not firing (EventBridge missed schedule)
-5. **Define SLIs/SLOs** — draft service level indicators and objectives:
-   - Availability SLI: % of API invocations returning non-5xx responses
-   - Latency SLI: P99 sync execution duration < 30s
-   - Correctness SLI: % of executions reaching terminal state within expected time
-   - Error budget: per-target, per-week rolling window
 
 ### ZOA Access Lambda
 
