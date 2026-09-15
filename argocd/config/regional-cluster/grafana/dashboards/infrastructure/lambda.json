@@ -1,0 +1,391 @@
+{
+  "title": "Lambda",
+  "uid": "lambda-overview",
+  "description": "AWS Lambda and SQS (DLQ) infrastructure metrics across the fleet. Default view spans the entire region (RC + all MCs). Select a cluster to drill into a single AWS account.",
+  "tags": ["aws", "cloudwatch", "lambda", "sqs", "sre"],
+  "timezone": "browser",
+  "refresh": "1m",
+  "schemaVersion": 38,
+  "graphTooltip": 1,
+  "time": { "from": "now-3h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "label": "Datasource",
+        "query": "prometheus",
+        "current": { "text": "Thanos", "value": "Thanos" },
+        "hide": 0,
+        "refresh": 1
+      },
+      {
+        "name": "cluster",
+        "type": "query",
+        "label": "Cluster",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(aws_lambda_invocations_sum, cluster)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "sort": 1
+      },
+      {
+        "name": "function",
+        "type": "query",
+        "label": "Function",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(aws_lambda_invocations_sum{cluster=~\"$cluster\"}, dimension_FunctionName)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Health Overview",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+    },
+
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Error Rate",
+      "description": "Errors / Invocations across selected functions in the current CloudWatch period. Any sustained non-zero warrants investigation.",
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(aws_lambda_errors_sum{dimension_FunctionName=~\"$function\", cluster=~\"$cluster\"}) / clamp_min(sum(aws_lambda_invocations_sum{dimension_FunctionName=~\"$function\", cluster=~\"$cluster\"}), 1) or vector(0)"
+        }
+      ],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "value": null, "color": "green" }, { "value": 0.01, "color": "red" }]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Throttles",
+      "description": "Lambda throttles in the current CloudWatch period. Should always be 0 — non-zero means reserved concurrency is exhausted.",
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(aws_lambda_throttles_sum{dimension_FunctionName=~\"$function\", cluster=~\"$cluster\"}) or vector(0)"
+        }
+      ],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "value": null, "color": "green" }, { "value": 1, "color": "red" }]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Duration (p99)",
+      "description": "99th percentile Lambda execution time. High values may indicate EKS API latency or large payloads.",
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(aws_lambda_duration_p99{dimension_FunctionName=~\"$function\", cluster=~\"$cluster\"}) or vector(0)"
+        }
+      ],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "value": null, "color": "green" }, { "value": 10000, "color": "yellow" }, { "value": 60000, "color": "red" }]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Concurrent Executions",
+      "description": "Peak concurrent Lambda executions. Watch for approaching the account concurrency limit.",
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(aws_lambda_concurrent_executions_maximum{dimension_FunctionName=~\"$function\", cluster=~\"$cluster\"}) or vector(0)"
+        }
+      ],
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "none" } }
+    },
+
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "DLQ Depth",
+      "description": "Visible messages on DLQ queues. Non-zero means failed invocations are accumulating.",
+      "gridPos": { "x": 16, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(aws_sqs_approximate_number_of_messages_visible_maximum{dimension_QueueName=~\".*-dlq\", cluster=~\"$cluster\"}) or vector(0)"
+        }
+      ],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "value": null, "color": "green" }, { "value": 1, "color": "red" }]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "DLQ Oldest Message",
+      "description": "Age of the oldest visible DLQ message. Growing age means messages are not being drained.",
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(aws_sqs_approximate_age_of_oldest_message_maximum{dimension_QueueName=~\".*-dlq\", cluster=~\"$cluster\"}) or vector(0)"
+        }
+      ],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "value": null, "color": "green" }, { "value": 60, "color": "yellow" }, { "value": 300, "color": "red" }]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Traffic & Errors",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 }
+    },
+
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Invocations by Function",
+      "description": "Total Lambda invocations per CloudWatch period. Breakdown by cluster and function shows traffic distribution across accounts.",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (cluster, dimension_FunctionName) (aws_lambda_invocations_sum{dimension_FunctionName=~\"$function\", cluster=~\"$cluster\"})",
+          "legendFormat": "{{ cluster }} {{ dimension_FunctionName }}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "none" } },
+      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Errors by Function",
+      "description": "Lambda execution errors. Any sustained errors indicate application-level failures or infrastructure issues (EKS unreachable, OOM kills).",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (cluster, dimension_FunctionName) (aws_lambda_errors_sum{dimension_FunctionName=~\"$function\", cluster=~\"$cluster\"})",
+          "legendFormat": "{{ cluster }} {{ dimension_FunctionName }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "value": null, "color": "green" }, { "value": 1, "color": "red" }] }
+        }
+      },
+      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Throttles by Function",
+      "description": "Lambda throttle events. Non-zero means the function exceeded its reserved concurrency or the account limit.",
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (cluster, dimension_FunctionName) (aws_lambda_throttles_sum{dimension_FunctionName=~\"$function\", cluster=~\"$cluster\"})",
+          "legendFormat": "{{ cluster }} {{ dimension_FunctionName }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "value": null, "color": "green" }, { "value": 1, "color": "red" }] }
+        }
+      },
+      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+
+    {
+      "id": 12,
+      "type": "row",
+      "title": "Latency & Concurrency",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 1 }
+    },
+
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Duration – Average & p99",
+      "description": "Lambda execution time. Average shows typical behavior; p99 shows tail latency. A widening gap indicates some invocations are much slower than others (e.g. cold starts, EKS API retries).",
+      "gridPos": { "x": 0, "y": 23, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg by (cluster, dimension_FunctionName) (aws_lambda_duration_average{dimension_FunctionName=~\"$function\", cluster=~\"$cluster\"})",
+          "legendFormat": "Avg – {{ cluster }} {{ dimension_FunctionName }}"
+        },
+        {
+          "refId": "B",
+          "expr": "avg by (cluster, dimension_FunctionName) (aws_lambda_duration_p99{dimension_FunctionName=~\"$function\", cluster=~\"$cluster\"})",
+          "legendFormat": "p99 – {{ cluster }} {{ dimension_FunctionName }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "custom": { "lineWidth": 2 } },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": "/^p99/" },
+            "properties": [{ "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }]
+          }
+        ]
+      },
+      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Concurrent Executions",
+      "description": "Peak concurrent Lambda containers. If approaching account limit, expect throttles.",
+      "gridPos": { "x": 12, "y": 23, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (cluster, dimension_FunctionName) (aws_lambda_concurrent_executions_maximum{dimension_FunctionName=~\"$function\", cluster=~\"$cluster\"})",
+          "legendFormat": "{{ cluster }} {{ dimension_FunctionName }}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "none" } },
+      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+
+    {
+      "id": 15,
+      "type": "row",
+      "title": "Dead Letter Queue (SQS)",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 31, "w": 24, "h": 1 }
+    },
+
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "DLQ Messages Visible",
+      "description": "Visible messages on DLQ queues by cluster and queue. Non-zero means failed invocations are accumulating.",
+      "gridPos": { "x": 0, "y": 32, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (cluster, dimension_QueueName) (aws_sqs_approximate_number_of_messages_visible_maximum{dimension_QueueName=~\".*-dlq\", cluster=~\"$cluster\"})",
+          "legendFormat": "{{ cluster }} {{ dimension_QueueName }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "value": null, "color": "green" }, { "value": 1, "color": "red" }] }
+        }
+      },
+      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "DLQ Oldest Message Age",
+      "description": "Age of the oldest visible DLQ message. Growing age means messages are not being drained or retried.",
+      "gridPos": { "x": 12, "y": 32, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (cluster, dimension_QueueName) (aws_sqs_approximate_age_of_oldest_message_maximum{dimension_QueueName=~\".*-dlq\", cluster=~\"$cluster\"})",
+          "legendFormat": "{{ cluster }} {{ dimension_QueueName }}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+    }
+
+  ],
+  "annotations": { "list": [] },
+  "links": []
+}
