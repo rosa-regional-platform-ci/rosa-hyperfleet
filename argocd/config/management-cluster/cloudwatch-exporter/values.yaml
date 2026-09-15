@@ -51,6 +51,94 @@ prometheus-yet-another-cloudwatch-exporter:
             nilToZero: true
             statistics: [Sum]
 
+    discovery:
+      exportedTagsOnMetrics:
+        AWS/Lambda:
+          - Component
+          - HandlerMode
+          - Cluster
+        AWS/SQS:
+          - Component
+          - Cluster
+      jobs:
+        - type: AWS/Lambda
+          regions:
+            - {{ .Values.global.aws_region }}
+          searchTags:
+            - key: Component
+              value: zoa
+          period: 120
+          length: 120
+          delay: 120
+          metrics:
+            - name: Invocations
+              statistics: [Sum]
+              nilToZero: true
+            - name: Errors
+              statistics: [Sum]
+              nilToZero: true
+            - name: Throttles
+              statistics: [Sum]
+              nilToZero: true
+            - name: Duration
+              statistics: [Average, p99]
+              nilToZero: true
+            - name: ConcurrentExecutions
+              statistics: [Maximum]
+              nilToZero: true
+
+        - type: AWS/SQS
+          regions:
+            - {{ .Values.global.aws_region }}
+          searchTags:
+            - key: Component
+              value: zoa
+          period: 120
+          length: 120
+          delay: 120
+          metrics:
+            - name: ApproximateNumberOfMessagesVisible
+              statistics: [Maximum]
+              nilToZero: true
+            - name: ApproximateAgeOfOldestMessage
+              statistics: [Maximum]
+              nilToZero: true
+
+    customNamespace:
+      - name: zoa-emf
+        namespace: ZOA
+        regions:
+          - {{ .Values.global.aws_region }}
+        period: 120
+        length: 120
+        delay: 120
+        nilToZero: true
+        metrics:
+          - name: ExecutionCount
+            statistics: [Sum]
+          - name: ExecutionDuration
+            statistics: [Average, p99]
+          - name: HttpRequestCount
+            statistics: [Sum]
+          - name: HttpRequestDuration
+            statistics: [Average, p99]
+          - name: RejectionCount
+            statistics: [Sum]
+          - name: ReconcilerDuration
+            statistics: [Average, p99]
+          - name: ReconcilerErrors
+            statistics: [Sum]
+          - name: ReconcilerLastRun
+            statistics: [Maximum]
+            nilToZero: false
+          - name: GCDuration
+            statistics: [Average, p99]
+          - name: GCErrors
+            statistics: [Sum]
+          - name: GCCleanedResources
+            statistics: [Sum]
+          - name: CircuitBreakerStateChange
+            statistics: [Sum]
 
   extraArgs:
     fips: true

@@ -89,6 +89,24 @@ resource "aws_iam_role_policy" "cloudwatch_exporter_metrics" {
           "iam:ListAccountAliases",
         ]
         Resource = "*"
+      },
+      {
+        Sid    = "LambdaDiscovery"
+        Effect = "Allow"
+        Action = [
+          "lambda:ListFunctions",
+          "lambda:ListTags",
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "SQSDiscovery"
+        Effect = "Allow"
+        Action = [
+          "sqs:ListQueues",
+          "sqs:ListQueueTags",
+        ]
+        Resource = "*"
       }
     ]
   })
