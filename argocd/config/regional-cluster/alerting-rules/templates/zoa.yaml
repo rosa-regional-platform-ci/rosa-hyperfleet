@@ -17,14 +17,14 @@ spec:
         # not Prometheus counters. Ratios use current-scrape sums, not rate().
         - record: zoa:ta_success_rate
           expr: |
-            sum by (cluster, dimension_Action) (zoa_execution_count_sum{dimension_Status="succeeded"})
-            / sum by (cluster, dimension_Action) (zoa_execution_count_sum)
+            sum by (cluster, dimension_Action) (aws_zoa_execution_count_sum{dimension_Status="succeeded"})
+            / sum by (cluster, dimension_Action) (aws_zoa_execution_count_sum)
 
         - record: zoa:api_availability
           expr: |
             1 - (
-              sum by (cluster) (zoa_http_request_count_sum{dimension_StatusClass="5xx"})
-              / sum by (cluster) (zoa_http_request_count_sum)
+              sum by (cluster) (aws_zoa_http_request_count_sum{dimension_StatusClass="5xx"})
+              / sum by (cluster) (aws_zoa_http_request_count_sum)
             )
 
         - record: zoa:worker_error_rate
@@ -36,7 +36,7 @@ spec:
         # Used as "now - last run" without enumerating clusters.
         - record: zoa:reconciler_last_run
           expr: |
-            max by (cluster) (zoa_reconciler_last_run_maximum)
+            max by (cluster) (aws_zoa_reconciler_last_run_maximum)
 
     - name: zoa-alerts
       rules:
@@ -141,7 +141,7 @@ spec:
 
         - alert: ZOAGCErrors
           expr: |
-            sum by (cluster) (zoa_gc_errors_sum) > 0
+            sum by (cluster) (aws_zoa_gc_errors_sum) > 0
           for: 15m
           labels:
             severity: warning
@@ -153,7 +153,7 @@ spec:
 
         - alert: ZOACircuitBreakerOpen
           expr: |
-            sum by (cluster) (zoa_circuit_breaker_state_change_sum{dimension_State="open"}) > 0
+            sum by (cluster) (aws_zoa_circuit_breaker_state_change_sum{dimension_State="open"}) > 0
           for: 15m
           labels:
             severity: warning

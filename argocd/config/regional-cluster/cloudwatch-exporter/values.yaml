@@ -235,8 +235,10 @@ prometheus-yet-another-cloudwatch-exporter:
           regions:
             - {{ .Values.global.aws_region }}
           searchTags:
-            - key: Component
-              value: zoa
+            - key: Cluster
+              value: ^{{ .Values.global.cluster_name }}$
+          dimensionNameRequirements:
+            - FunctionName
           period: 120
           length: 120
           delay: 120
@@ -261,8 +263,8 @@ prometheus-yet-another-cloudwatch-exporter:
           regions:
             - {{ .Values.global.aws_region }}
           searchTags:
-            - key: Component
-              value: zoa
+            - key: Cluster
+              value: ^{{ .Values.global.cluster_name }}$
           period: 120
           length: 120
           delay: 120
@@ -275,10 +277,17 @@ prometheus-yet-another-cloudwatch-exporter:
               nilToZero: true
 
     customNamespace:
-      - name: zoa-emf
+      # Job name becomes the Prometheus metric prefix (zoa_execution_count_sum, etc.).
+      - name: zoa
         namespace: ZOA
         regions:
           - {{ .Values.global.aws_region }}
+        {{- if eq .Values.global.environment "ephemeral" }}
+        # Ephemeral-only: limit ListMetrics to recently-active metrics (PT3H)
+        # to avoid scraping stale data from torn-down ephemeral clusters in
+        # the shared AWS account.
+        recentlyActiveOnly: true
+        {{- end }}
         period: 120
         length: 120
         delay: 120
@@ -324,6 +333,13 @@ prometheus-yet-another-cloudwatch-exporter:
     metricRelabelings:
       - action: labeldrop
         regex: "instance|pod"
+      {{- if eq .Values.global.environment "ephemeral" }}
+      # Ephemeral-only: ZOA EMF metrics are account-wide in CloudWatch
+      # (shared AWS account); keep only this cluster's series.
+      - sourceLabels: [__name__, dimension_Cluster]
+        regex: 'aws_zoa_.+;(?!{{ .Values.global.cluster_name }}$).*'
+        action: drop
+      {{- end }}
 
   # FedRAMP: non-root with read-only root filesystem
   podSecurityContext:
