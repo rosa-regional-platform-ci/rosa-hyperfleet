@@ -14,6 +14,8 @@
 set -euo pipefail
 trap 'echo "FAILED: line $LINENO, exit code $?" >&2' ERR
 
+source scripts/pipeline-common/lib.sh
+
 echo "Provisioning pipelines for ${ENVIRONMENT:-staging}"
 
 # Compute the platform image reference from the Dockerfile to ensure consistency.
@@ -118,7 +120,7 @@ retry_terraform_apply() {
     local wait_time=30
 
     while [ $attempt -le $max_attempts ]; do
-        if terraform apply -auto-approve "$@"; then
+        if terraform_with_parallelism apply "$@"; then
             return 0
         fi
 
@@ -157,7 +159,7 @@ resolve_ssm_param() {
 destroy_pipeline() {
     local pipeline_type="$1"
     
-    if terraform destroy -auto-approve "${TF_ARGS[@]}"; then
+    if terraform_with_parallelism destroy "${TF_ARGS[@]}"; then
         return 0
     else
         echo "ERROR: Failed to destroy $pipeline_type pipeline resources" >&2

@@ -56,7 +56,7 @@ terraform init -reconfigure \
     -backend-config="use_lockfile=true"
 
 set +e
-terraform "${TERRAFORM_ACTION}" -auto-approve
+terraform_with_parallelism "${TERRAFORM_ACTION}"
 TERRAFORM_STATUS=$?
 set -e
 

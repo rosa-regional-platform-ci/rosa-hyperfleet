@@ -18,8 +18,21 @@
 #   import_if_needed         Idempotent terraform import
 #   tf_state_value           Read attribute from terraform state
 #   tf_import_summary        Print import summary, fail if errors
+#   terraform_with_parallelism  Run apply/destroy with -parallelism (TF_PARALLELISM)
 
 set -euo pipefail
+
+# Default parallelism for pipeline terraform apply/destroy (override via TF_PARALLELISM).
+TF_PARALLELISM="${TF_PARALLELISM:-20}"
+
+# Run terraform apply or destroy with explicit -parallelism (echoed to CodeBuild logs).
+# Usage: terraform_with_parallelism <apply|destroy> [extra terraform args...]
+terraform_with_parallelism() {
+    local action="$1"
+    shift
+    echo "Running: terraform ${action} -parallelism=${TF_PARALLELISM} -auto-approve $*"
+    terraform "${action}" -parallelism="${TF_PARALLELISM}" -auto-approve "$@"
+}
 
 # ── Internal state ───────────────────────────────────────────────────────────
 

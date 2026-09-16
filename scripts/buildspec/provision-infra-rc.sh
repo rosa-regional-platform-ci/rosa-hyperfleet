@@ -197,4 +197,4 @@ if [ "${TERRAFORM_ACTION}" == "apply" ] && [ -f imports.sh ]; then
     source imports.sh
 fi
 
-terraform "${TERRAFORM_ACTION}" -auto-approve
+terraform_with_parallelism "${TERRAFORM_ACTION}"
