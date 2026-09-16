@@ -49,7 +49,7 @@
         "type": "query",
         "label": "Action",
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "query": "label_values(aws_zoa_execution_count_sum{cluster=~\"$cluster\"}, dimension_Action)",
+        "query": "label_values(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}, dimension_Action)",
         "refresh": 2,
         "multi": true,
         "includeAll": true,
@@ -79,7 +79,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Action=~\"$action\"}) > 0) and (sum(aws_zoa_execution_count_sum{dimension_Status=\"succeeded\", cluster=~\"$cluster\", dimension_Action=~\"$action\"}) / sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Action=~\"$action\"}))"
+          "expr": "(sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}) > 0) and (sum(aws_zoa_execution_count_sum{dimension_Status=\"succeeded\", cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}) / sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}))"
         }
       ],
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
@@ -106,7 +106,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\"}) > 0) and ((sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\"}) - (sum(aws_zoa_http_request_count_sum{dimension_StatusClass=\"5xx\", cluster=~\"$cluster\"}) or vector(0))) / sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\"}))"
+          "expr": "(sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}) > 0) and ((sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}) - (sum(aws_zoa_http_request_count_sum{dimension_StatusClass=\"5xx\", cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}) or vector(0))) / sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}))"
         }
       ],
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
@@ -159,7 +159,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Action=~\"$action\"}) or vector(0)"
+          "expr": "sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}) or vector(0)"
         }
       ],
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
@@ -176,7 +176,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max(aws_zoa_execution_duration_p99{cluster=~\"$cluster\", dimension_Action=~\"$action\"}) or vector(0)"
+          "expr": "max(aws_zoa_execution_duration_p99{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}) or vector(0)"
         }
       ],
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
@@ -235,7 +235,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (dimension_Action, dimension_Status) (aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Action=~\"$action\"})",
+          "expr": "sum by (dimension_Action, dimension_Status) (aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"})",
           "legendFormat": "{{ dimension_Action }} {{ dimension_Status }}"
         }
       ],
@@ -252,7 +252,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max by (dimension_Action) (aws_zoa_execution_duration_p99{cluster=~\"$cluster\", dimension_Action=~\"$action\"})",
+          "expr": "max by (dimension_Action) (aws_zoa_execution_duration_p99{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"})",
           "legendFormat": "{{ dimension_Action }}"
         }
       ],
@@ -270,7 +270,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (dimension_Reason) (aws_zoa_rejection_count_sum{cluster=~\"$cluster\"})",
+          "expr": "sum by (dimension_Reason) (aws_zoa_rejection_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
           "legendFormat": "{{ dimension_Reason }}"
         }
       ],
@@ -296,7 +296,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (dimension_RouteTemplate, dimension_StatusClass) (aws_zoa_http_request_count_sum{cluster=~\"$cluster\"})",
+          "expr": "sum by (dimension_RouteTemplate, dimension_StatusClass) (aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
           "legendFormat": "{{ dimension_RouteTemplate }} {{ dimension_StatusClass }}"
         }
       ],
@@ -314,12 +314,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (cluster) (aws_zoa_http_request_count_sum{dimension_StatusClass=\"5xx\", cluster=~\"$cluster\"})",
+          "expr": "sum by (cluster) (aws_zoa_http_request_count_sum{dimension_StatusClass=\"5xx\", cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
           "legendFormat": "{{ cluster }} 5xx"
         },
         {
           "refId": "B",
-          "expr": "sum by (cluster) (aws_zoa_http_request_count_sum{dimension_StatusClass=\"4xx\", cluster=~\"$cluster\"})",
+          "expr": "sum by (cluster) (aws_zoa_http_request_count_sum{dimension_StatusClass=\"4xx\", cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
           "legendFormat": "{{ cluster }} 4xx"
         }
       ],
@@ -348,7 +348,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max by (dimension_RouteTemplate, dimension_StatusClass) (aws_zoa_http_request_duration_p99{cluster=~\"$cluster\"})",
+          "expr": "max by (dimension_RouteTemplate, dimension_StatusClass) (aws_zoa_http_request_duration_p99{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
           "legendFormat": "{{ dimension_RouteTemplate }} {{ dimension_StatusClass }}"
         }
       ],
@@ -373,7 +373,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "avg by (cluster) (aws_zoa_reconciler_duration_average{cluster=~\"$cluster\"})",
+          "expr": "avg by (cluster) (aws_zoa_reconciler_duration_average{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
           "legendFormat": "{{ cluster }}"
         }
       ],
@@ -390,12 +390,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (cluster) (aws_zoa_reconciler_errors_sum{cluster=~\"$cluster\"})",
+          "expr": "sum by (cluster) (aws_zoa_reconciler_errors_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
           "legendFormat": "reconciler {{ cluster }}"
         },
         {
           "refId": "B",
-          "expr": "sum by (cluster) (aws_zoa_gc_errors_sum{cluster=~\"$cluster\"})",
+          "expr": "sum by (cluster) (aws_zoa_gc_errors_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
           "legendFormat": "gc {{ cluster }}"
         }
       ],
@@ -439,7 +439,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (cluster, dimension_ResourceType) (aws_zoa_gc_cleaned_resources_sum{cluster=~\"$cluster\"})",
+          "expr": "sum by (cluster, dimension_ResourceType) (aws_zoa_gc_cleaned_resources_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
           "legendFormat": "{{ cluster }} {{ dimension_ResourceType }}"
         }
       ],
@@ -457,7 +457,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (cluster, dimension_State) (aws_zoa_circuit_breaker_state_change_sum{cluster=~\"$cluster\"})",
+          "expr": "sum by (cluster, dimension_State) (aws_zoa_circuit_breaker_state_change_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
           "legendFormat": "{{ cluster }} {{ dimension_State }}"
         }
       ],

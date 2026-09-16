@@ -333,13 +333,6 @@ prometheus-yet-another-cloudwatch-exporter:
     metricRelabelings:
       - action: labeldrop
         regex: "instance|pod"
-      {{- if eq .Values.global.environment "ephemeral" }}
-      # Ephemeral-only: ZOA EMF metrics are account-wide in CloudWatch
-      # (shared AWS account); keep only this cluster's series.
-      - sourceLabels: [__name__, dimension_Cluster]
-        regex: 'aws_zoa_.+;(?!{{ .Values.global.cluster_name }}$).*'
-        action: drop
-      {{- end }}
 
   # FedRAMP: non-root with read-only root filesystem
   podSecurityContext:
