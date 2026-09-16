@@ -23,7 +23,6 @@ hyperfleet:
 pagerduty:
   enabled: true
 cloudwatch-exporter:
-  filterZoaByCluster: false
   prometheus-yet-another-cloudwatch-exporter:
     recentlyActiveOnly: false
 grafana:

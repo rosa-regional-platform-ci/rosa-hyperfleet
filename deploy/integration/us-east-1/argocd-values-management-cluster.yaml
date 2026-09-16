@@ -20,6 +20,5 @@ hypershift:
   externalDns:
     domain: us-east-1.int0.rosa.devshift.net
 cloudwatch-exporter:
-  filterZoaByCluster: false
   prometheus-yet-another-cloudwatch-exporter:
     recentlyActiveOnly: false

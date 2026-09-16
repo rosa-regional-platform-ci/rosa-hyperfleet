@@ -174,9 +174,6 @@ observability:
     # @doc observability.cloudwatch.recently_active_only When true, YACE customNamespace jobs use recentlyActiveOnly (PT3H) to skip stale metrics from torn-down clusters in shared AWS accounts.
     # @used-by observability.cloudwatch.recently_active_only _context
     recently_active_only: true
-    # @doc observability.cloudwatch.filter_zoa_by_cluster When true, Prometheus metricRelabelings drop aws_zoa_* series whose dimension_Cluster doesn't match the scraping cluster. Prevents cross-cluster ZOA EMF pollution in shared AWS accounts.
-    # @used-by observability.cloudwatch.filter_zoa_by_cluster _context
-    filter_zoa_by_cluster: true
   pagerduty:
     # @doc observability.pagerduty.enabled Enable PagerDuty service provisioning for the region.
     # @used-by observability.pagerduty.enabled _context
@@ -224,9 +221,6 @@ applications:
         domain: "{% if dns.domain %}{{ deployment_name }}.{{ dns.domain }}{% endif %}"
     cloudwatch-exporter:
       # @doc applications.management-cluster.cloudwatch-exporter CloudWatch exporter (YACE) settings passed as Helm values.
-      # @doc applications.management-cluster.cloudwatch-exporter.filterZoaByCluster Drop aws_zoa_* metrics from other clusters at scrape time. Prevents cross-cluster ZOA EMF pollution in shared AWS accounts.
-      # @used-by applications.management-cluster.cloudwatch-exporter.filterZoaByCluster argocd/config/management-cluster/cloudwatch-exporter/values.yaml
-      filterZoaByCluster: "{{ observability.cloudwatch.filter_zoa_by_cluster | default(false) }}"
       prometheus-yet-another-cloudwatch-exporter:
         # @doc applications.management-cluster.cloudwatch-exporter.recentlyActiveOnly Limit YACE customNamespace ListMetrics to recently-active metrics (PT3H). Reduces cost in shared AWS accounts.
         # @used-by applications.management-cluster.cloudwatch-exporter.recentlyActiveOnly argocd/config/management-cluster/cloudwatch-exporter/values.yaml
@@ -264,9 +258,6 @@ applications:
       enabled: "{{ observability.pagerduty.enabled | default(false) }}"
     cloudwatch-exporter:
       # @doc applications.regional-cluster.cloudwatch-exporter CloudWatch exporter (YACE) settings passed as Helm values.
-      # @doc applications.regional-cluster.cloudwatch-exporter.filterZoaByCluster Drop aws_zoa_* metrics from other clusters at scrape time. Prevents cross-cluster ZOA EMF pollution in shared AWS accounts.
-      # @used-by applications.regional-cluster.cloudwatch-exporter.filterZoaByCluster argocd/config/regional-cluster/cloudwatch-exporter/values.yaml
-      filterZoaByCluster: "{{ observability.cloudwatch.filter_zoa_by_cluster | default(false) }}"
       prometheus-yet-another-cloudwatch-exporter:
         # @doc applications.regional-cluster.cloudwatch-exporter.recentlyActiveOnly Limit YACE customNamespace ListMetrics to recently-active metrics (PT3H). Reduces cost in shared AWS accounts.
         # @used-by applications.regional-cluster.cloudwatch-exporter.recentlyActiveOnly argocd/config/regional-cluster/cloudwatch-exporter/values.yaml

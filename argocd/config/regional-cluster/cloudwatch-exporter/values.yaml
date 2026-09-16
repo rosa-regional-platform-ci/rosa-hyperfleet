@@ -362,9 +362,3 @@ serviceMonitor:
   metricRelabelings:
     - action: labeldrop
       regex: "instance|pod"
-
-# When true, drop aws_zoa_* metrics whose dimension_Cluster doesn't match the
-# current cluster.  Needed in shared AWS accounts (ephemeral) where YACE's
-# customNamespace job scrapes ZOA EMF metrics from all clusters in the account.
-# Set via config hierarchy: observability.cloudwatch.filter_zoa_by_cluster.
-filterZoaByCluster: false

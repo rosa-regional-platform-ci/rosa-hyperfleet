@@ -3,11 +3,10 @@
   Helm template rendering inside metricRelabelings (the subchart uses toYaml,
   not tpl, so .Values.global.cluster_name is inaccessible there).
 
-  When filterZoaByCluster is true (ephemeral environments with shared AWS
-  accounts), YACE's customNamespace job scrapes ALL clusters' ZOA EMF metrics
-  account-wide because customNamespace has no tag-based filtering.  The relabel
-  rules below drop aws_zoa_* metrics whose dimension_Cluster doesn't match the
-  current cluster, preventing cross-cluster pollution in Prometheus/Thanos.
+  Always drops aws_zoa_* metrics whose dimension_Cluster doesn't match the
+  current cluster.  In shared AWS accounts (ephemeral) this prevents cross-
+  cluster ZOA EMF pollution; in isolated accounts (int/stage/prod) every
+  dimension_Cluster already matches, so the rules are harmless no-ops.
 
   The 2-step mark-then-drop pattern works around RE2's lack of negative
   lookahead.  Temporary __tmp_* labels are automatically stripped before
@@ -29,18 +28,21 @@ spec:
       interval: {{ .Values.serviceMonitor.interval }}
       metricRelabelings:
         {{- toYaml .Values.serviceMonitor.metricRelabelings | nindent 8 }}
-        {{- if .Values.filterZoaByCluster }}
-        # Drop aws_zoa_* metrics from other clusters in shared AWS accounts.
-        # Step 1: Mark aws_zoa_* metrics where dimension_Cluster matches this cluster.
+        # Drop aws_zoa_* metrics from other clusters.
+        # In shared AWS accounts (ephemeral), YACE's customNamespace job scrapes
+        # all ZOA EMF metrics account-wide because customNamespace has no tag-based
+        # filtering.  In isolated accounts (int/stage/prod), dimension_Cluster
+        # always matches so these rules are harmless no-ops.
+        #
+        # 2-step mark-then-drop works around RE2's lack of negative lookahead.
+        # Temporary __tmp_* labels are stripped automatically before storage.
         - sourceLabels: [__name__, dimension_Cluster]
           regex: 'aws_zoa_.+;{{ .Values.global.cluster_name }}'
           targetLabel: __tmp_zoa_mine
           replacement: 'y'
-        # Step 2: Drop aws_zoa_* metrics that weren't marked (other clusters).
         - sourceLabels: [__name__, __tmp_zoa_mine]
           regex: 'aws_zoa_.+;'
           action: drop
-        {{- end }}
   jobLabel: cloudwatch-exporter
   namespaceSelector:
     matchNames:
