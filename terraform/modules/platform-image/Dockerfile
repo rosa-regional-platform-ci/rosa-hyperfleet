@@ -115,4 +115,9 @@ RUN chmod +x /opt/platform/scripts/* && \
 RUN mkdir -p /opt/platform/home && chown 65534:65534 /opt/platform/home
 ENV HOME=/opt/platform/home
 ENV PATH="/opt/platform/scripts:${PATH}"
+# Default plan/apply/destroy concurrency for all CodePipeline terraform runs (override via
+# CodeBuild env TF_CLI_ARGS_plan / TF_CLI_ARGS_apply / TF_CLI_ARGS_destroy, e.g. -parallelism=10).
+ENV TF_CLI_ARGS_plan="-parallelism=20"
+ENV TF_CLI_ARGS_apply="-parallelism=20"
+ENV TF_CLI_ARGS_destroy="-parallelism=20"
 USER 65534
