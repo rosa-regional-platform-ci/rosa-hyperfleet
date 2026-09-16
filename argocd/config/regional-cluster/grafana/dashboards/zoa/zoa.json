@@ -79,12 +79,13 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(aws_zoa_execution_count_sum{dimension_Status=\"succeeded\", cluster=~\"$cluster\", dimension_Action=~\"$action\"}) / clamp_min(sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Action=~\"$action\"}), 1) or vector(1)"
+          "expr": "(sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Action=~\"$action\"}) > 0) and (sum(aws_zoa_execution_count_sum{dimension_Status=\"succeeded\", cluster=~\"$cluster\", dimension_Action=~\"$action\"}) / sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Action=~\"$action\"}))"
         }
       ],
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": {
         "defaults": {
+          "noValue": "No executions",
           "unit": "percentunit",
           "color": { "mode": "thresholds" },
           "thresholds": {
@@ -105,12 +106,13 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\"}) - sum(aws_zoa_http_request_count_sum{dimension_StatusClass=\"5xx\", cluster=~\"$cluster\"}) or vector(0)) / clamp_min(sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\"}), 1) or vector(1)"
+          "expr": "(sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\"}) > 0) and ((sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\"}) - (sum(aws_zoa_http_request_count_sum{dimension_StatusClass=\"5xx\", cluster=~\"$cluster\"}) or vector(0))) / sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\"}))"
         }
       ],
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": {
         "defaults": {
+          "noValue": "No traffic",
           "unit": "percentunit",
           "color": { "mode": "thresholds" },
           "thresholds": {
