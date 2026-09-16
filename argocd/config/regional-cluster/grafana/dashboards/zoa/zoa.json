@@ -79,7 +79,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}) > 0) and (sum(aws_zoa_execution_count_sum{dimension_Status=\"succeeded\", cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}) / sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}))"
+          "expr": "(sum(aws_zoa_execution_count_sum{dimension_Status=\"succeeded\", cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}) / sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"})) and on() (sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}) > 0)"
         }
       ],
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
@@ -106,7 +106,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}) > 0) and ((sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}) - (sum(aws_zoa_http_request_count_sum{dimension_StatusClass=\"5xx\", cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}) or vector(0))) / sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}))"
+          "expr": "((sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}) - (sum(aws_zoa_http_request_count_sum{dimension_StatusClass=\"5xx\", cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}) or vector(0))) / sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})) and on() (sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}) > 0)"
         }
       ],
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
