@@ -112,12 +112,7 @@ prometheus-yet-another-cloudwatch-exporter:
         namespace: ZOA
         regions:
           - {{ .Values.global.aws_region }}
-        {{- if eq .Values.global.environment "ephemeral" }}
-        # Ephemeral-only: limit ListMetrics to recently-active metrics (PT3H)
-        # to avoid scraping stale data from torn-down ephemeral clusters in
-        # the shared AWS account.
-        recentlyActiveOnly: true
-        {{- end }}
+        recentlyActiveOnly: {{ .Values.recentlyActiveOnly | default false }}
         period: 120
         length: 120
         delay: 120

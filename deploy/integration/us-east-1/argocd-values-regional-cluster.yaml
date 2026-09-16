@@ -22,6 +22,9 @@ hyperfleet:
   oidcS3Bucket: PLACEHOLDER-overridden-by-terraform-output
 pagerduty:
   enabled: true
+cloudwatch-exporter:
+  prometheus-yet-another-cloudwatch-exporter:
+    recentlyActiveOnly: false
 grafana:
   grafana.ini:
     auth.anonymous:
