@@ -54,5 +54,6 @@ management_cluster_defaults:
 observability:
   cloudwatch:
     recently_active_only: true
+    filter_zoa_by_cluster: true
   pagerduty:
     enabled: false

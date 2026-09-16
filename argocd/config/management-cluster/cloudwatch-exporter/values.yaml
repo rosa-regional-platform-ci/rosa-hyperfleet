@@ -151,13 +151,11 @@ prometheus-yet-another-cloudwatch-exporter:
     scraping-interval: 120
 
   serviceMonitor:
-    enabled: true
-    # Must match extraArgs.scraping-interval to avoid redundant scrapes.
-    interval: 120s
-    metricRelabelings:
-      - action: labeldrop
-        regex: "instance|pod"
+    # Disabled — wrapper chart creates its own ServiceMonitor (templates/servicemonitor.yaml)
+    # to support Helm-templated metricRelabelings (subchart uses toYaml, not tpl).
+    enabled: false
 
+  # FedRAMP: non-root with read-only root filesystem
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 65534
@@ -184,3 +182,18 @@ prometheus-yet-another-cloudwatch-exporter:
 
   aws:
     role: ""
+
+# Wrapper ServiceMonitor config (see templates/servicemonitor.yaml).
+serviceMonitor:
+  enabled: true
+  # Must match extraArgs.scraping-interval to avoid redundant scrapes.
+  interval: 120s
+  metricRelabelings:
+    - action: labeldrop
+      regex: "instance|pod"
+
+# When true, drop aws_zoa_* metrics whose dimension_Cluster doesn't match the
+# current cluster.  Needed in shared AWS accounts (ephemeral) where YACE's
+# customNamespace job scrapes ZOA EMF metrics from all clusters in the account.
+# Set via config hierarchy: observability.cloudwatch.filter_zoa_by_cluster.
+filterZoaByCluster: false

@@ -7,9 +7,9 @@ tests:
   # Recording: aggregate-then-ratio API availability (not per-series 1-ratio summed)
   - interval: 1m
     input_series:
-      - series: 'zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="2xx"}'
+      - series: 'aws_zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="2xx"}'
         values: "80x10"
-      - series: 'zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="5xx"}'
+      - series: 'aws_zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="5xx"}'
         values: "20x10"
     promql_expr_test:
       - expr: zoa:api_availability{cluster="mc-01"}
@@ -20,9 +20,9 @@ tests:
 
   - interval: 1m
     input_series:
-      - series: 'zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="succeeded"}'
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="succeeded"}'
         values: "9x10"
-      - series: 'zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="failed"}'
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="failed"}'
         values: "1x10"
     promql_expr_test:
       - expr: zoa:ta_success_rate{cluster="mc-01",dimension_Action="must_gather"}
@@ -84,9 +84,9 @@ tests:
   # Healthy cluster tracks time; stuck cluster freezes at t=2m (120s).
   - interval: 1m
     input_series:
-      - series: 'zoa_reconciler_last_run_maximum{cluster="mc-01"}'
+      - series: 'aws_zoa_reconciler_last_run_maximum{cluster="mc-01"}'
         values: "0+60x20"
-      - series: 'zoa_reconciler_last_run_maximum{cluster="mc-05"}'
+      - series: 'aws_zoa_reconciler_last_run_maximum{cluster="mc-05"}'
         values: "0 60 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120"
     alert_rule_test:
       - eval_time: 13m
@@ -101,9 +101,9 @@ tests:
 
   - interval: 1m
     input_series:
-      - series: 'zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="succeeded"}'
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="succeeded"}'
         values: "1x40"
-      - series: 'zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="failed"}'
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="failed"}'
         values: "9x40"
     alert_rule_test:
       - eval_time: 31m
@@ -119,11 +119,11 @@ tests:
 
   - interval: 1m
     input_series:
-      - series: 'zoa_http_request_count_sum{cluster="mc-05",dimension_StatusClass="5xx"}'
+      - series: 'aws_zoa_http_request_count_sum{cluster="mc-05",dimension_StatusClass="5xx"}'
         values: "10x20"
-      - series: 'zoa_http_request_count_sum{cluster="mc-05",dimension_StatusClass="2xx"}'
+      - series: 'aws_zoa_http_request_count_sum{cluster="mc-05",dimension_StatusClass="2xx"}'
         values: "90x20"
-      - series: 'zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="2xx"}'
+      - series: 'aws_zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="2xx"}'
         values: "100x20"
     alert_rule_test:
       - eval_time: 11m
