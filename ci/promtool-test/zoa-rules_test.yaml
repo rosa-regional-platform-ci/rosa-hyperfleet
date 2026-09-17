@@ -4,7 +4,34 @@ rule_files:
   - rules.yaml
 
 tests:
-  # Recording: aggregate-then-ratio API availability (not per-series 1-ratio summed)
+  # ──────────────────────────────────────────────────────────────
+  # Recording rule tests
+  # ──────────────────────────────────────────────────────────────
+
+  # Global weighted TA success rate: 90/100 = 0.9
+  - interval: 1m
+    input_series:
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="get_pods",dimension_Status="succeeded"}'
+        values: "80x10"
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="get_pods",dimension_Status="failed"}'
+        values: "10x10"
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="succeeded"}'
+        values: "10x10"
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="failed"}'
+        values: "0x10"
+    promql_expr_test:
+      - expr: zoa:ta_success_rate{cluster="mc-01"}
+        eval_time: 5m
+        exp_samples:
+          - labels: 'zoa:ta_success_rate{cluster="mc-01"}'
+            value: 0.9
+      - expr: zoa:ta_total_executions{cluster="mc-01"}
+        eval_time: 5m
+        exp_samples:
+          - labels: 'zoa:ta_total_executions{cluster="mc-01"}'
+            value: 100
+
+  # API availability: 80/100 = 0.8
   - interval: 1m
     input_series:
       - series: 'aws_zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="2xx"}'
@@ -18,20 +45,29 @@ tests:
           - labels: 'zoa:api_availability{cluster="mc-01"}'
             value: 0.8
 
+  # Lambda error rate: combined api+worker (12/200 = 6%)
   - interval: 1m
     input_series:
-      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="succeeded"}'
-        values: "9x10"
-      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="failed"}'
-        values: "1x10"
+      - series: 'aws_lambda_errors_sum{cluster="mc-01",dimension_FunctionName="eph-mc01-zoa-api"}'
+        values: "2x10"
+      - series: 'aws_lambda_errors_sum{cluster="mc-01",dimension_FunctionName="eph-mc01-zoa-worker"}'
+        values: "10x10"
+      - series: 'aws_lambda_invocations_sum{cluster="mc-01",dimension_FunctionName="eph-mc01-zoa-api"}'
+        values: "100x10"
+      - series: 'aws_lambda_invocations_sum{cluster="mc-01",dimension_FunctionName="eph-mc01-zoa-worker"}'
+        values: "100x10"
     promql_expr_test:
-      - expr: zoa:ta_success_rate{cluster="mc-01",dimension_Action="must_gather"}
+      - expr: zoa:lambda_error_rate{cluster="mc-01"}
         eval_time: 5m
         exp_samples:
-          - labels: 'zoa:ta_success_rate{cluster="mc-01",dimension_Action="must_gather"}'
-            value: 0.9
+          - labels: 'zoa:lambda_error_rate{cluster="mc-01"}'
+            value: 0.06
 
-  # DLQ: mc-05 fires, mc-01 stays quiet
+  # ──────────────────────────────────────────────────────────────
+  # Alert tests — CRITICAL
+  # ──────────────────────────────────────────────────────────────
+
+  # DLQ: mc-05 has messages, mc-01 is clean
   - interval: 1m
     input_series:
       - series: 'aws_sqs_approximate_number_of_messages_visible_maximum{cluster="mc-05",dimension_QueueName="eph-mc05-zoa-dlq"}'
@@ -40,48 +76,26 @@ tests:
         values: "0+0x10"
     alert_rule_test:
       - eval_time: 6m
-        alertname: ZOADLQMessagesVisible
+        alertname: ZOADLQNotDraining
         exp_alerts:
           - exp_labels:
               severity: critical
               cluster: mc-05
             exp_annotations:
-              summary: ZOA DLQ has visible messages
-              description: ZOA dead-letter queue on cluster mc-05 has 6 visible message(s) for >5m. Investigate worker Lambda failures and reconciler pipeline health.
+              summary: ZOA dead-letter queue has visible messages
+              description: ZOA DLQ on cluster mc-05 has 6 visible message(s) for >5m. Investigate worker Lambda failures and reconciler pipeline health.
 
+  # DLQ: clean cluster does not fire
   - interval: 1m
     input_series:
       - series: 'aws_sqs_approximate_number_of_messages_visible_maximum{cluster="mc-01",dimension_QueueName="eph-mc01-zoa-dlq"}'
         values: "0+0x10"
     alert_rule_test:
       - eval_time: 6m
-        alertname: ZOADLQMessagesVisible
+        alertname: ZOADLQNotDraining
         exp_alerts: []
 
-  # Worker error rate gauges (not counters): 2 / 100 = 2%
-  - interval: 1m
-    input_series:
-      - series: 'aws_lambda_errors_sum{cluster="mc-05",dimension_FunctionName="eph-mc05-zoa-worker"}'
-        values: "2x20"
-      - series: 'aws_lambda_invocations_sum{cluster="mc-05",dimension_FunctionName="eph-mc05-zoa-worker"}'
-        values: "100x20"
-      - series: 'aws_lambda_errors_sum{cluster="mc-01",dimension_FunctionName="eph-mc01-zoa-worker"}'
-        values: "0x20"
-      - series: 'aws_lambda_invocations_sum{cluster="mc-01",dimension_FunctionName="eph-mc01-zoa-worker"}'
-        values: "100x20"
-    alert_rule_test:
-      - eval_time: 11m
-        alertname: ZOAWorkerLambdaErrorRateHigh
-        exp_alerts:
-          - exp_labels:
-              severity: critical
-              cluster: mc-05
-            exp_annotations:
-              summary: ZOA worker Lambda error rate elevated
-              description: ZOA worker Lambda on cluster mc-05 error rate is 2% (>1%) for 10m.
-
-  # Reconciler tick health via changes(): healthy cluster has changing values;
-  # stuck cluster has frozen value → changes() = 0.
+  # Reconciler stalled: mc-05 freezes after 2 ticks, mc-01 keeps ticking
   - interval: 1m
     input_series:
       - series: 'aws_zoa_reconciler_last_run_maximum{cluster="mc-01"}'
@@ -90,48 +104,117 @@ tests:
         values: "0 60 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120"
     alert_rule_test:
       - eval_time: 16m
-        alertname: ZOAReconcilerNotRunning
+        alertname: ZOAReconcilerStalled
         exp_alerts:
           - exp_labels:
               severity: critical
               cluster: mc-05
             exp_annotations:
-              summary: ZOA reconciler not invoking
-              description: ZOA reconciler on cluster mc-05 has stopped ticking. Check EventBridge schedule and worker Lambda health.
+              summary: ZOA reconciler has stopped ticking
+              description: ZOA reconciler on cluster mc-05 has not ticked in >10m (expected every 60s). Check EventBridge schedule and worker Lambda health.
 
+  # DynamoDB throttling → critical
   - interval: 1m
     input_series:
-      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="succeeded"}'
-        values: "1x40"
-      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="failed"}'
-        values: "9x40"
+      - series: 'aws_dynamodb_throttled_requests_sum{cluster="mc-05",dimension_TableName="eph-mc05-zoa-executions"}'
+        values: "0+1x10"
     alert_rule_test:
-      - eval_time: 31m
-        alertname: ZOATAFailureRateHigh
+      - eval_time: 6m
+        alertname: ZOADynamoDBThrottled
         exp_alerts:
           - exp_labels:
-              severity: warning
-              cluster: mc-01
-              dimension_Action: must_gather
+              severity: critical
+              cluster: mc-05
             exp_annotations:
-              summary: ZOA TA failure rate elevated
-              description: ZOA action must_gather on cluster mc-01 success rate is 10% (<90%) for 30m.
+              summary: ZOA DynamoDB tables are being throttled
+              description: DynamoDB throttles detected on ZOA tables for cluster mc-05. Execution state and audit writes are being rejected.
 
+  # Total failure: 0% success with >10 executions → critical
   - interval: 1m
     input_series:
-      - series: 'aws_zoa_http_request_count_sum{cluster="mc-05",dimension_StatusClass="5xx"}'
-        values: "10x20"
-      - series: 'aws_zoa_http_request_count_sum{cluster="mc-05",dimension_StatusClass="2xx"}'
-        values: "90x20"
-      - series: 'aws_zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="2xx"}'
-        values: "100x20"
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-05",dimension_Action="get_pods",dimension_Status="failed"}'
+        values: "20x20"
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-05",dimension_Action="get_pods",dimension_Status="succeeded"}'
+        values: "0x20"
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: ZOAExecutionsTotalFailure
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              cluster: mc-05
+            exp_annotations:
+              summary: ZOA executions almost completely failing
+              description: ZOA on cluster mc-05 global TA success rate is 0% (<10%) for 15m. Likely a dependency failure (EKS, S3, STS). Check dashboard for per-action breakdown.
+
+  # Total failure: low traffic (<10) should NOT fire even at 0%
+  - interval: 1m
+    input_series:
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-06",dimension_Action="get_pods",dimension_Status="failed"}'
+        values: "3x20"
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-06",dimension_Action="get_pods",dimension_Status="succeeded"}'
+        values: "0x20"
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: ZOAExecutionsTotalFailure
+        exp_alerts: []
+
+  # ──────────────────────────────────────────────────────────────
+  # Alert tests — WARNING
+  # ──────────────────────────────────────────────────────────────
+
+  # Lambda error rate: 10% with >10 invocations → fires warning
+  - interval: 1m
+    input_series:
+      - series: 'aws_lambda_errors_sum{cluster="mc-05",dimension_FunctionName="eph-mc05-zoa-api"}'
+        values: "5x20"
+      - series: 'aws_lambda_errors_sum{cluster="mc-05",dimension_FunctionName="eph-mc05-zoa-worker"}'
+        values: "5x20"
+      - series: 'aws_lambda_invocations_sum{cluster="mc-05",dimension_FunctionName="eph-mc05-zoa-api"}'
+        values: "50x20"
+      - series: 'aws_lambda_invocations_sum{cluster="mc-05",dimension_FunctionName="eph-mc05-zoa-worker"}'
+        values: "50x20"
     alert_rule_test:
       - eval_time: 11m
-        alertname: ZOAApiErrorRateHigh
+        alertname: ZOALambdaErrorRateHigh
         exp_alerts:
           - exp_labels:
               severity: warning
               cluster: mc-05
             exp_annotations:
-              summary: ZOA API 5xx rate elevated
-              description: ZOA API on cluster mc-05 is returning 5xx for 10% of requests (>5%) for 10m.
+              summary: ZOA Lambda error rate elevated
+              description: ZOA Lambda functions on cluster mc-05 error rate is 10% (>5%) for 10m. Covers both API and worker Lambdas.
+
+  # Lambda error rate: low traffic should NOT fire
+  - interval: 1m
+    input_series:
+      - series: 'aws_lambda_errors_sum{cluster="mc-06",dimension_FunctionName="eph-mc06-zoa-worker"}'
+        values: "2x20"
+      - series: 'aws_lambda_invocations_sum{cluster="mc-06",dimension_FunctionName="eph-mc06-zoa-worker"}'
+        values: "3x20"
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: ZOALambdaErrorRateHigh
+        exp_alerts: []
+
+  # TA success rate below SLO: 10% success, >10 execs → fires
+  - interval: 1m
+    input_series:
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="succeeded"}'
+        values: "1x20"
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="must_gather",dimension_Status="failed"}'
+        values: "9x20"
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="get_pods",dimension_Status="succeeded"}'
+        values: "1x20"
+      - series: 'aws_zoa_execution_count_sum{cluster="mc-01",dimension_Action="get_pods",dimension_Status="failed"}'
+        values: "9x20"
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: ZOATASuccessRateBelowSLO
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              cluster: mc-01
+            exp_annotations:
+              summary: ZOA TA success rate below SLO
+              description: ZOA on cluster mc-01 global TA success rate is 10% (target 0.95) for 15m. Check dashboard for per-action breakdown.

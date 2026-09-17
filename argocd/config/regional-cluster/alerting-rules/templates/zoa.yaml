@@ -13,13 +13,27 @@ spec:
   groups:
     - name: zoa-recording-rules
       rules:
+        # ──────────────────────────────────────────────────────────────
+        # SLI recording rules
+        # ──────────────────────────────────────────────────────────────
+
         # YACE CloudWatch Sum/Average/Maximum stats are gauges (period window),
         # not Prometheus counters. Ratios use current-scrape sums, not rate().
+
+        # Global weighted TA success rate (all actions aggregated).
+        # Used by ZOAExecutionsTotalFailure (critical) and
+        # ZOATASuccessRateBelowSLO (warning).
         - record: zoa:ta_success_rate
           expr: |
-            sum by (cluster, dimension_Action) (aws_zoa_execution_count_sum{dimension_Status="succeeded"})
-            / sum by (cluster, dimension_Action) (aws_zoa_execution_count_sum)
+            sum by (cluster) (aws_zoa_execution_count_sum{dimension_Status="succeeded"})
+            / sum by (cluster) (aws_zoa_execution_count_sum)
 
+        # Total execution volume — traffic guard for TA alerts.
+        - record: zoa:ta_total_executions
+          expr: |
+            sum by (cluster) (aws_zoa_execution_count_sum)
+
+        # API availability: 1 − (5xx / total).
         - record: zoa:api_availability
           expr: |
             1 - (
@@ -27,10 +41,16 @@ spec:
               / sum by (cluster) (aws_zoa_http_request_count_sum)
             )
 
-        - record: zoa:worker_error_rate
+        # Combined API + Worker Lambda error rate.
+        # Catches pre-handler crashes that EMF misses.
+        - record: zoa:lambda_error_rate
           expr: |
-            sum by (cluster) (aws_lambda_errors_sum{dimension_FunctionName=~".*-zoa-worker"})
-            / sum by (cluster) (aws_lambda_invocations_sum{dimension_FunctionName=~".*-zoa-worker"})
+            sum by (cluster) (aws_lambda_errors_sum{dimension_FunctionName=~".*-zoa-(api|worker)"})
+            / sum by (cluster) (aws_lambda_invocations_sum{dimension_FunctionName=~".*-zoa-(api|worker)"})
+
+        # ──────────────────────────────────────────────────────────────
+        # Tick health recording rules
+        # ──────────────────────────────────────────────────────────────
 
         # Unix seconds of the last reconciler tick (EMF ReconcilerLastRun).
         # last_over_time fills gaps when YACE scrapes miss a CloudWatch period.
@@ -60,33 +80,29 @@ spec:
 
     - name: zoa-alerts
       rules:
-        - alert: ZOADLQMessagesVisible
+        # ──────────────────────────────────────────────────────────────
+        # CRITICAL — page oncall, immediate action required
+        # ──────────────────────────────────────────────────────────────
+
+        # DLQ messages = failed async executions that won't auto-retry.
+        # Any message sitting for >5m means data loss / unprocessed work.
+        - alert: ZOADLQNotDraining
           expr: |
             sum by (cluster) (aws_sqs_approximate_number_of_messages_visible_maximum{dimension_QueueName=~".*-zoa-dlq"}) > 0
           for: 5m
           labels:
             severity: critical
           annotations:
-            summary: ZOA DLQ has visible messages
+            summary: ZOA dead-letter queue has visible messages
             description: >-
-              ZOA dead-letter queue on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has
-              {{ "{{" }} $value {{ "}}" }} visible message(s) for >5m. Investigate worker
-              Lambda failures and reconciler pipeline health.
+              ZOA DLQ on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has
+              {{ "{{" }} $value {{ "}}" }} visible message(s) for >5m.
+              Investigate worker Lambda failures and reconciler pipeline health.
 
-        - alert: ZOAWorkerLambdaErrorRateHigh
-          expr: zoa:worker_error_rate > 0.01
-          for: 10m
-          labels:
-            severity: critical
-          annotations:
-            summary: ZOA worker Lambda error rate elevated
-            description: >-
-              ZOA worker Lambda on cluster {{ "{{" }} $labels.cluster {{ "}}" }} error rate
-              is {{ "{{" }} $value | humanizePercentage {{ "}}" }} (>1%) for 10m.
-
-        # Tick health via recording rules (gap-filled with last_over_time).
-        # Reconciler fires every 60s → expected 3-4 changes per 10m.
-        - alert: ZOAReconcilerNotRunning
+        # Reconciler is ZOA's heartbeat — without it, executions pile up
+        # and stale resources are never cleaned. Fires ~15m after silence
+        # (10m changes() window + 5m for).
+        - alert: ZOAReconcilerStalled
           expr: |
             (zoa:reconciler_tick_count < 2)
             or
@@ -95,13 +111,123 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: ZOA reconciler not invoking
+            summary: ZOA reconciler has stopped ticking
             description: >-
-              ZOA reconciler on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has stopped
-              ticking. Check EventBridge schedule and worker Lambda health.
+              ZOA reconciler on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has not
+              ticked in >10m (expected every 60s). Check EventBridge schedule
+              and worker Lambda health.
 
-        # GC fires every 5min → expected 4-6 changes per 30m.
-        - alert: ZOAGCNotRunning
+        # DynamoDB is ZOA's persistence layer — throttling means
+        # executions and audit writes are being rejected.
+        - alert: ZOADynamoDBThrottled
+          expr: |
+            sum by (cluster) (aws_dynamodb_throttled_requests_sum{dimension_TableName=~".*-zoa-.*"}) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: ZOA DynamoDB tables are being throttled
+            description: >-
+              DynamoDB throttles detected on ZOA tables for cluster
+              {{ "{{" }} $labels.cluster {{ "}}" }}. Execution state and audit
+              writes are being rejected.
+
+        # Global TA success rate near zero — any dependency failure (EKS,
+        # S3, STS, networking) causes this. Backstop for scenarios where
+        # Lambda itself is healthy but all TAs fail.
+        # Traffic guard: >10 executions prevents false positives in quiet periods.
+        - alert: ZOAExecutionsTotalFailure
+          expr: |
+            (zoa:ta_success_rate < 0.10)
+            and
+            (zoa:ta_total_executions > 10)
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: ZOA executions almost completely failing
+            description: >-
+              ZOA on cluster {{ "{{" }} $labels.cluster {{ "}}" }} global TA success
+              rate is {{ "{{" }} $value | humanizePercentage {{ "}}" }} (<10%) for 15m.
+              Likely a dependency failure (EKS, S3, STS). Check dashboard
+              for per-action breakdown.
+
+        # ──────────────────────────────────────────────────────────────
+        # WARNING — needs attention, next business day / within hours
+        # ──────────────────────────────────────────────────────────────
+
+        # Combined API + Worker Lambda error rate. Catches pre-handler
+        # crashes (OOM, init panic) that EMF metrics miss.
+        # Traffic guard: >10 invocations prevents single-failure noise.
+        - alert: ZOALambdaErrorRateHigh
+          expr: |
+            (zoa:lambda_error_rate > 0.05)
+            and
+            (sum by (cluster) (aws_lambda_invocations_sum{dimension_FunctionName=~".*-zoa-(api|worker)"}) > 10)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA Lambda error rate elevated
+            description: >-
+              ZOA Lambda functions on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
+              error rate is {{ "{{" }} $value | humanizePercentage {{ "}}" }} (>5%)
+              for 10m. Covers both API and worker Lambdas.
+
+        # API availability below SLO target.
+        # Traffic guard: >10 requests prevents false positives when
+        # e.g. 1 request fails → 0% availability.
+        - alert: ZOAApiAvailabilityBelowSLO
+          expr: |
+            (zoa:api_availability < {{ .Values.sla.zoa.apiAvailability.target }})
+            and
+            (sum by (cluster) (aws_zoa_http_request_count_sum) > 10)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA API availability below SLO
+            description: >-
+              ZOA API on cluster {{ "{{" }} $labels.cluster {{ "}}" }} availability is
+              {{ "{{" }} $value | humanizePercentage {{ "}}" }}
+              (target {{ .Values.sla.zoa.apiAvailability.target }}) for 15m.
+
+        # Global TA success rate below SLO. Per-action detail is in the
+        # dashboard — alerts are global to avoid noise at fleet scale
+        # (40 regions × N MCs × M actions = unmanageable).
+        # Traffic guard: >10 executions prevents low-traffic false positives.
+        - alert: ZOATASuccessRateBelowSLO
+          expr: |
+            (zoa:ta_success_rate < {{ .Values.sla.zoa.taSuccessRate.target }})
+            and
+            (zoa:ta_total_executions > 10)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA TA success rate below SLO
+            description: >-
+              ZOA on cluster {{ "{{" }} $labels.cluster {{ "}}" }} global TA success
+              rate is {{ "{{" }} $value | humanizePercentage {{ "}}" }}
+              (target {{ .Values.sla.zoa.taSuccessRate.target }}) for 15m.
+              Check dashboard for per-action breakdown.
+
+        # Lambda concurrency limits hit — scaling or configuration issue.
+        - alert: ZOALambdaThrottled
+          expr: |
+            sum by (cluster) (aws_lambda_throttles_sum{dimension_FunctionName=~".*-zoa-(api|worker)"}) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA Lambda functions throttled
+            description: >-
+              ZOA Lambda functions on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
+              are being throttled. Check reserved concurrency limits.
+
+        # GC fires every 5min. Not immediately dangerous if stalled
+        # (stale SA/RBAC accumulate, nothing breaks). Next business day.
+        - alert: ZOAGCStalled
           expr: |
             (zoa:gc_tick_count < 2)
             or
@@ -110,92 +236,37 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: ZOA garbage collector not invoking
+            summary: ZOA garbage collector has stopped ticking
             description: >-
-              ZOA GC on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has stopped
-              ticking. Check EventBridge schedule and worker Lambda health.
+              ZOA GC on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has not ticked
+              in >30m (expected every 5min). Check EventBridge schedule
+              and worker Lambda health.
 
-        - alert: ZOAApiErrorRateHigh
+        # GC is encountering errors cleaning up resources.
+        - alert: ZOAGCErrors
           expr: |
-            (1 - zoa:api_availability) > 0.05
+            sum by (cluster) (aws_zoa_gc_errors_sum) > 0
           for: 10m
           labels:
             severity: warning
           annotations:
-            summary: ZOA API 5xx rate elevated
+            summary: ZOA garbage collector errors detected
             description: >-
-              ZOA API on cluster {{ "{{" }} $labels.cluster {{ "}}" }} is returning 5xx
-              for {{ "{{" }} $value | humanizePercentage {{ "}}" }} of requests (>5%) for 10m.
+              ZOA garbage collector on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
+              reported errors for >10m. Stale ServiceAccounts and RBAC
+              may be accumulating.
 
-        - alert: ZOAApiAvailabilityBelowSLO
+        # Circuit breaker flapping — multiple opens in 30min means
+        # sustained EKS connectivity issues on at least one Lambda container.
+        - alert: ZOACircuitBreakerFlapping
           expr: |
-            zoa:api_availability < {{ .Values.sla.zoa.apiAvailability.target }}
-          for: 30m
-          labels:
-            severity: warning
-          annotations:
-            summary: ZOA API availability below SLO
-            description: >-
-              ZOA API on cluster {{ "{{" }} $labels.cluster {{ "}}" }} availability is
-              {{ "{{" }} $value | humanizePercentage {{ "}}" }} (target {{ .Values.sla.zoa.apiAvailability.target }}) for 30m.
-
-        - alert: ZOATAFailureRateHigh
-          expr: zoa:ta_success_rate < 0.90
-          for: 30m
-          labels:
-            severity: warning
-          annotations:
-            summary: ZOA TA failure rate elevated
-            description: >-
-              ZOA action {{ "{{" }} $labels.dimension_Action {{ "}}" }} on cluster
-              {{ "{{" }} $labels.cluster {{ "}}" }} success rate is
-              {{ "{{" }} $value | humanizePercentage {{ "}}" }} (<90%) for 30m.
-
-        - alert: ZOALambdaThrottled
-          expr: |
-            sum by (cluster) (aws_lambda_throttles_sum{dimension_FunctionName=~".*-zoa-(api|worker)"}) > 0
-          for: 10m
-          labels:
-            severity: warning
-          annotations:
-            summary: ZOA Lambda throttled
-            description: >-
-              ZOA Lambda functions on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
-              are being throttled.
-
-        - alert: ZOADynamoDBThrottled
-          expr: |
-            sum by (cluster) (aws_dynamodb_throttled_requests_sum{dimension_TableName=~".*zoa.*"}) > 0
+            sum by (cluster) (increase(aws_zoa_circuit_breaker_state_change_sum{dimension_State="open"}[30m])) > 3
           for: 5m
           labels:
             severity: warning
           annotations:
-            summary: ZOA DynamoDB throttled
+            summary: ZOA EKS circuit breaker flapping
             description: >-
-              DynamoDB throttles detected on ZOA tables for cluster
-              {{ "{{" }} $labels.cluster {{ "}}" }}.
-
-        - alert: ZOAGCErrors
-          expr: |
-            sum by (cluster) (aws_zoa_gc_errors_sum) > 0
-          for: 15m
-          labels:
-            severity: warning
-          annotations:
-            summary: ZOA GC errors detected
-            description: >-
-              ZOA garbage collector on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
-              reported errors in the last 15m.
-
-        - alert: ZOACircuitBreakerOpen
-          expr: |
-            sum by (cluster) (aws_zoa_circuit_breaker_state_change_sum{dimension_State="open"}) > 0
-          for: 15m
-          labels:
-            severity: warning
-          annotations:
-            summary: ZOA circuit breaker opening
-            description: >-
-              ZOA EKS circuit breaker on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
-              is opening repeatedly. Per-container, not global — at least one Lambda
-              container cannot reach EKS.
+              ZOA circuit breaker on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
+              has opened >3 times in 30min. At least one Lambda container
+              is experiencing sustained EKS API connectivity issues.

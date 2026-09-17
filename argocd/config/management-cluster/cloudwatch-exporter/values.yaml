@@ -137,13 +137,21 @@ prometheus-yet-another-cloudwatch-exporter:
             nilToZero: false
           - name: GCDuration
             statistics: [Average, p99]
+            period: 600
+            length: 600
           - name: GCErrors
             statistics: [Sum]
+            period: 600
+            length: 600
           - name: GCCleanedResources
             statistics: [Sum]
+            period: 600
+            length: 600
           - name: GCLastRun
             statistics: [Maximum]
             nilToZero: false
+            period: 600
+            length: 600
           - name: CircuitBreakerStateChange
             statistics: [Sum]
 

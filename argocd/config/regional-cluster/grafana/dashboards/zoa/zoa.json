@@ -73,7 +73,7 @@
       "id": 2,
       "type": "stat",
       "title": "TA Success Rate",
-      "description": "Succeeded / all terminal executions in the current CloudWatch period. SLO target: 95%.",
+      "description": "Succeeded / all terminal executions in the current CloudWatch period. SLO target: 95%. Alert fires when <95% with >10 executions for 15m; this panel may show low percentages during quiet periods without triggering an alert.",
       "gridPos": { "x": 0, "y": 1, "w": 4, "h": 5 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
@@ -100,7 +100,7 @@
       "id": 3,
       "type": "stat",
       "title": "API Availability",
-      "description": "Non-5xx / total HTTP requests. SLO target: 99%. Excludes 4xx (client errors are expected: cooldown, validation).",
+      "description": "Non-5xx / total HTTP requests. SLO target: 99%. Excludes 4xx (client errors are expected: cooldown, validation). Alert fires when <99% with >10 requests for 15m; this panel may show low percentages during quiet periods without triggering an alert.",
       "gridPos": { "x": 4, "y": 1, "w": 4, "h": 5 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
@@ -662,7 +662,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (dimension_TableName) (aws_dynamodb_throttled_requests_sum{dimension_TableName=~\".*zoa.*\", cluster=~\"$cluster\"})",
+          "expr": "sum by (dimension_TableName) (aws_dynamodb_throttled_requests_sum{dimension_TableName=~\".*-zoa-.*\", cluster=~\"$cluster\"})",
           "legendFormat": "{{ dimension_TableName }}"
         }
       ],
@@ -686,7 +686,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "avg by (dimension_TableName) (aws_dynamodb_successful_request_latency_p99{dimension_TableName=~\".*zoa.*\", cluster=~\"$cluster\"})",
+          "expr": "avg by (dimension_TableName) (aws_dynamodb_successful_request_latency_p99{dimension_TableName=~\".*-zoa-.*\", cluster=~\"$cluster\"})",
           "legendFormat": "{{ dimension_TableName }}"
         }
       ],
@@ -704,12 +704,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (dimension_TableName) (aws_dynamodb_consumed_read_capacity_units_sum{dimension_TableName=~\".*zoa.*\", cluster=~\"$cluster\"})",
+          "expr": "sum by (dimension_TableName) (aws_dynamodb_consumed_read_capacity_units_sum{dimension_TableName=~\".*-zoa-.*\", cluster=~\"$cluster\"})",
           "legendFormat": "{{ dimension_TableName }} read"
         },
         {
           "refId": "B",
-          "expr": "sum by (dimension_TableName) (aws_dynamodb_consumed_write_capacity_units_sum{dimension_TableName=~\".*zoa.*\", cluster=~\"$cluster\"})",
+          "expr": "sum by (dimension_TableName) (aws_dynamodb_consumed_write_capacity_units_sum{dimension_TableName=~\".*-zoa-.*\", cluster=~\"$cluster\"})",
           "legendFormat": "{{ dimension_TableName }} write"
         }
       ],
