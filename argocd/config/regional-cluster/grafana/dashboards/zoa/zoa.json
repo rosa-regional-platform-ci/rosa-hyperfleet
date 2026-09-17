@@ -456,7 +456,7 @@
           "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "value": null, "color": "red" }, { "value": 2, "color": "yellow" }, { "value": 4, "color": "green" }]
+            "steps": [{ "value": null, "color": "red" }, { "value": 2, "color": "yellow" }, { "value": 3, "color": "green" }]
           }
         }
       },
