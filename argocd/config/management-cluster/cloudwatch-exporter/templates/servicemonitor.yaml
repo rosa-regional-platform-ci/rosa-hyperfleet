@@ -37,11 +37,11 @@ spec:
         # 2-step mark-then-drop works around RE2's lack of negative lookahead.
         # Temporary __tmp_* labels are stripped automatically before storage.
         - sourceLabels: [__name__, dimension_Cluster]
-          regex: 'aws_zoa_.+;{{ .Values.global.cluster_name }}'
+          regex: aws_zoa_.+;{{ .Values.global.cluster_name }}
           targetLabel: __tmp_zoa_mine
-          replacement: 'y'
+          replacement: "y"
         - sourceLabels: [__name__, __tmp_zoa_mine]
-          regex: 'aws_zoa_.+;'
+          regex: aws_zoa_.+;
           action: drop
   jobLabel: cloudwatch-exporter
   namespaceSelector:

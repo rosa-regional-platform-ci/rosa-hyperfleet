@@ -170,7 +170,7 @@
       "id": 6,
       "type": "stat",
       "title": "P99 TA Duration",
-      "description": "Worst-case TA execution latency. Approaching 60s means timeouts are likely.",
+      "description": "P99 execution latency across selected TAs. Most sync TAs complete in seconds; async TAs (must_gather: 30 min deadline, rollout_restart: 3 min) are expected to be slower. See Duration by Action for per-TA breakdown.",
       "gridPos": { "x": 16, "y": 1, "w": 4, "h": 5 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
@@ -183,10 +183,11 @@
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
+          "noValue": "No executions",
           "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "value": null, "color": "green" }, { "value": 30000, "color": "yellow" }, { "value": 60000, "color": "red" }]
+            "steps": [{ "value": null, "color": "green" }, { "value": 300000, "color": "yellow" }, { "value": 600000, "color": "red" }]
           }
         }
       }
