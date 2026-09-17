@@ -33,26 +33,30 @@ spec:
             / sum by (cluster) (aws_lambda_invocations_sum{dimension_FunctionName=~".*-zoa-worker"})
 
         # Unix seconds of the last reconciler tick (EMF ReconcilerLastRun).
+        # last_over_time fills gaps when YACE scrapes miss a CloudWatch period.
         - record: zoa:reconciler_last_run
           expr: |
-            max by (cluster) (aws_zoa_reconciler_last_run_maximum)
+            max by (cluster) (last_over_time(aws_zoa_reconciler_last_run_maximum[10m]))
 
         # Unix seconds of the last GC tick (EMF GCLastRun).
+        # last_over_time is essential for GC: it fires every 5min, so YACE scrapes
+        # often hit empty CloudWatch periods (nilToZero=false → gaps in Prometheus).
+        # 10min lookback covers at least one GC tick.
         - record: zoa:gc_last_run
           expr: |
-            max by (cluster) (aws_zoa_gc_last_run_maximum)
+            max by (cluster) (last_over_time(aws_zoa_gc_last_run_maximum[10m]))
 
-        # Tick health: count of distinct ReconcilerLastRun values in the window.
-        # Healthy: ~5 changes per 10m (one per 120s YACE scrape). 0 = stalled.
+        # Tick health: count of distinct values in the gap-filled recording rule.
+        # Reconciler fires every 60s → expected 3-4 changes per 10m window.
         - record: zoa:reconciler_tick_count
           expr: |
-            changes(aws_zoa_reconciler_last_run_maximum[10m])
+            changes(zoa:reconciler_last_run[10m])
 
-        # Tick health: count of distinct GCLastRun values in the window.
-        # Healthy: ~3 changes per 30m (GC fires every 5m, YACE scrapes every 120s). 0 = stalled.
+        # Tick health: count of distinct values in the gap-filled recording rule.
+        # GC fires every 5min → expected 4-6 changes per 30m window.
         - record: zoa:gc_tick_count
           expr: |
-            changes(aws_zoa_gc_last_run_maximum[30m])
+            changes(zoa:gc_last_run[30m])
 
     - name: zoa-alerts
       rules:
@@ -80,15 +84,13 @@ spec:
               ZOA worker Lambda on cluster {{ "{{" }} $labels.cluster {{ "}}" }} error rate
               is {{ "{{" }} $value | humanizePercentage {{ "}}" }} (>1%) for 10m.
 
-        # Tick health: changes() counts distinct values in the window.
-        # Immune to CloudWatch → YACE → Prometheus pipeline latency — measures
-        # "is the timestamp advancing?" not "how stale is the last value?"
-        # Reconciler fires every 60s → ~5 changes per 10m at 120s YACE scrape.
+        # Tick health via recording rules (gap-filled with last_over_time).
+        # Reconciler fires every 60s → expected 3-4 changes per 10m.
         - alert: ZOAReconcilerNotRunning
           expr: |
-            (changes(aws_zoa_reconciler_last_run_maximum[10m]) < 2)
+            (zoa:reconciler_tick_count < 2)
             or
-            (absent_over_time(aws_zoa_reconciler_last_run_maximum[10m]) == 1)
+            (absent_over_time(zoa:reconciler_last_run[10m]) == 1)
           for: 5m
           labels:
             severity: critical
@@ -98,12 +100,12 @@ spec:
               ZOA reconciler on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has stopped
               ticking. Check EventBridge schedule and worker Lambda health.
 
-        # GC fires every 5min → ~3 changes per 30m at 120s YACE scrape.
+        # GC fires every 5min → expected 4-6 changes per 30m.
         - alert: ZOAGCNotRunning
           expr: |
-            (changes(aws_zoa_gc_last_run_maximum[30m]) < 2)
+            (zoa:gc_tick_count < 2)
             or
-            (absent_over_time(aws_zoa_gc_last_run_maximum[30m]) == 1)
+            (absent_over_time(zoa:gc_last_run[30m]) == 1)
           for: 10m
           labels:
             severity: warning
