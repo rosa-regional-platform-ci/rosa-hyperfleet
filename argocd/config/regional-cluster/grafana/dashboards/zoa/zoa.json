@@ -439,24 +439,51 @@
     {
       "id": 33,
       "type": "timeseries",
-      "title": "Seconds Since Last Reconciler Tick",
-      "description": "time() minus ReconcilerLastRun (unix). Reconciler fires every 60s, GC every 5min. Steady-state shows ~5-7min due to CloudWatch \u2192 YACE \u2192 Prometheus pipeline latency. Alert fires above 600s (10min).",
-      "gridPos": { "x": 16, "y": 41, "w": 8, "h": 8 },
+      "title": "Reconciler Tick Health",
+      "description": "Distinct ReconcilerLastRun values in the last 10 minutes (changes()). Expected: ~5 (one per 120s YACE scrape). 0 = stalled. Pipeline-latency immune.",
+      "gridPos": { "x": 16, "y": 41, "w": 4, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
         {
           "refId": "A",
-          "expr": "time() - max by (cluster) (max_over_time(zoa:reconciler_last_run{cluster=~\"$cluster\"}[1h]))",
+          "expr": "zoa:reconciler_tick_count{cluster=~\"$cluster\"}",
           "legendFormat": "{{ cluster }}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "short",
           "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "value": null, "color": "green" }, { "value": 120, "color": "yellow" }, { "value": 300, "color": "red" }]
+            "steps": [{ "value": null, "color": "red" }, { "value": 2, "color": "yellow" }, { "value": 4, "color": "green" }]
+          }
+        }
+      },
+      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+
+    {
+      "id": 36,
+      "type": "timeseries",
+      "title": "GC Tick Health",
+      "description": "Distinct GCLastRun values in the last 30 minutes (changes()). Expected: ~3 (GC fires every 5min, YACE scrapes every 120s). 0 = stalled. Pipeline-latency immune.",
+      "gridPos": { "x": 20, "y": 41, "w": 4, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "zoa:gc_tick_count{cluster=~\"$cluster\"}",
+          "legendFormat": "{{ cluster }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "value": null, "color": "red" }, { "value": 1, "color": "yellow" }, { "value": 2, "color": "green" }]
           }
         }
       },

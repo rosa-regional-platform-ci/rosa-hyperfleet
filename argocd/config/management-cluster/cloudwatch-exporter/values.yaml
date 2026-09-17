@@ -141,6 +141,9 @@ prometheus-yet-another-cloudwatch-exporter:
             statistics: [Sum]
           - name: GCCleanedResources
             statistics: [Sum]
+          - name: GCLastRun
+            statistics: [Maximum]
+            nilToZero: false
           - name: CircuitBreakerStateChange
             statistics: [Sum]
 

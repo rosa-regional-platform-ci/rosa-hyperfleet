@@ -33,10 +33,26 @@ spec:
             / sum by (cluster) (aws_lambda_invocations_sum{dimension_FunctionName=~".*-zoa-worker"})
 
         # Unix seconds of the last reconciler tick (EMF ReconcilerLastRun).
-        # Used as "now - last run" without enumerating clusters.
         - record: zoa:reconciler_last_run
           expr: |
             max by (cluster) (aws_zoa_reconciler_last_run_maximum)
+
+        # Unix seconds of the last GC tick (EMF GCLastRun).
+        - record: zoa:gc_last_run
+          expr: |
+            max by (cluster) (aws_zoa_gc_last_run_maximum)
+
+        # Tick health: count of distinct ReconcilerLastRun values in the window.
+        # Healthy: ~5 changes per 10m (one per 120s YACE scrape). 0 = stalled.
+        - record: zoa:reconciler_tick_count
+          expr: |
+            changes(aws_zoa_reconciler_last_run_maximum[10m])
+
+        # Tick health: count of distinct GCLastRun values in the window.
+        # Healthy: ~3 changes per 30m (GC fires every 5m, YACE scrapes every 120s). 0 = stalled.
+        - record: zoa:gc_tick_count
+          expr: |
+            changes(aws_zoa_gc_last_run_maximum[30m])
 
     - name: zoa-alerts
       rules:
@@ -64,24 +80,38 @@ spec:
               ZOA worker Lambda on cluster {{ "{{" }} $labels.cluster {{ "}}" }} error rate
               is {{ "{{" }} $value | humanizePercentage {{ "}}" }} (>1%) for 10m.
 
-        # Heartbeat: ReconcilerLastRun is a unix timestamp emitted every tick.
-        # max_over_time keeps the last value if YACE stops exporting the series.
-        # Clusters that never ran ZOA have no series and do not page.
-        #
-        # Threshold is 600s (10min) to account for CloudWatch → YACE → Prometheus
-        # pipeline latency (~5-7min steady state even when healthy).
-        # Reconciler fires every 60s, GC every 5min.
+        # Tick health: changes() counts distinct values in the window.
+        # Immune to CloudWatch → YACE → Prometheus pipeline latency — measures
+        # "is the timestamp advancing?" not "how stale is the last value?"
+        # Reconciler fires every 60s → ~5 changes per 10m at 120s YACE scrape.
         - alert: ZOAReconcilerNotRunning
           expr: |
-            (time() - max by (cluster) (max_over_time(zoa:reconciler_last_run[1h]))) > 600
+            (changes(aws_zoa_reconciler_last_run_maximum[10m]) < 2)
+            or
+            (absent_over_time(aws_zoa_reconciler_last_run_maximum[10m]) == 1)
           for: 5m
           labels:
             severity: critical
           annotations:
             summary: ZOA reconciler not invoking
             description: >-
-              No ZOA reconciler tick on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
-              for >10m. Check EventBridge schedule and worker Lambda health.
+              ZOA reconciler on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has stopped
+              ticking. Check EventBridge schedule and worker Lambda health.
+
+        # GC fires every 5min → ~3 changes per 30m at 120s YACE scrape.
+        - alert: ZOAGCNotRunning
+          expr: |
+            (changes(aws_zoa_gc_last_run_maximum[30m]) < 2)
+            or
+            (absent_over_time(aws_zoa_gc_last_run_maximum[30m]) == 1)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA garbage collector not invoking
+            description: >-
+              ZOA GC on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has stopped
+              ticking. Check EventBridge schedule and worker Lambda health.
 
         - alert: ZOAApiErrorRateHigh
           expr: |

@@ -80,8 +80,8 @@ tests:
               summary: ZOA worker Lambda error rate elevated
               description: ZOA worker Lambda on cluster mc-05 error rate is 2% (>1%) for 10m.
 
-  # Reconciler last-run: values are unix-seconds in the promtool time domain (t=0).
-  # Healthy cluster tracks time; stuck cluster freezes at t=2m (120s).
+  # Reconciler tick health via changes(): healthy cluster has changing values;
+  # stuck cluster has frozen value → changes() = 0.
   - interval: 1m
     input_series:
       - series: 'aws_zoa_reconciler_last_run_maximum{cluster="mc-01"}'
@@ -89,7 +89,7 @@ tests:
       - series: 'aws_zoa_reconciler_last_run_maximum{cluster="mc-05"}'
         values: "0 60 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120"
     alert_rule_test:
-      - eval_time: 18m
+      - eval_time: 16m
         alertname: ZOAReconcilerNotRunning
         exp_alerts:
           - exp_labels:
@@ -97,7 +97,7 @@ tests:
               cluster: mc-05
             exp_annotations:
               summary: ZOA reconciler not invoking
-              description: No ZOA reconciler tick on cluster mc-05 for >10m. Check EventBridge schedule and worker Lambda health.
+              description: ZOA reconciler on cluster mc-05 has stopped ticking. Check EventBridge schedule and worker Lambda health.
 
   - interval: 1m
     input_series:
