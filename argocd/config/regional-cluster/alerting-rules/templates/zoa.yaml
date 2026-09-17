@@ -67,9 +67,13 @@ spec:
         # Heartbeat: ReconcilerLastRun is a unix timestamp emitted every tick.
         # max_over_time keeps the last value if YACE stops exporting the series.
         # Clusters that never ran ZOA have no series and do not page.
+        #
+        # Threshold is 600s (10min) to account for CloudWatch → YACE → Prometheus
+        # pipeline latency (~5-7min steady state even when healthy).
+        # Reconciler fires every 60s, GC every 5min.
         - alert: ZOAReconcilerNotRunning
           expr: |
-            (time() - max by (cluster) (max_over_time(zoa:reconciler_last_run[1h]))) > 300
+            (time() - max by (cluster) (max_over_time(zoa:reconciler_last_run[1h]))) > 600
           for: 5m
           labels:
             severity: critical
@@ -77,7 +81,7 @@ spec:
             summary: ZOA reconciler not invoking
             description: >-
               No ZOA reconciler tick on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
-              for >5m. Check EventBridge schedule and worker Lambda health.
+              for >10m. Check EventBridge schedule and worker Lambda health.
 
         - alert: ZOAApiErrorRateHigh
           expr: |

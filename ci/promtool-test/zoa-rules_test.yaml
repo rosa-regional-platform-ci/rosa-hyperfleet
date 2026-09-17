@@ -89,7 +89,7 @@ tests:
       - series: 'aws_zoa_reconciler_last_run_maximum{cluster="mc-05"}'
         values: "0 60 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120"
     alert_rule_test:
-      - eval_time: 13m
+      - eval_time: 18m
         alertname: ZOAReconcilerNotRunning
         exp_alerts:
           - exp_labels:
@@ -97,7 +97,7 @@ tests:
               cluster: mc-05
             exp_annotations:
               summary: ZOA reconciler not invoking
-              description: No ZOA reconciler tick on cluster mc-05 for >5m. Check EventBridge schedule and worker Lambda health.
+              description: No ZOA reconciler tick on cluster mc-05 for >10m. Check EventBridge schedule and worker Lambda health.
 
   - interval: 1m
     input_series:

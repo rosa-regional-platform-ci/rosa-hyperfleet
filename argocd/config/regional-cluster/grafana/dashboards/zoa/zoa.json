@@ -440,7 +440,7 @@
       "id": 33,
       "type": "timeseries",
       "title": "Seconds Since Last Reconciler Tick",
-      "description": "time() minus ReconcilerLastRun (unix). Reconciler should tick every ~60s. Alert fires above 300s.",
+      "description": "time() minus ReconcilerLastRun (unix). Reconciler fires every 60s, GC every 5min. Steady-state shows ~5-7min due to CloudWatch \u2192 YACE \u2192 Prometheus pipeline latency. Alert fires above 600s (10min).",
       "gridPos": { "x": 16, "y": 41, "w": 8, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
@@ -467,7 +467,7 @@
       "id": 34,
       "type": "timeseries",
       "title": "GC Cleaned Resources",
-      "description": "Ephemeral Kubernetes resources (ServiceAccounts, RBAC) cleaned up by the garbage collector. Steady flow means GC is healthy.",
+      "description": "Ephemeral Kubernetes resources (ServiceAccounts, RBAC) cleaned up by the garbage collector. Empty is normal when no stale resources exist. Steady flow during activity means GC is healthy.",
       "gridPos": { "x": 0, "y": 49, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
@@ -485,7 +485,7 @@
       "id": 35,
       "type": "timeseries",
       "title": "Circuit Breaker State Changes",
-      "description": "Circuit breaker is per Lambda container, not global. A single state=open event means at least one container cannot reach EKS.",
+      "description": "Circuit breaker is per Lambda container, not global. Empty means healthy (no trips). A state=open event means at least one container cannot reach EKS.",
       "gridPos": { "x": 12, "y": 49, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
