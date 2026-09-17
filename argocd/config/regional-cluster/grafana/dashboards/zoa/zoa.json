@@ -440,7 +440,7 @@
       "id": 33,
       "type": "timeseries",
       "title": "Reconciler Tick Health",
-      "description": "Distinct ReconcilerLastRun values in the last 10 minutes (changes()). Expected: ~5 (one per 120s YACE scrape). 0 = stalled. Pipeline-latency immune.",
+      "description": "Distinct ReconcilerLastRun values in the last 10 minutes (changes()). Reconciler fires every 60s. Expected: 3\u20134 (YACE scrapes every 120s \u2192 ~5 samples, ~4 transitions). 0 = stalled.",
       "gridPos": { "x": 16, "y": 41, "w": 4, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
@@ -467,7 +467,7 @@
       "id": 36,
       "type": "timeseries",
       "title": "GC Tick Health",
-      "description": "Distinct GCLastRun values in the last 30 minutes (changes()). Expected: ~3 (GC fires every 5min, YACE scrapes every 120s). 0 = stalled. Pipeline-latency immune.",
+      "description": "Distinct GCLastRun values in the last 30 minutes (changes()). GC fires every 5min. Expected: 4\u20136 (YACE scrapes every 120s \u2192 ~15 samples, ~6 GC ticks in window). 0 = stalled.",
       "gridPos": { "x": 20, "y": 41, "w": 4, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
