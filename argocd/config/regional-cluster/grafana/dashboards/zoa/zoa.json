@@ -478,14 +478,56 @@
       }
     },
     {
+      "id": 41,
+      "type": "barchart",
+      "title": "Executions by Cluster",
+      "description": "Total TA executions per cluster in the dashboard time range. Shows which RC/MC is busiest. Respects action filter.",
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "stacking": "none",
+        "barWidth": 0.7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (cluster) (sum_over_time(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}[$__range]))",
+          "legendFormat": "{{ cluster }}",
+          "instant": true
+        }
+      ]
+    },
+    {
       "id": 37,
       "type": "barchart",
       "title": "Executions by Status",
       "description": "Total TA executions in the dashboard time range grouped by outcome. Respects cluster and action filters.",
       "gridPos": {
-        "x": 0,
+        "x": 5,
         "y": 7,
-        "w": 6,
+        "w": 5,
         "h": 4
       },
       "datasource": {
@@ -525,9 +567,9 @@
       "title": "Executions by Scope",
       "description": "kube-api (K8s operations) vs aws-api (AWS operations) in the dashboard time range. Respects cluster and action filters.",
       "gridPos": {
-        "x": 6,
+        "x": 10,
         "y": 7,
-        "w": 6,
+        "w": 5,
         "h": 4
       },
       "datasource": {
@@ -567,9 +609,9 @@
       "title": "Executions by Type",
       "description": "read (diagnostic) vs write (mutating) TAs in the dashboard time range. Respects cluster and action filters.",
       "gridPos": {
-        "x": 12,
+        "x": 15,
         "y": 7,
-        "w": 6,
+        "w": 5,
         "h": 4
       },
       "datasource": {
@@ -609,9 +651,9 @@
       "title": "Executions by Mode",
       "description": "sync (in-Lambda) vs async (K8s Job) TAs in the dashboard time range. Respects cluster and action filters.",
       "gridPos": {
-        "x": 18,
+        "x": 20,
         "y": 7,
-        "w": 6,
+        "w": 4,
         "h": 4
       },
       "datasource": {
