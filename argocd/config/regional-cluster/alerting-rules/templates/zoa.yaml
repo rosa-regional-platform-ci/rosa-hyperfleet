@@ -124,11 +124,13 @@ spec:
         # Reconciler is ZOA's heartbeat. Without it, async TA results
         # are never recorded — executions stay "running" forever in
         # DynamoDB, creating a silent failure mode invisible to
-        # symptom-based alerts. Fires ~15m after silence (10m
-        # changes() window + 5m for).
+        # symptom-based alerts.
+        # Uses timestamp staleness (time() - last_run) which works from
+        # minute 1 — no history needed, unlike changes().
+        # Threshold 600s = 10× frequency (60s) absorbs pipeline delay (~5-7min).
         - alert: ZOAReconcilerStalled
           expr: |
-            (zoa:reconciler_tick_count < 2)
+            (time() - zoa:reconciler_last_run > 600)
             or
             (absent_over_time(zoa:reconciler_last_run[10m]) == 1)
           for: 5m
@@ -303,9 +305,10 @@ spec:
 
         # GC fires every 5min. Not immediately dangerous if stalled
         # (stale SA/RBAC accumulate, nothing breaks). Next business day.
+        # Threshold 1800s = 6× frequency (5min) absorbs pipeline delay (~10-15min).
         - alert: ZOAGCStalled
           expr: |
-            (zoa:gc_tick_count < 2)
+            (time() - zoa:gc_last_run > 1800)
             or
             (absent_over_time(zoa:gc_last_run[30m]) == 1)
           for: 10m

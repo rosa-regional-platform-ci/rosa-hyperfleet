@@ -95,14 +95,15 @@ tests:
         exp_alerts: []
 
   # Reconciler stalled: mc-05 freezes after 2 ticks, mc-01 keeps ticking
+  # time() - last_run > 600 first true at t=13m, fires after for:5m at t=18m
   - interval: 1m
     input_series:
       - series: 'aws_zoa_reconciler_last_run_maximum{cluster="mc-01"}'
-        values: "0+60x20"
+        values: "0+60x25"
       - series: 'aws_zoa_reconciler_last_run_maximum{cluster="mc-05"}'
-        values: "0 60 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120"
+        values: "0 60 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120"
     alert_rule_test:
-      - eval_time: 16m
+      - eval_time: 19m
         alertname: ZOAReconcilerStalled
         exp_alerts:
           - exp_labels:
