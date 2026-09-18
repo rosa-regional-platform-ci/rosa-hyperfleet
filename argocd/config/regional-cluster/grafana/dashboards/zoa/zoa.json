@@ -2,12 +2,22 @@
   "title": "ZOA",
   "uid": "zoa",
   "description": "Unified ZOA service dashboard: SLIs, Trusted Action executions, HTTP API, worker pipeline, and underlying Lambda/DLQ/DynamoDB infrastructure. Single pane of glass for on-call.",
-  "tags": ["zoa", "emf", "lambda", "dynamodb", "sqs", "sre"],
+  "tags": [
+    "zoa",
+    "emf",
+    "lambda",
+    "dynamodb",
+    "sqs",
+    "sre"
+  ],
   "timezone": "browser",
   "refresh": "1m",
   "schemaVersion": 38,
   "graphTooltip": 1,
-  "time": { "from": "now-3h", "to": "now" },
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
   "links": [
     {
       "asDropdown": false,
@@ -27,7 +37,10 @@
         "type": "datasource",
         "label": "Datasource",
         "query": "prometheus",
-        "current": { "text": "Thanos", "value": "Thanos" },
+        "current": {
+          "text": "Thanos",
+          "value": "Thanos"
+        },
         "hide": 0,
         "refresh": 1
       },
@@ -35,232 +48,630 @@
         "name": "cluster",
         "type": "query",
         "label": "Cluster",
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
         "query": "label_values(aws_zoa_execution_count_sum, cluster)",
         "refresh": 2,
         "multi": true,
         "includeAll": true,
         "allValue": ".*",
-        "current": { "text": "All", "value": "$__all" },
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "sort": 1
       },
       {
         "name": "action",
         "type": "query",
         "label": "Action",
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
         "query": "label_values(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}, dimension_Action)",
         "refresh": 2,
         "multi": true,
         "includeAll": true,
         "allValue": ".*",
-        "current": { "text": "All", "value": "$__all" },
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "sort": 1
       }
     ]
   },
   "panels": [
-
     {
       "id": 1,
       "type": "row",
       "title": "SLO Overview",
       "collapsed": false,
-      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      }
     },
-
     {
       "id": 2,
       "type": "stat",
       "title": "TA Success Rate",
       "description": "Succeeded / all terminal executions in the current CloudWatch period. SLO target: 95%. Alert fires when <95% with >10 executions for 15m; this panel may show low percentages during quiet periods without triggering an alert.",
-      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
           "expr": "(sum(aws_zoa_execution_count_sum{dimension_Status=\"succeeded\", cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}) / sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"})) and on() (sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}) > 0)"
         }
       ],
-      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "fieldConfig": {
         "defaults": {
           "noValue": "No executions",
           "unit": "percentunit",
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "value": null, "color": "red" }, { "value": 0.9, "color": "yellow" }, { "value": 0.95, "color": "green" }]
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 0.9,
+                "color": "yellow"
+              },
+              {
+                "value": 0.95,
+                "color": "green"
+              }
+            ]
           }
         }
       }
     },
-
     {
       "id": 3,
       "type": "stat",
       "title": "API Availability",
       "description": "Non-5xx / total HTTP requests. SLO target: 99%. Excludes 4xx (client errors are expected: cooldown, validation). Alert fires when <99% with >10 requests for 15m; this panel may show low percentages during quiet periods without triggering an alert.",
-      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 4,
+        "y": 1,
+        "w": 4,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
           "expr": "((sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}) - (sum(aws_zoa_http_request_count_sum{dimension_StatusClass=\"5xx\", cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}) or vector(0))) / sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})) and on() (sum(aws_zoa_http_request_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"}) > 0)"
         }
       ],
-      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "fieldConfig": {
         "defaults": {
           "noValue": "No traffic",
           "unit": "percentunit",
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "value": null, "color": "red" }, { "value": 0.95, "color": "yellow" }, { "value": 0.99, "color": "green" }]
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 0.95,
+                "color": "yellow"
+              },
+              {
+                "value": 0.99,
+                "color": "green"
+              }
+            ]
           }
         }
       }
     },
-
     {
       "id": 4,
       "type": "stat",
       "title": "Lambda Error Rate",
-      "description": "Lambda-level error rate across ZOA functions. Complements API availability — a Lambda error means the entire request was lost.",
-      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Lambda-level error rate across ZOA functions. Complements API availability \u2014 a Lambda error means the entire request was lost.",
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 4,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
           "expr": "sum(aws_lambda_errors_sum{dimension_FunctionName=~\".*-zoa-(api|worker)\", cluster=~\"$cluster\"}) / clamp_min(sum(aws_lambda_invocations_sum{dimension_FunctionName=~\".*-zoa-(api|worker)\", cluster=~\"$cluster\"}), 1) or vector(0)"
         }
       ],
-      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "value": null, "color": "green" }, { "value": 0.01, "color": "red" }]
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 0.01,
+                "color": "red"
+              }
+            ]
           }
         }
       }
     },
-
     {
       "id": 5,
       "type": "stat",
       "title": "Executions",
       "description": "Terminal TA execution count in the current YACE CloudWatch window (~120s).",
-      "gridPos": { "x": 12, "y": 1, "w": 3, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 3,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
           "expr": "sum(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}) or vector(0)"
         }
       ],
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "fieldConfig": { "defaults": { "unit": "none" } }
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      }
     },
-
     {
       "id": 6,
       "type": "stat",
       "title": "P99 Sync TA",
-      "description": "P99 latency of sync Trusted Actions (in-Lambda execution). Async TAs run as K8s Jobs with longer deadlines — see P99 Async TA and Duration by Action.",
-      "gridPos": { "x": 15, "y": 1, "w": 3, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "P99 latency of sync Trusted Actions (in-Lambda execution). Async TAs run as K8s Jobs with longer deadlines \u2014 see P99 Async TA and Duration by Action.",
+      "gridPos": {
+        "x": 15,
+        "y": 1,
+        "w": 3,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
           "expr": "max(aws_zoa_execution_duration_p99{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\", dimension_Mode=\"sync\"}) or vector(0)"
         }
       ],
-      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
           "noValue": "No executions",
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "value": null, "color": "green" }, { "value": 30000, "color": "yellow" }, { "value": 60000, "color": "red" }]
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 30000,
+                "color": "yellow"
+              },
+              {
+                "value": 60000,
+                "color": "red"
+              }
+            ]
           }
         }
       }
     },
-
     {
       "id": 8,
       "type": "stat",
       "title": "P99 Async TA",
-      "description": "P99 latency of async Trusted Actions (K8s Job-based). Minutes are normal — async TAs run outside Lambda with longer deadlines (must_gather: 30 min).",
-      "gridPos": { "x": 18, "y": 1, "w": 3, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "P99 latency of async Trusted Actions (K8s Job-based). Minutes are normal \u2014 async TAs run outside Lambda with longer deadlines (must_gather: 30 min).",
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 3,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
           "expr": "max(aws_zoa_execution_duration_p99{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\", dimension_Mode=\"async\"}) or vector(0)"
         }
       ],
-      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
           "noValue": "No executions",
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "value": null, "color": "green" }, { "value": 600000, "color": "yellow" }, { "value": 1200000, "color": "red" }]
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 600000,
+                "color": "yellow"
+              },
+              {
+                "value": 1200000,
+                "color": "red"
+              }
+            ]
           }
         }
       }
     },
-
     {
       "id": 7,
       "type": "stat",
       "title": "DLQ Depth",
       "description": "Visible messages on ZOA DLQ. Non-zero means worker/reconciler invocations failed and are not being retried.",
-      "gridPos": { "x": 21, "y": 1, "w": 3, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 21,
+        "y": 1,
+        "w": 3,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
           "expr": "sum(aws_sqs_approximate_number_of_messages_visible_maximum{dimension_QueueName=~\".*-zoa-dlq\", cluster=~\"$cluster\"}) or vector(0)"
         }
       ],
-      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "value": null, "color": "green" }, { "value": 1, "color": "red" }]
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
+            ]
           }
         }
       }
     },
-
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Activity Overview",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 37,
+      "type": "barchart",
+      "title": "Executions by Status",
+      "description": "Total TA executions in the dashboard time range grouped by outcome. Respects cluster and action filters.",
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "stacking": "none",
+        "barWidth": 0.7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (dimension_Status) (sum_over_time(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}[$__range]))",
+          "legendFormat": "{{ dimension_Status }}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "type": "barchart",
+      "title": "Executions by Scope",
+      "description": "kube-api (K8s operations) vs aws-api (AWS operations) in the dashboard time range. Respects cluster and action filters.",
+      "gridPos": {
+        "x": 6,
+        "y": 7,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "stacking": "none",
+        "barWidth": 0.7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (dimension_Scope) (sum_over_time(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}[$__range]))",
+          "legendFormat": "{{ dimension_Scope }}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "type": "barchart",
+      "title": "Executions by Type",
+      "description": "read (diagnostic) vs write (mutating) TAs in the dashboard time range. Respects cluster and action filters.",
+      "gridPos": {
+        "x": 12,
+        "y": 7,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "stacking": "none",
+        "barWidth": 0.7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (dimension_Type) (sum_over_time(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}[$__range]))",
+          "legendFormat": "{{ dimension_Type }}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "type": "barchart",
+      "title": "Executions by Mode",
+      "description": "sync (in-Lambda) vs async (K8s Job) TAs in the dashboard time range. Respects cluster and action filters.",
+      "gridPos": {
+        "x": 18,
+        "y": 7,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "stacking": "none",
+        "barWidth": 0.7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (dimension_Mode) (sum_over_time(aws_zoa_execution_count_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\", dimension_Action=~\"$action\"}[$__range]))",
+          "legendFormat": "{{ dimension_Mode }}",
+          "instant": true
+        }
+      ]
+    },
     {
       "id": 10,
       "type": "row",
       "title": "Trusted Action Executions",
       "collapsed": false,
-      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 }
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 24,
+        "h": 1
+      }
     },
-
     {
       "id": 11,
       "type": "timeseries",
       "title": "Executions by Action & Status",
       "description": "Breakdown of terminal TA executions by action name and outcome (succeeded/failed). Use to spot failing actions or unusual traffic patterns.",
-      "gridPos": { "x": 0, "y": 7, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -268,17 +679,33 @@
           "legendFormat": "{{ dimension_Action }} {{ dimension_Status }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "none" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 12,
       "type": "timeseries",
       "title": "P99 Execution Duration by Action",
       "description": "Per-action P99 execution latency over time. Sync TAs should stay in seconds; async TAs (must_gather) in minutes. Spikes indicate degradation for that specific action.",
-      "gridPos": { "x": 12, "y": 7, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -286,17 +713,33 @@
           "legendFormat": "{{ dimension_Action }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "ms" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 13,
       "type": "timeseries",
       "title": "Rejections by Reason",
-      "description": "Cooldown, max concurrent, validation, action-not-found, circuit breaker. Expected traffic — do not page.",
-      "gridPos": { "x": 0, "y": 15, "w": 24, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Cooldown, max concurrent, validation, action-not-found, circuit breaker. Expected traffic \u2014 do not page.",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -304,25 +747,45 @@
           "legendFormat": "{{ dimension_Reason }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "none" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 20,
       "type": "row",
       "title": "HTTP API",
       "collapsed": false,
-      "gridPos": { "x": 0, "y": 23, "w": 24, "h": 1 }
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 1
+      }
     },
-
     {
       "id": 21,
       "type": "timeseries",
       "title": "Request Count by Route & Status",
       "description": "Function URL has no API Gateway metrics. RouteTemplate is low-cardinality (no execution UUIDs).",
-      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -330,17 +793,33 @@
           "legendFormat": "{{ dimension_RouteTemplate }} {{ dimension_StatusClass }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "none" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 22,
       "type": "timeseries",
       "title": "5xx vs 4xx by Cluster",
       "description": "4xx includes cooldown and validation rejections (expected). 5xx means API unavailability.",
-      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 12,
+        "y": 29,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -354,28 +833,64 @@
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "none" },
+        "defaults": {
+          "unit": "none"
+        },
         "overrides": [
           {
-            "matcher": { "id": "byRegexp", "options": "/5xx/" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/5xx/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byRegexp", "options": "/4xx/" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/4xx/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 23,
       "type": "timeseries",
       "title": "P99 HTTP Request Duration",
       "description": "P99 latency of HTTP requests to the ZOA API Lambda Function URL. Includes dispatch overhead, not full execution time for async TAs.",
-      "gridPos": { "x": 0, "y": 32, "w": 24, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 37,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -383,25 +898,45 @@
           "legendFormat": "{{ dimension_RouteTemplate }} {{ dimension_StatusClass }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "ms" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 30,
       "type": "row",
       "title": "Worker Pipeline",
       "collapsed": false,
-      "gridPos": { "x": 0, "y": 40, "w": 24, "h": 1 }
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 24,
+        "h": 1
+      }
     },
-
     {
       "id": 31,
       "type": "timeseries",
       "title": "Reconciler Duration",
       "description": "Time taken by the reconciler tick (dispatch approved TAs, timeout stale ones, poll async jobs). Healthy is single-digit seconds.",
-      "gridPos": { "x": 0, "y": 41, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 46,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -409,17 +944,33 @@
           "legendFormat": "{{ cluster }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "ms" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 32,
       "type": "timeseries",
       "title": "Reconciler / GC Errors",
       "description": "Phase errors during reconciler or GC ticks. Non-zero means some operations failed within the tick (e.g., DynamoDB write, Lambda invocation).",
-      "gridPos": { "x": 8, "y": 41, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 8,
+        "y": 46,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -432,17 +983,33 @@
           "legendFormat": "gc {{ cluster }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "none" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 33,
       "type": "timeseries",
       "title": "Reconciler Tick Health",
       "description": "Distinct ReconcilerLastRun values in the last 10 minutes (changes()). Reconciler fires every 60s. Expected: 3\u20134 (YACE scrapes every 120s \u2192 ~5 samples, ~4 transitions). 0 = stalled.",
-      "gridPos": { "x": 16, "y": 41, "w": 4, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 16,
+        "y": 46,
+        "w": 4,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -453,23 +1020,50 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "value": null, "color": "red" }, { "value": 2, "color": "yellow" }, { "value": 3, "color": "green" }]
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 2,
+                "color": "yellow"
+              },
+              {
+                "value": 3,
+                "color": "green"
+              }
+            ]
           }
         }
       },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 36,
       "type": "timeseries",
       "title": "GC Tick Health",
       "description": "Distinct GCLastRun values in the last 30 minutes (changes()). GC fires every 5min. Expected: 4\u20136 (YACE scrapes every 120s \u2192 ~15 samples, ~6 GC ticks in window). 0 = stalled.",
-      "gridPos": { "x": 20, "y": 41, "w": 4, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 20,
+        "y": 46,
+        "w": 4,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -480,23 +1074,50 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "value": null, "color": "red" }, { "value": 1, "color": "yellow" }, { "value": 2, "color": "green" }]
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 1,
+                "color": "yellow"
+              },
+              {
+                "value": 2,
+                "color": "green"
+              }
+            ]
           }
         }
       },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 34,
       "type": "timeseries",
       "title": "GC Cleaned Resources",
       "description": "Ephemeral Kubernetes resources (ServiceAccounts, RBAC) cleaned up by the garbage collector. Empty is normal when no stale resources exist. Steady flow during activity means GC is healthy.",
-      "gridPos": { "x": 0, "y": 49, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 54,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -504,17 +1125,33 @@
           "legendFormat": "{{ cluster }} {{ dimension_ResourceType }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "none" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 35,
       "type": "timeseries",
       "title": "Circuit Breaker State Changes",
       "description": "Circuit breaker is per Lambda container, not global. Empty means healthy (no trips). A state=open event means at least one container cannot reach EKS.",
-      "gridPos": { "x": 12, "y": 49, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 12,
+        "y": 54,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -522,25 +1159,45 @@
           "legendFormat": "{{ cluster }} {{ dimension_State }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "none" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 40,
       "type": "row",
       "title": "Infrastructure: Lambda",
       "collapsed": false,
-      "gridPos": { "x": 0, "y": 57, "w": 24, "h": 1 }
+      "gridPos": {
+        "x": 0,
+        "y": 62,
+        "w": 24,
+        "h": 1
+      }
     },
-
     {
       "id": 41,
       "type": "timeseries",
       "title": "Lambda Invocations",
       "description": "Raw Lambda invocations across ZOA functions (api + worker). Includes retries and scheduled events.",
-      "gridPos": { "x": 0, "y": 58, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 63,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -548,17 +1205,33 @@
           "legendFormat": "{{ cluster }} {{ dimension_FunctionName }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "none" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 42,
       "type": "timeseries",
       "title": "Lambda Errors",
       "description": "Lambda-level errors (unhandled exceptions, timeouts, OOM). Any non-zero value means requests were completely lost.",
-      "gridPos": { "x": 8, "y": 58, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 8,
+        "y": 63,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -569,20 +1242,46 @@
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "value": null, "color": "green" }, { "value": 1, "color": "red" }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
+            ]
+          }
         }
       },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 43,
       "type": "timeseries",
       "title": "Lambda Duration p99",
       "description": "P99 Lambda execution time (wall clock). Approaching the Lambda timeout (300s) means code deadline or cold starts need investigation.",
-      "gridPos": { "x": 16, "y": 58, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 16,
+        "y": 63,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -590,25 +1289,45 @@
           "legendFormat": "{{ cluster }} {{ dimension_FunctionName }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "ms" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 50,
       "type": "row",
       "title": "Infrastructure: DLQ (SQS)",
       "collapsed": false,
-      "gridPos": { "x": 0, "y": 66, "w": 24, "h": 1 }
+      "gridPos": {
+        "x": 0,
+        "y": 71,
+        "w": 24,
+        "h": 1
+      }
     },
-
     {
       "id": 51,
       "type": "timeseries",
       "title": "DLQ Messages Visible",
       "description": "Number of messages in the ZOA dead-letter queue over time. Each message represents a failed worker/reconciler Lambda invocation that exhausted retries.",
-      "gridPos": { "x": 0, "y": 67, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -619,20 +1338,46 @@
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "value": null, "color": "green" }, { "value": 1, "color": "red" }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
+            ]
+          }
         }
       },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 52,
       "type": "timeseries",
       "title": "DLQ Oldest Message Age",
       "description": "Age of the oldest DLQ message in seconds. Growing age means DLQ messages are not being investigated or replayed.",
-      "gridPos": { "x": 12, "y": 67, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 12,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -640,25 +1385,45 @@
           "legendFormat": "{{ cluster }} {{ dimension_QueueName }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 60,
       "type": "row",
       "title": "Infrastructure: DynamoDB",
       "collapsed": false,
-      "gridPos": { "x": 0, "y": 75, "w": 24, "h": 1 }
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 24,
+        "h": 1
+      }
     },
-
     {
       "id": 61,
       "type": "timeseries",
       "title": "ZOA Table Throttled Requests",
       "description": "Should always be 0 with on-demand billing. Non-zero means DynamoDB is rejecting ZOA requests.",
-      "gridPos": { "x": 0, "y": 76, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 81,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -669,20 +1434,46 @@
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "value": null, "color": "green" }, { "value": 1, "color": "red" }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
+            ]
+          }
         }
       },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 62,
       "type": "timeseries",
       "title": "ZOA Table Latency p99",
       "description": "Tail latency of successful DynamoDB requests. Healthy is single-digit ms.",
-      "gridPos": { "x": 8, "y": 76, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 8,
+        "y": 81,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -690,17 +1481,33 @@
           "legendFormat": "{{ dimension_TableName }}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "ms" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
-
     {
       "id": 63,
       "type": "timeseries",
       "title": "ZOA Table Consumed Capacity",
       "description": "Read and write capacity consumption. Sudden spikes can indicate unexpected load or table scans.",
-      "gridPos": { "x": 16, "y": 76, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 16,
+        "y": 81,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
@@ -713,10 +1520,20 @@
           "legendFormat": "{{ dimension_TableName }} write"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "none" } },
-      "options": { "tooltip": { "mode": "multi", "sort": "desc" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     }
-
   ],
-  "annotations": { "list": [] }
+  "annotations": {
+    "list": []
+  }
 }

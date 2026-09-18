@@ -98,6 +98,13 @@ spec:
               ZOA DLQ on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has
               {{ "{{" }} $value {{ "}}" }} visible message(s) for >5m.
               Investigate worker Lambda failures and reconciler pipeline health.
+            runbook: >-
+              1. Check DLQ depth in ZOA dashboard, Infrastructure: DLQ panel.
+              2. Check worker Lambda errors in CloudWatch Logs for the affected cluster.
+              3. Common causes: worker Lambda crash, EKS unreachable, DynamoDB throttling.
+              4. Messages in DLQ are failed async TA invocations that will NOT auto-retry.
+              5. After fixing root cause, manually redrive DLQ messages via AWS Console (SQS, select queue, Start DLQ redrive) or purge if stale.
+              6. Alert auto-recovers when DLQ depth drops to 0.
 
         # Reconciler is ZOA's heartbeat — without it, executions pile up
         # and stale resources are never cleaned. Fires ~15m after silence
@@ -116,6 +123,12 @@ spec:
               ZOA reconciler on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has not
               ticked in >10m (expected every 60s). Check EventBridge schedule
               and worker Lambda health.
+            runbook: >-
+              1. Check EventBridge schedule: AWS Console, EventBridge, Rules, filter by cluster ID, verify 1-minute rate schedule is enabled.
+              2. Check worker Lambda health: CloudWatch, Lambda, filter by cluster, look for invocation errors or throttling.
+              3. Check if Lambda can reach EKS: look for circuit breaker state changes in ZOA dashboard Worker Pipeline section.
+              4. If EventBridge schedule is missing, re-run the ZOA Terraform module.
+              5. Alert auto-recovers when reconciler resumes ticking.
 
         # DynamoDB is ZOA's persistence layer — throttling means
         # executions and audit writes are being rejected.
@@ -131,6 +144,12 @@ spec:
               DynamoDB throttles detected on ZOA tables for cluster
               {{ "{{" }} $labels.cluster {{ "}}" }}. Execution state and audit
               writes are being rejected.
+            runbook: >-
+              1. Check which table is throttled in ZOA dashboard, Infrastructure: DynamoDB.
+              2. Check DynamoDB capacity mode: AWS Console, DynamoDB, Tables, filter by cluster ID. If provisioned, consider switching to on-demand or increasing RCU/WCU.
+              3. Check for hot partitions: CloudWatch, DynamoDB, per-partition metrics.
+              4. Common cause: burst of TA executions exceeding provisioned capacity.
+              5. Alert auto-recovers when throttling stops.
 
         # Global TA success rate near zero — any dependency failure (EKS,
         # S3, STS, networking) causes this. Backstop for scenarios where
@@ -151,6 +170,14 @@ spec:
               rate is {{ "{{" }} $value | humanizePercentage {{ "}}" }} (<10%) for 15m.
               Likely a dependency failure (EKS, S3, STS). Check dashboard
               for per-action breakdown.
+            runbook: >-
+              1. Open ZOA dashboard, check Activity Overview for which statuses dominate.
+              2. Check Executions by Action and Status panel to identify if all or specific actions are failing.
+              3. If all kube-api scope TAs fail: EKS is likely unreachable. Check circuit breaker panel and EKS cluster health.
+              4. If all aws-api scope TAs fail: STS AssumeRole is likely failing. Check IAM roles and STS regional endpoint health.
+              5. If only async TAs fail: check K8s Job creation and runner image availability.
+              6. If only a specific action fails: check that action RBAC and dependencies.
+              7. Alert auto-recovers when success rate rises above 10%.
 
         # ──────────────────────────────────────────────────────────────
         # WARNING — needs attention, next business day / within hours
@@ -173,6 +200,13 @@ spec:
               ZOA Lambda functions on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
               error rate is {{ "{{" }} $value | humanizePercentage {{ "}}" }} (>5%)
               for 10m. Covers both API and worker Lambdas.
+            runbook: >-
+              1. Check Lambda error details in CloudWatch Logs, filter by cluster and function name (api or worker).
+              2. Look for OOM kills (Runtime.ExitError), init failures, or handler panics.
+              3. If OOM: increase Lambda memory in Terraform zoa-lambda module.
+              4. If init panic: check recent ZOA image deployments, may need rollback.
+              5. If sporadic: may be transient AWS issue, monitor for self-recovery.
+              6. Alert auto-recovers when error rate drops below 5%.
 
         # API availability below SLO target.
         # Traffic guard: >10 requests prevents false positives when
@@ -191,6 +225,13 @@ spec:
               ZOA API on cluster {{ "{{" }} $labels.cluster {{ "}}" }} availability is
               {{ "{{" }} $value | humanizePercentage {{ "}}" }}
               (target {{ .Values.sla.zoa.apiAvailability.target }}) for 15m.
+            runbook: >-
+              1. Check ZOA dashboard HTTP API section, 5xx vs 4xx by Cluster panel.
+              2. Check Request Count by Route panel for which routes are returning 5xx.
+              3. Common causes: DynamoDB issues (check throttling), Lambda memory pressure, code bugs in request handling.
+              4. If correlated with ZOADynamoDBThrottled: fix DynamoDB first.
+              5. If correlated with ZOALambdaErrorRateHigh: fix Lambda first.
+              6. Alert auto-recovers when availability rises above {{ .Values.sla.zoa.apiAvailability.target }}.
 
         # Global TA success rate below SLO. Per-action detail is in the
         # dashboard — alerts are global to avoid noise at fleet scale
@@ -211,6 +252,12 @@ spec:
               rate is {{ "{{" }} $value | humanizePercentage {{ "}}" }}
               (target {{ .Values.sla.zoa.taSuccessRate.target }}) for 15m.
               Check dashboard for per-action breakdown.
+            runbook: >-
+              1. Open ZOA dashboard Executions by Action and Status panel to identify which actions are failing.
+              2. Check Activity Overview By Scope to see if kube-api or aws-api is affected.
+              3. If a single action is failing: check that action RBAC, timeout, and target resource availability.
+              4. If many actions fail: likely a shared dependency issue, see ZOAExecutionsTotalFailure runbook.
+              5. Alert auto-recovers when success rate rises above {{ .Values.sla.zoa.taSuccessRate.target }}.
 
         # Lambda concurrency limits hit — scaling or configuration issue.
         - alert: ZOALambdaThrottled
@@ -224,6 +271,12 @@ spec:
             description: >-
               ZOA Lambda functions on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
               are being throttled. Check reserved concurrency limits.
+            runbook: >-
+              1. Check Lambda concurrent executions in ZOA dashboard, Infrastructure: Lambda.
+              2. Check AWS Console, Lambda, Configuration, Concurrency for the affected functions. ZOA uses reserved concurrency per VPC.
+              3. If concurrency is too low: increase reserved concurrency in Terraform zoa-lambda module.
+              4. If account-level concurrent execution limit is hit: request limit increase via AWS Support.
+              5. Alert auto-recovers when throttling stops.
 
         # GC fires every 5min. Not immediately dangerous if stalled
         # (stale SA/RBAC accumulate, nothing breaks). Next business day.
@@ -241,6 +294,12 @@ spec:
               ZOA GC on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has not ticked
               in >30m (expected every 5min). Check EventBridge schedule
               and worker Lambda health.
+            runbook: >-
+              1. Check EventBridge schedule: AWS Console, EventBridge, Rules, filter by cluster ID, verify 5-minute rate schedule is enabled.
+              2. Check worker Lambda health. GC runs inside the worker Lambda.
+              3. If ZOAReconcilerStalled is also firing: the worker Lambda itself is likely broken, prioritize that alert.
+              4. Impact: stale ServiceAccounts and RBAC bindings accumulate in the MC. Not immediately dangerous but creates clutter.
+              5. Alert auto-recovers when GC resumes ticking.
 
         # GC is encountering errors cleaning up resources.
         - alert: ZOAGCErrors
@@ -255,6 +314,12 @@ spec:
               ZOA garbage collector on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
               reported errors for >10m. Stale ServiceAccounts and RBAC
               may be accumulating.
+            runbook: >-
+              1. Check worker Lambda logs for GC error details, filter by HandlerMode=gc.
+              2. Common causes: RBAC permissions insufficient to delete resources, K8s API server temporarily unreachable, namespace stuck in terminating.
+              3. Check if circuit breaker is also opening (ZOACircuitBreakerFlapping).
+              4. Impact: stale resources accumulate but do not affect TA execution.
+              5. Alert auto-recovers when GC errors stop.
 
         # Circuit breaker flapping — multiple opens in 30min means
         # sustained EKS connectivity issues on at least one Lambda container.
@@ -270,3 +335,10 @@ spec:
               ZOA circuit breaker on cluster {{ "{{" }} $labels.cluster {{ "}}" }}
               has opened >3 times in 30min. At least one Lambda container
               is experiencing sustained EKS API connectivity issues.
+            runbook: >-
+              1. Circuit breaker is per Lambda container, not global. Some containers may work fine while others cannot reach EKS.
+              2. Check EKS cluster health: kubectl get nodes, check API server logs.
+              3. Check VPC connectivity: Lambda ENIs, security groups, NACLs.
+              4. Check if EKS API server is overloaded: look for 429/503 responses.
+              5. If correlated with ZOAExecutionsTotalFailure: EKS is likely the root cause.
+              6. Lambda container rotation (cold starts) naturally recovers individual containers. Alert auto-recovers when EKS becomes reachable.

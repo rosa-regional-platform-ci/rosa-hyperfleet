@@ -84,6 +84,7 @@ tests:
             exp_annotations:
               summary: ZOA dead-letter queue has visible messages
               description: ZOA DLQ on cluster mc-05 has 6 visible message(s) for >5m. Investigate worker Lambda failures and reconciler pipeline health.
+              runbook: "1. Check DLQ depth in ZOA dashboard, Infrastructure: DLQ panel. 2. Check worker Lambda errors in CloudWatch Logs for the affected cluster. 3. Common causes: worker Lambda crash, EKS unreachable, DynamoDB throttling. 4. Messages in DLQ are failed async TA invocations that will NOT auto-retry. 5. After fixing root cause, manually redrive DLQ messages via AWS Console (SQS, select queue, Start DLQ redrive) or purge if stale. 6. Alert auto-recovers when DLQ depth drops to 0."
 
   # DLQ: clean cluster does not fire
   - interval: 1m
@@ -112,6 +113,7 @@ tests:
             exp_annotations:
               summary: ZOA reconciler has stopped ticking
               description: ZOA reconciler on cluster mc-05 has not ticked in >10m (expected every 60s). Check EventBridge schedule and worker Lambda health.
+              runbook: "1. Check EventBridge schedule: AWS Console, EventBridge, Rules, filter by cluster ID, verify 1-minute rate schedule is enabled. 2. Check worker Lambda health: CloudWatch, Lambda, filter by cluster, look for invocation errors or throttling. 3. Check if Lambda can reach EKS: look for circuit breaker state changes in ZOA dashboard Worker Pipeline section. 4. If EventBridge schedule is missing, re-run the ZOA Terraform module. 5. Alert auto-recovers when reconciler resumes ticking."
 
   # DynamoDB throttling → critical
   - interval: 1m
@@ -128,6 +130,7 @@ tests:
             exp_annotations:
               summary: ZOA DynamoDB tables are being throttled
               description: DynamoDB throttles detected on ZOA tables for cluster mc-05. Execution state and audit writes are being rejected.
+              runbook: "1. Check which table is throttled in ZOA dashboard, Infrastructure: DynamoDB. 2. Check DynamoDB capacity mode: AWS Console, DynamoDB, Tables, filter by cluster ID. If provisioned, consider switching to on-demand or increasing RCU/WCU. 3. Check for hot partitions: CloudWatch, DynamoDB, per-partition metrics. 4. Common cause: burst of TA executions exceeding provisioned capacity. 5. Alert auto-recovers when throttling stops."
 
   # Total failure: 0% success with >10 executions → critical
   - interval: 1m
@@ -146,6 +149,7 @@ tests:
             exp_annotations:
               summary: ZOA executions almost completely failing
               description: ZOA on cluster mc-05 global TA success rate is 0% (<10%) for 15m. Likely a dependency failure (EKS, S3, STS). Check dashboard for per-action breakdown.
+              runbook: "1. Open ZOA dashboard, check Activity Overview for which statuses dominate. 2. Check Executions by Action and Status panel to identify if all or specific actions are failing. 3. If all kube-api scope TAs fail: EKS is likely unreachable. Check circuit breaker panel and EKS cluster health. 4. If all aws-api scope TAs fail: STS AssumeRole is likely failing. Check IAM roles and STS regional endpoint health. 5. If only async TAs fail: check K8s Job creation and runner image availability. 6. If only a specific action fails: check that action RBAC and dependencies. 7. Alert auto-recovers when success rate rises above 10%."
 
   # Total failure: low traffic (<10) should NOT fire even at 0%
   - interval: 1m
@@ -184,6 +188,7 @@ tests:
             exp_annotations:
               summary: ZOA Lambda error rate elevated
               description: ZOA Lambda functions on cluster mc-05 error rate is 10% (>5%) for 10m. Covers both API and worker Lambdas.
+              runbook: "1. Check Lambda error details in CloudWatch Logs, filter by cluster and function name (api or worker). 2. Look for OOM kills (Runtime.ExitError), init failures, or handler panics. 3. If OOM: increase Lambda memory in Terraform zoa-lambda module. 4. If init panic: check recent ZOA image deployments, may need rollback. 5. If sporadic: may be transient AWS issue, monitor for self-recovery. 6. Alert auto-recovers when error rate drops below 5%."
 
   # Lambda error rate: low traffic should NOT fire
   - interval: 1m
@@ -218,3 +223,4 @@ tests:
             exp_annotations:
               summary: ZOA TA success rate below SLO
               description: ZOA on cluster mc-01 global TA success rate is 10% (target 0.95) for 15m. Check dashboard for per-action breakdown.
+              runbook: "1. Open ZOA dashboard Executions by Action and Status panel to identify which actions are failing. 2. Check Activity Overview By Scope to see if kube-api or aws-api is affected. 3. If a single action is failing: check that action RBAC, timeout, and target resource availability. 4. If many actions fail: likely a shared dependency issue, see ZOAExecutionsTotalFailure runbook. 5. Alert auto-recovers when success rate rises above 0.95."
