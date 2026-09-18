@@ -81,75 +81,10 @@ spec:
     - name: zoa-alerts
       rules:
         # ──────────────────────────────────────────────────────────────
-        # CRITICAL — page oncall, immediate action required
+        # CRITICAL — page oncall, ZOA operational capability is lost
+        # Only 2 critical alerts: total execution failure + reconciler
+        # stalled (silent async failure mode).
         # ──────────────────────────────────────────────────────────────
-
-        # DLQ messages = failed async executions that won't auto-retry.
-        # Any message sitting for >5m means data loss / unprocessed work.
-        - alert: ZOADLQNotDraining
-          expr: |
-            sum by (cluster) (aws_sqs_approximate_number_of_messages_visible_maximum{dimension_QueueName=~".*-zoa-dlq"}) > 0
-          for: 5m
-          labels:
-            severity: critical
-          annotations:
-            summary: ZOA dead-letter queue has visible messages
-            description: >-
-              ZOA DLQ on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has
-              {{ "{{" }} $value {{ "}}" }} visible message(s) for >5m.
-              Investigate worker Lambda failures and reconciler pipeline health.
-            runbook: >-
-              1. Check DLQ depth in ZOA dashboard, Infrastructure: DLQ panel.
-              2. Check worker Lambda errors in CloudWatch Logs for the affected cluster.
-              3. Common causes: worker Lambda crash, EKS unreachable, DynamoDB throttling.
-              4. Messages in DLQ are failed async TA invocations that will NOT auto-retry.
-              5. After fixing root cause, manually redrive DLQ messages via AWS Console (SQS, select queue, Start DLQ redrive) or purge if stale.
-              6. Alert auto-recovers when DLQ depth drops to 0.
-
-        # Reconciler is ZOA's heartbeat — without it, executions pile up
-        # and stale resources are never cleaned. Fires ~15m after silence
-        # (10m changes() window + 5m for).
-        - alert: ZOAReconcilerStalled
-          expr: |
-            (zoa:reconciler_tick_count < 2)
-            or
-            (absent_over_time(zoa:reconciler_last_run[10m]) == 1)
-          for: 5m
-          labels:
-            severity: critical
-          annotations:
-            summary: ZOA reconciler has stopped ticking
-            description: >-
-              ZOA reconciler on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has not
-              ticked in >10m (expected every 60s). Check EventBridge schedule
-              and worker Lambda health.
-            runbook: >-
-              1. Check EventBridge schedule: AWS Console, EventBridge, Rules, filter by cluster ID, verify 1-minute rate schedule is enabled.
-              2. Check worker Lambda health: CloudWatch, Lambda, filter by cluster, look for invocation errors or throttling.
-              3. Check if Lambda can reach EKS: look for circuit breaker state changes in ZOA dashboard Worker Pipeline section.
-              4. If EventBridge schedule is missing, re-run the ZOA Terraform module.
-              5. Alert auto-recovers when reconciler resumes ticking.
-
-        # DynamoDB is ZOA's persistence layer — throttling means
-        # executions and audit writes are being rejected.
-        - alert: ZOADynamoDBThrottled
-          expr: |
-            sum by (cluster) (aws_dynamodb_throttled_requests_sum{dimension_TableName=~".*-zoa-.*"}) > 0
-          for: 5m
-          labels:
-            severity: critical
-          annotations:
-            summary: ZOA DynamoDB tables are being throttled
-            description: >-
-              DynamoDB throttles detected on ZOA tables for cluster
-              {{ "{{" }} $labels.cluster {{ "}}" }}. Execution state and audit
-              writes are being rejected.
-            runbook: >-
-              1. Check which table is throttled in ZOA dashboard, Infrastructure: DynamoDB.
-              2. Check DynamoDB capacity mode: AWS Console, DynamoDB, Tables, filter by cluster ID. If provisioned, consider switching to on-demand or increasing RCU/WCU.
-              3. Check for hot partitions: CloudWatch, DynamoDB, per-partition metrics.
-              4. Common cause: burst of TA executions exceeding provisioned capacity.
-              5. Alert auto-recovers when throttling stops.
 
         # Global TA success rate near zero — any dependency failure (EKS,
         # S3, STS, networking) causes this. Backstop for scenarios where
@@ -179,9 +114,104 @@ spec:
               6. If only a specific action fails: check that action RBAC and dependencies.
               7. Alert auto-recovers when success rate rises above 10%.
 
+        # Reconciler is ZOA's heartbeat. Without it, async TA results
+        # are never recorded — executions stay "running" forever in
+        # DynamoDB, creating a silent failure mode invisible to
+        # symptom-based alerts. Fires ~15m after silence (10m
+        # changes() window + 5m for).
+        - alert: ZOAReconcilerStalled
+          expr: |
+            (zoa:reconciler_tick_count < 2)
+            or
+            (absent_over_time(zoa:reconciler_last_run[10m]) == 1)
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: ZOA reconciler has stopped ticking
+            description: >-
+              ZOA reconciler on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has not
+              ticked in >10m (expected every 60s). Async TA results will
+              not be recorded. Check EventBridge schedule and worker Lambda health.
+            runbook: >-
+              1. Check EventBridge schedule: AWS Console, EventBridge, Rules, filter by cluster ID, verify 1-minute rate schedule is enabled.
+              2. Check worker Lambda health: CloudWatch, Lambda, filter by cluster, look for invocation errors or throttling.
+              3. Check if Lambda can reach EKS: look for circuit breaker state changes in ZOA dashboard Worker Pipeline section.
+              4. If EventBridge schedule is missing, re-run the ZOA Terraform module.
+              5. Alert auto-recovers when reconciler resumes ticking.
+
         # ──────────────────────────────────────────────────────────────
-        # WARNING — needs attention, next business day / within hours
+        # WARNING — needs attention, next business day / within hours.
+        # ZOA is an internal SRE tool: degradation does not impact
+        # customers directly. Warnings go to Slack and create tickets.
         # ──────────────────────────────────────────────────────────────
+
+        # DLQ actively growing — new async TA failures accumulating.
+        # Uses delta() (rate of change) instead of static depth (> 0)
+        # so the alert auto-resolves when failures stop, even if old
+        # messages remain in the queue. 3+ new messages in 30min
+        # means a recurring problem, not a single transient error.
+        - alert: ZOADLQGrowing
+          expr: |
+            delta(sum by (cluster) (aws_sqs_approximate_number_of_messages_visible_maximum{dimension_QueueName=~".*-zoa-dlq"})[30m:]) > 3
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA dead-letter queue is actively growing
+            description: >-
+              ZOA DLQ on cluster {{ "{{" }} $labels.cluster {{ "}}" }} gained
+              {{ "{{" }} $value | humanize {{ "}}" }} messages in the last 30min.
+              Async TA executions are failing repeatedly.
+            runbook: >-
+              1. Check worker Lambda errors in CloudWatch Logs for the affected cluster.
+              2. Common causes: worker Lambda crash, EKS unreachable, DynamoDB throttling.
+              3. Messages in DLQ are failed async TA invocations that will NOT auto-retry.
+              4. After fixing root cause, redrive DLQ messages via AWS Console (SQS, Start DLQ redrive) or purge if stale.
+              5. Alert auto-recovers when no new messages arrive for 30min.
+
+        # DLQ hygiene — old messages have accumulated and need manual
+        # cleanup. Low-priority housekeeping, not an active problem.
+        - alert: ZOADLQNeedsPurge
+          expr: |
+            sum by (cluster) (aws_sqs_approximate_number_of_messages_visible_maximum{dimension_QueueName=~".*-zoa-dlq"}) > 20
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA DLQ has accumulated stale messages
+            description: >-
+              ZOA DLQ on cluster {{ "{{" }} $labels.cluster {{ "}}" }} has
+              {{ "{{" }} $value | humanize {{ "}}" }} messages (>20). Purge stale
+              messages or redrive any that should be retried.
+            runbook: >-
+              1. Check DLQ in AWS Console, SQS, filter by cluster and zoa-dlq.
+              2. Inspect a sample of messages to determine if they should be redriven or purged.
+              3. Redrive: SQS console, Start DLQ redrive (sends messages back to source queue).
+              4. Purge: SQS console, Purge queue (deletes all messages permanently).
+              5. Alert auto-recovers when queue depth drops below 20.
+
+        # DynamoDB is ZOA's persistence layer — sustained throttling
+        # means executions and audit writes are being degraded. Human
+        # action needed: check capacity and increase if required.
+        - alert: ZOADynamoDBThrottled
+          expr: |
+            sum by (cluster) (aws_dynamodb_throttled_requests_sum{dimension_TableName=~".*-zoa-.*"}) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: ZOA DynamoDB tables are being throttled
+            description: >-
+              DynamoDB throttles detected on ZOA tables for cluster
+              {{ "{{" }} $labels.cluster {{ "}}" }} for >15m. Execution state
+              and audit writes may be degraded.
+            runbook: >-
+              1. Check which table is throttled in ZOA dashboard, Infrastructure: DynamoDB.
+              2. Check DynamoDB capacity mode: AWS Console, DynamoDB, Tables, filter by cluster ID. If provisioned, consider switching to on-demand or increasing RCU/WCU.
+              3. Check for hot partitions: CloudWatch, DynamoDB, per-partition metrics.
+              4. Common cause: burst of TA executions exceeding provisioned capacity.
+              5. Alert auto-recovers when throttling stops.
 
         # Combined API + Worker Lambda error rate. Catches pre-handler
         # crashes (OOM, init panic) that EMF metrics miss.
