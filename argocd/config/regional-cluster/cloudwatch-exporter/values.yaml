@@ -1,3 +1,7 @@
+global:
+  environment: ""
+  cluster_name: ""
+
 prometheus-yet-another-cloudwatch-exporter:
   fullnameOverride: cloudwatch-exporter
 
@@ -282,7 +286,12 @@ prometheus-yet-another-cloudwatch-exporter:
         namespace: ZOA
         regions:
           - {{ .Values.global.aws_region }}
-        recentlyActiveOnly: {{ .Values.recentlyActiveOnly | default false }}
+        {{- if eq .Values.global.environment "ephemeral" }}
+        # In shared AWS accounts (ephemeral), multiple clusters share one
+        # account. recentlyActiveOnly limits ListMetrics to metrics active
+        # in the last 3 hours, skipping stale series from torn-down clusters.
+        recentlyActiveOnly: true
+        {{- end }}
         period: 120
         length: 120
         delay: 120
