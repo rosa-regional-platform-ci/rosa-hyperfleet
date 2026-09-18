@@ -34,10 +34,17 @@ spec:
             sum by (cluster) (aws_zoa_execution_count_sum)
 
         # API availability: 1 − (5xx / total).
+        # When there are no 5xx requests, the 5xx sum is empty (not zero),
+        # so the division returns empty. We use `or (0 * group(...))` to
+        # inject a zero-valued series with matching cluster labels.
         - record: zoa:api_availability
           expr: |
             1 - (
-              sum by (cluster) (aws_zoa_http_request_count_sum{dimension_StatusClass="5xx"})
+              (
+                sum by (cluster) (aws_zoa_http_request_count_sum{dimension_StatusClass="5xx"})
+                or
+                (0 * group by (cluster) (aws_zoa_http_request_count_sum))
+              )
               / sum by (cluster) (aws_zoa_http_request_count_sum)
             )
 
@@ -64,7 +71,7 @@ spec:
         # 10min lookback covers at least one GC tick.
         - record: zoa:gc_last_run
           expr: |
-            max by (cluster) (last_over_time(aws_zoa_gc_last_run_maximum[10m]))
+            max by (cluster) (last_over_time(aws_zoa_gclast_run_maximum[10m]))
 
         # Tick health: count of distinct values in the gap-filled recording rule.
         # Reconciler fires every 60s → expected 3-4 changes per 10m window.
@@ -320,7 +327,7 @@ spec:
         # GC is encountering errors cleaning up resources.
         - alert: ZOAGCErrors
           expr: |
-            sum by (cluster) (aws_zoa_gc_errors_sum) > 0
+            sum by (cluster) (aws_zoa_gcerrors_sum) > 0
           for: 10m
           labels:
             severity: warning

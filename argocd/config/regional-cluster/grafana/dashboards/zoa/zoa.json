@@ -979,7 +979,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum by (cluster) (aws_zoa_gc_errors_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
+          "expr": "sum by (cluster) (aws_zoa_gcerrors_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
           "legendFormat": "gc {{ cluster }}"
         }
       ],
@@ -1121,7 +1121,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (cluster, dimension_ResourceType) (aws_zoa_gc_cleaned_resources_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
+          "expr": "sum by (cluster, dimension_ResourceType) (aws_zoa_gccleaned_resources_sum{cluster=~\"$cluster\", dimension_Cluster=~\"$cluster\"})",
           "legendFormat": "{{ cluster }} {{ dimension_ResourceType }}"
         }
       ],
