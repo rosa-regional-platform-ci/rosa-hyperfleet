@@ -1,6 +1,6 @@
 # Metrics Platform Overview
 
-**Last Updated**: 2026-05-13
+**Last Updated**: 2026-09-22
 
 ## Summary
 
@@ -15,7 +15,7 @@ graph TB
     subgraph MC["Management Cluster"]
         MC_KSM["kube-state-metrics"]
         MC_NE["node-exporter"]
-        MC_YACE["YACE<br/>EKS CloudWatch"]
+        MC_YACE["YACE<br/>EKS, Lambda, SQS,<br/>ZOA EMF"]
         MC_SM["ServiceMonitors<br/>app metrics"]
         MC_PROM["Prometheus (HA)"]
         MC_SIGV4["sigv4-proxy"]
@@ -36,7 +36,7 @@ graph TB
     subgraph RC["Regional Cluster"]
         RC_KSM["kube-state-metrics"]
         RC_NE["node-exporter"]
-        RC_YACE["YACE<br/>EKS, RDS, ALB,<br/>API GW, DynamoDB, ACM"]
+        RC_YACE["YACE<br/>EKS, RDS, ALB,<br/>API GW, DynamoDB, ACM,<br/>Lambda, SQS, ZOA EMF"]
         RC_SM["ServiceMonitors<br/>app metrics"]
         RC_PROM["Prometheus (HA)"]
         RECEIVE["Thanos Receive<br/>router + ingesters"]
@@ -118,12 +118,27 @@ YACE polls AWS CloudWatch APIs and exposes metrics in Prometheus format. Both cl
 | `AWS/ApplicationELB`          | RequestCount, TargetResponseTime, HealthyHostCount, HTTPCode counts                                | API load balancer             |
 | `AWS/DynamoDB`                | ConsumedRead/WriteCapacityUnits, UserErrors, ThrottledRequests, SuccessfulRequestLatency           | Authorization tables          |
 | `AWS/CertificateManager`      | DaysToExpiry                                                                                       | API certificate lifecycle     |
+| `AWS/Lambda`                  | Invocations, Errors, Throttles, Duration, ConcurrentExecutions                                     | ZOA Lambda functions (tag `Cluster`) |
+| `AWS/SQS`                     | ApproximateNumberOfMessagesVisible, ApproximateAgeOfOldestMessage                                   | ZOA DLQ (`*-zoa-dlq`, tag `Cluster`) |
+| `ZOA` (EMF custom namespace)  | ExecutionCount, HttpRequestCount, ReconcilerLastRun, GCLastRun, RejectionCount, and others         | ZOA business metrics from Lambda EMF |
 
 **Management Cluster** scrapes:
 
-| AWS Namespace | Metrics                                                                                 | Purpose                  |
-| ------------- | --------------------------------------------------------------------------------------- | ------------------------ |
-| `AWS/EKS`     | apiserver_storage_size_bytes, scheduler_pending_pods, scheduler_schedule_attempts_total | EKS control plane health |
+| AWS Namespace                | Metrics                                                                                 | Purpose                              |
+| ---------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------ |
+| `AWS/EKS`                    | apiserver_storage_size_bytes, scheduler_pending_pods, scheduler_schedule_attempts_total | EKS control plane health             |
+| `AWS/Lambda`                 | Invocations, Errors, Throttles, Duration, ConcurrentExecutions                          | ZOA Lambda functions (tag `Cluster`)   |
+| `AWS/SQS`                    | ApproximateNumberOfMessagesVisible, ApproximateAgeOfOldestMessage                       | ZOA DLQ (`*-zoa-dlq`, tag `Cluster`) |
+| `ZOA` (EMF custom namespace) | Same EMF metrics as RC                                                                  | ZOA business metrics from Lambda EMF   |
+
+ZOA YACE configuration lives in `argocd/config/regional-cluster/cloudwatch-exporter/values.yaml` (RC) and `argocd/config/management-cluster/cloudwatch-exporter/values.yaml` (MC). Both use a 120s scrape period (600s for GC EMF metrics). Lambda discovery uses `dimensionNameRequirements: [FunctionName]` to avoid high-cardinality `Resource` dimensions.
+
+**Ephemeral environments** share one AWS account across many clusters. Because the `ZOA` customNamespace job has no tag filter, two guards apply only when `global.environment=ephemeral`:
+
+1. **`recentlyActiveOnly: true`** on the ZOA customNamespace job — limits CloudWatch `ListMetrics` to metrics active in the last 3 hours, skipping stale series from torn-down clusters.
+2. **ServiceMonitor metric relabeling** — drops `aws_zoa_*` series whose `dimension_Cluster` does not match the current `global.cluster_name` (mark-then-drop pattern in `cloudwatch-exporter/templates/servicemonitor.yaml`).
+
+Integration, stage, and production use one cluster per AWS account, so neither guard is needed there.
 
 ### Thanos HA Deduplication
 

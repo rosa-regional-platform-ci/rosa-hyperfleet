@@ -63,6 +63,54 @@ tests:
           - labels: 'zoa:lambda_error_rate{cluster="mc-01"}'
             value: 0.06
 
+  # Reconciler last-run recording rule (gap-filled from EMF gauge)
+  - interval: 1m
+    input_series:
+      - series: 'aws_zoa_reconciler_last_run_maximum{cluster="mc-01"}'
+        values: "1700000000x10"
+    promql_expr_test:
+      - expr: zoa:reconciler_last_run{cluster="mc-01"}
+        eval_time: 5m
+        exp_samples:
+          - labels: 'zoa:reconciler_last_run{cluster="mc-01"}'
+            value: 1700000000
+
+  # GC last-run recording rule (gap-filled from EMF gauge)
+  - interval: 1m
+    input_series:
+      - series: 'aws_zoa_gclast_run_maximum{cluster="mc-01"}'
+        values: "1700000100x10"
+    promql_expr_test:
+      - expr: zoa:gc_last_run{cluster="mc-01"}
+        eval_time: 5m
+        exp_samples:
+          - labels: 'zoa:gc_last_run{cluster="mc-01"}'
+            value: 1700000100
+
+  # Reconciler tick count: last_run advances every minute → changes() > 0
+  - interval: 1m
+    input_series:
+      - series: 'aws_zoa_reconciler_last_run_maximum{cluster="mc-01"}'
+        values: "0+60x15"
+    promql_expr_test:
+      - expr: zoa:reconciler_tick_count{cluster="mc-01"}
+        eval_time: 10m
+        exp_samples:
+          - labels: 'zoa:reconciler_tick_count{cluster="mc-01"}'
+            value: 9
+
+  # GC tick count: step changes every 10m → 3 changes in a 30m window
+  - interval: 1m
+    input_series:
+      - series: 'aws_zoa_gclast_run_maximum{cluster="mc-01"}'
+        values: "1000x10 2000x10 3000x10 4000x10"
+    promql_expr_test:
+      - expr: zoa:gc_tick_count{cluster="mc-01"}
+        eval_time: 30m
+        exp_samples:
+          - labels: 'zoa:gc_tick_count{cluster="mc-01"}'
+            value: 2
+
   # ──────────────────────────────────────────────────────────────
   # Alert tests — CRITICAL
   # ──────────────────────────────────────────────────────────────
@@ -224,3 +272,102 @@ tests:
               summary: ZOA TA success rate below SLO
               description: ZOA on cluster mc-01 global TA success rate is 10% (target 0.95) for 15m. Check dashboard for per-action breakdown.
               runbook: "1. Open ZOA dashboard Executions by Action and Status panel to identify which actions are failing. 2. Check Activity Overview By Scope to see if kube-api or aws-api is affected. 3. If a single action is failing: check that action RBAC, timeout, and target resource availability. 4. If many actions fail: likely a shared dependency issue, see ZOAExecutionsTotalFailure runbook. 5. Alert auto-recovers when success rate rises above 0.95."
+
+  # API availability below SLO: 80/100 = 0.8 (< 0.99 target), >10 requests → fires
+  - interval: 1m
+    input_series:
+      - series: 'aws_zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="2xx"}'
+        values: "80x20"
+      - series: 'aws_zoa_http_request_count_sum{cluster="mc-01",dimension_StatusClass="5xx"}'
+        values: "20x20"
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: ZOAApiAvailabilityBelowSLO
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              cluster: mc-01
+            exp_annotations:
+              summary: ZOA API availability below SLO
+              description: ZOA API on cluster mc-01 availability is 80% (target 0.99) for 15m.
+              runbook: "1. Check ZOA dashboard HTTP API section, 5xx vs 4xx by Cluster panel. 2. Check Request Count by Route panel for which routes are returning 5xx. 3. Common causes: DynamoDB issues (check throttling), Lambda memory pressure, code bugs in request handling. 4. If correlated with ZOADynamoDBThrottled: fix DynamoDB first. 5. If correlated with ZOALambdaErrorRateHigh: fix Lambda first. 6. Alert auto-recovers when availability rises above 0.99."
+
+  # API availability healthy → does NOT fire
+  - interval: 1m
+    input_series:
+      - series: 'aws_zoa_http_request_count_sum{cluster="mc-02",dimension_StatusClass="2xx"}'
+        values: "99x20"
+      - series: 'aws_zoa_http_request_count_sum{cluster="mc-02",dimension_StatusClass="5xx"}'
+        values: "1x20"
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: ZOAApiAvailabilityBelowSLO
+        exp_alerts: []
+
+  # Lambda throttled: sustained throttles for >10m → fires warning
+  - interval: 1m
+    input_series:
+      - series: 'aws_lambda_throttles_sum{cluster="mc-05",dimension_FunctionName="eph-mc05-zoa-api"}'
+        values: "1x20"
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: ZOALambdaThrottled
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              cluster: mc-05
+            exp_annotations:
+              summary: ZOA Lambda functions throttled
+              description: ZOA Lambda functions on cluster mc-05 are being throttled. Check reserved concurrency limits.
+              runbook: "1. Check Lambda concurrent executions in ZOA dashboard, Infrastructure: Lambda. 2. Check AWS Console, Lambda, Configuration, Concurrency for the affected functions. ZOA uses reserved concurrency per VPC. 3. If concurrency is too low: increase reserved concurrency in Terraform zoa-lambda module. 4. If account-level concurrent execution limit is hit: request limit increase via AWS Support. 5. Alert auto-recovers when throttling stops."
+
+  # GC stalled: last_run frozen at 0, time()-0 > 1800 for 10m → fires warning
+  - interval: 1m
+    input_series:
+      - series: 'aws_zoa_gclast_run_maximum{cluster="mc-05"}'
+        values: "0x60"
+    alert_rule_test:
+      - eval_time: 52m
+        alertname: ZOAGCStalled
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              cluster: mc-05
+            exp_annotations:
+              summary: ZOA garbage collector has stopped ticking
+              description: ZOA GC on cluster mc-05 has not ticked in >30m (expected every 5min). Check EventBridge schedule and worker Lambda health.
+              runbook: "1. Check EventBridge schedule: AWS Console, EventBridge, Rules, filter by cluster ID, verify 5-minute rate schedule is enabled. 2. Check worker Lambda health. GC runs inside the worker Lambda. 3. If ZOAReconcilerStalled is also firing: the worker Lambda itself is likely broken, prioritize that alert. 4. Impact: stale ServiceAccounts and RBAC bindings accumulate in the MC. Not immediately dangerous but creates clutter. 5. Alert auto-recovers when GC resumes ticking."
+
+  # GC errors: sustained errors for >10m → fires warning
+  - interval: 1m
+    input_series:
+      - series: 'aws_zoa_gcerrors_sum{cluster="mc-05"}'
+        values: "1x20"
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: ZOAGCErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              cluster: mc-05
+            exp_annotations:
+              summary: ZOA garbage collector errors detected
+              description: ZOA garbage collector on cluster mc-05 reported errors for >10m. Stale ServiceAccounts and RBAC may be accumulating.
+              runbook: "1. Check worker Lambda logs for GC error details, filter by HandlerMode=gc. 2. Common causes: RBAC permissions insufficient to delete resources, K8s API server temporarily unreachable, namespace stuck in terminating. 3. Check if circuit breaker is also opening (ZOACircuitBreakerFlapping). 4. Impact: stale resources accumulate but do not affect TA execution. 5. Alert auto-recovers when GC errors stop."
+
+  # Circuit breaker flapping: >3 open events in 30m → fires warning
+  - interval: 1m
+    input_series:
+      - series: 'aws_zoa_circuit_breaker_state_change_sum{cluster="mc-05",dimension_State="open"}'
+        values: "0+1x40"
+    alert_rule_test:
+      - eval_time: 36m
+        alertname: ZOACircuitBreakerFlapping
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              cluster: mc-05
+            exp_annotations:
+              summary: ZOA EKS circuit breaker flapping
+              description: ZOA circuit breaker on cluster mc-05 has opened >3 times in 30min. At least one Lambda container is experiencing sustained EKS API connectivity issues.
+              runbook: "1. Circuit breaker is per Lambda container, not global. Some containers may work fine while others cannot reach EKS. 2. Check EKS cluster health: kubectl get nodes, check API server logs. 3. Check VPC connectivity: Lambda ENIs, security groups, NACLs. 4. Check if EKS API server is overloaded: look for 429/503 responses. 5. If correlated with ZOAExecutionsTotalFailure: EKS is likely the root cause. 6. Lambda container rotation (cold starts) naturally recovers individual containers. Alert auto-recovers when EKS becomes reachable."
