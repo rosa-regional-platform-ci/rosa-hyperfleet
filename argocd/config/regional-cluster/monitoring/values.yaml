@@ -13,6 +13,9 @@ kube-prometheus-stack:
 
   crds:
     enabled: true
+    upgradeJob:
+      enabled: true
+      forceConflicts: true
 
   defaultRules:
     create: false
