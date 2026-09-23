@@ -19,8 +19,8 @@ hyperfleet:
 
   helmValues:
     image:
-      repository: quay.io/redhat-user-workloads/rosa-tenant/hyperfleet-operator
-      tag: "fec5b9fc6db3217d5059fed03e1fdad9591c034f"
+      repository: quay.io/cbusse_openshift/hyperfleet-operator
+      tag: "managed-ingress-dns-2981571"
       pullPolicy: Always
 
     replicaCount: 2
