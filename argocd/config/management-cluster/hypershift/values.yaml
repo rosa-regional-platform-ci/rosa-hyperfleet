@@ -1,32 +1,8 @@
-# Default values for hypershift-install chart
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
-# All values are namespaced under 'hypershift' to maintain consistency
-# with the rendering system and avoid conflicts with other charts
 hypershift:
-  # AWS region — used by the ASCP SecretProviderClass to fetch from Secrets Manager
   region: us-east-1
-
-  # External DNS domain filter — set from config via render.py
   externalDns:
-    domain: ""
+    domain: ''
     image: registry.redhat.io/edo/external-dns-rhel9:c8f7fbd233b9fbcc312672a6e5afd020655c791f
-
-  # Hypershift configuration
   hypershift:
-    # Self-built image on top of hypershift main adding:
-    # - aws-iam-authenticator KAS sidecar injection and webhook redirect (CPO)
-    # - aws-iam-auth-config ConfigMap sync from HC to HCP namespace (HC controller)
-    # - hypershift.openshift.io/aws-iam-authenticator annotation propagation
-    # Branch: https://github.com/typeid/hypershift/tree/aws-iam-authenticator-poc
-    image: quay.io/cbusse_openshift/hypershift-operator:aws-iam-auth
-    # Optional development override for the control-plane-operator (CPO) image.
-    # When set, the HyperShift operator is installed with
-    # --control-plane-operator-image, so every HostedCluster it provisions on
-    # this management cluster runs the given CPO build (e.g. from an
-    # openshift/hypershift PR). Empty disables the override — the CPO image then
-    # defaults to the one the operator derives from the release payload.
-    # Intended for pre-merge e2e (set via ROSA_REGIONAL_EXTRA_COMPONENTS); leave
-    # empty for normal deployments.
-    controlPlaneOperatorImage: ""
+    image: quay.io/rrp-dev-ci/hypershift-operator:ci-85824-2103217223685378048
+    controlPlaneOperatorImage: quay.io/rrp-dev-ci/control-plane-operator:ci-85824-2103217223685378048
