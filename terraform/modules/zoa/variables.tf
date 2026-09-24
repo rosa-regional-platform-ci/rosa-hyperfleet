@@ -3,11 +3,6 @@ variable "regional_id" {
   type        = string
 }
 
-variable "eks_cluster_name" {
-  description = "Name of the RC EKS cluster"
-  type        = string
-}
-
 variable "environment" {
   description = "Deployment environment name (e.g. 'ephemeral', 'integration', 'production'). Controls DynamoDB protection settings and S3 force_destroy behavior."
   type        = string
@@ -35,7 +30,8 @@ variable "output_retention_days" {
   default     = 365
 }
 
-# --- Container images (mirrored from source registry → ECR) ---
+# --- Lambda image (mirrored from source registry → ECR in this module) ---
+# Runner and boundary images are referenced by tag from the source registry in zoa-lambda / deploy config.
 
 variable "zoa_lambda_source_image" {
   description = "Source registry image for ZOA Lambda (mirrored to ECR at deploy time)"
@@ -53,6 +49,11 @@ variable "zoa_lambda_image_tag" {
   description = "Immutable image tag for the ZOA Lambda. Used for source→ECR mirroring."
   type        = string
   default     = "67ef089"
+
+  validation {
+    condition     = var.zoa_lambda_image_tag != ""
+    error_message = "zoa_lambda_image_tag must be set; Seaplane always deploys the full ZOA stack."
+  }
 }
 
 variable "zoa_runner_image_tag" {
