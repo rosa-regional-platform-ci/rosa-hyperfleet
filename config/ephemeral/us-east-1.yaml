@@ -1,3 +1,5 @@
 provision_mcs:
   mc01: {}
-# Force teardown: 2026-09-28T16:19:21Z
+aws:
+  account_id: '599476212575'
+  management_cluster_account_id: '855246887846'
