@@ -1,2 +1,4 @@
+delete: true
 provision_mcs:
   mc01: {}
+# Force teardown: 2026-09-28T16:19:21Z
