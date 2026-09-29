@@ -113,12 +113,12 @@ resource "aws_lambda_function" "access" {
 
   environment {
     variables = {
-      HANDLER_MODE           = "access"
-      SESSIONS_TABLE         = var.sessions_table_name
-      BOUNDARY_TARGETS_TABLE = var.targets_table_name
-      AUDIT_TABLE            = var.audit_table_name
-      KMS_KEY_ARN            = var.kms_key_arn
-      DEPLOYMENT_NAME        = var.deployment_name
+      HANDLER_MODE       = "access"
+      SESSIONS_TABLE     = var.sessions_table_name
+      TARGETS_SSM_PREFIX = var.targets_ssm_prefix
+      AUDIT_TABLE        = var.audit_table_name
+      KMS_KEY_ARN        = var.kms_key_arn
+      DEPLOYMENT_NAME    = var.deployment_name
     }
   }
 
@@ -353,19 +353,7 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.sessions_table_name}/index/*",
         ]
       },
-      {
-        Sid    = "TargetsRead"
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:Query",
-          "dynamodb:DescribeTable",
-        ]
-        Resource = [
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.targets_table_name}",
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.targets_table_name}/index/*",
-        ]
-      },
+      # Targets read via SSM (see lambda_ssm policy below)
       {
         Sid    = "AuditWrite"
         Effect = "Allow"
@@ -435,21 +423,33 @@ resource "aws_iam_role_policy" "lambda_sts" {
   })
 }
 
-# SSM: Read/Write deployment discovery parameters
+# SSM: Deployment discovery (Central Account) and target registration (RC Account)
 resource "aws_iam_role_policy" "lambda_ssm" {
   name = "${local.function_name}-ssm"
   role = aws_iam_role.lambda.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "ssm:PutParameter",
-        "ssm:GetParameter",
-      ]
-      Resource = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/zoa/deployments/*"
-    }]
+    Statement = [
+      {
+        Sid    = "DeploymentDiscovery"
+        Effect = "Allow"
+        Action = [
+          "ssm:PutParameter",
+          "ssm:GetParameter",
+        ]
+        Resource = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/zoa/deployments/*"
+      },
+      {
+        Sid    = "TargetDiscovery"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParametersByPath",
+          "ssm:GetParameter",
+        ]
+        Resource = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/zoa/targets/*"
+      },
+    ]
   })
 }
 
