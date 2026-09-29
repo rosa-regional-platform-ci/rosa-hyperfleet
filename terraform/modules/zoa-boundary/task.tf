@@ -41,8 +41,7 @@ resource "aws_ecs_task_definition" "boundary" {
           done
           echo ""
 
-          # Set prompt to include cluster context
-          export PS1="[\u@zoa:$ZOA_TARGET] \w \$ "
+          export PS1="[\u@zoa:$ZOA_DEPLOYMENT/$ZOA_TARGET] \w \$ "
 
           echo "=== Boundary ready for connections ==="
           echo "Execute TAs with: zoa run <action> [args]"
