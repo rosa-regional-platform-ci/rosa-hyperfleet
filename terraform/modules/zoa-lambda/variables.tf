@@ -206,3 +206,9 @@ variable "dynamodb_ttl_days" {
   type        = number
   default     = 365
 }
+
+variable "enable_boundary" {
+  description = "Controls whether boundary-related security group rules and Lambda resource policies are added for the ZOA Boundary task role. Set to true when the zoa-boundary module is deployed alongside this module."
+  type        = bool
+  default     = false
+}
