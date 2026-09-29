@@ -6,13 +6,14 @@
   "environment": "integration",
   "account_id": "ssm:///infra/integration/us-east-1/mc01/account_id",
   "region": "us-east-1",
-  "alias": "mc01",
-  "management_id": "mc01",
+  "alias": "eph-70d227-mc01",
+  "management_id": "eph-70d227-mc01",
   "regional_aws_account_id": "ssm:///infra/integration/us-east-1/account_id",
-  "zoa_lambda_image_tag": "9999f75",
-  "zoa_runner_image_tag": "9999f75",
+  "zoa_lambda_image_tag": "ci-105-2104924759606169600",
+  "zoa_runner_image_tag": "ci-105-2104924759606169600",
   "zoa_runner_source_image": "quay.io/rrp-dev-ci/zoa-runner",
   "worker_node_ami_id": "ami-08534dafc055ff299",
   "worker_node_root_volume_size": 50,
+  "eph_prefix": "eph-70d227",
   "enable_bastion": true
 }
