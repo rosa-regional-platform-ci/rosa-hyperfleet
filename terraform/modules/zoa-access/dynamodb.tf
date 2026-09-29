@@ -1,11 +1,13 @@
 # =============================================================================
-# ZOA Access — DynamoDB table references
+# ZOA Access — Storage references
 # =============================================================================
-# Boundary session and target tables are created in the zoa/ module
-# (consolidated storage). This module receives table names as variables
-# and only configures IAM access to them.
+# Boundary session table is created in the zoa/ module (consolidated storage).
+# This module receives the table name as a variable and only configures IAM.
+#
+# Target registration uses SSM Parameter Store (not DynamoDB):
+#   /zoa/targets/<deployment>/<cluster> — written by each cluster's Terraform,
+#   read by this Lambda via GetParametersByPath. See zoa/dynamodb.tf.
 # =============================================================================
-# Tables:
-#   - Sessions: var.sessions_table_name (from zoa/ module)
-#   - Targets:  var.targets_table_name  (from zoa/ module)
-#   - Audit:    var.audit_table_name    (from zoa/ module)
+# DynamoDB tables (from zoa/ module):
+#   - Sessions: var.sessions_table_name
+#   - Audit:    var.audit_table_name

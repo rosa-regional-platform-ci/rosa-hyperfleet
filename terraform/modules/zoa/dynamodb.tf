@@ -349,49 +349,19 @@ resource "aws_dynamodb_table" "boundary_sessions" {
 }
 
 # =============================================================================
-# DynamoDB Table for ZOA Boundary Targets
+# ZOA Boundary Targets — SSM Parameter Store
 # =============================================================================
-# Registry of RC/MC clusters available for boundary sessions.
-# PK: targetId (e.g., rc, mc01)
-# Each per-VPC deployment registers here; zoa-access reads for discovery.
-
-resource "aws_dynamodb_table" "boundary_targets" {
-  count                       = var.enable_boundary ? 1 : 0
-  name                        = local.targets_table_name
-  billing_mode                = var.billing_mode
-  hash_key                    = "targetId"
-  deletion_protection_enabled = var.environment != "ephemeral"
-
-  attribute {
-    name = "targetId"
-    type = "S"
-  }
-
-  attribute {
-    name = "deploymentName"
-    type = "S"
-  }
-
-  attribute {
-    name = "targetType"
-    type = "S"
-  }
-
-  global_secondary_index {
-    name            = "deployment-index"
-    hash_key        = "deploymentName"
-    range_key       = "targetType"
-    projection_type = "ALL"
-  }
-
-  point_in_time_recovery {
-    enabled = var.environment != "ephemeral"
-  }
-
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = aws_kms_key.zoa.arn
-  }
-
-  tags = merge(local.common_tags, { Name = local.targets_table_name })
-}
+# Target registration uses SSM Parameter Store instead of DynamoDB because
+# targets are static, Terraform-managed data:
+#   - Written by each cluster's Terraform (RC, MC)
+#   - Auto-removed on terraform destroy (no orphans, no GC)
+#   - Listed via GetParametersByPath("/zoa/targets/<deployment>/")
+#
+# SSM parameters live in the RC account (Access Lambda reads with ambient creds;
+# CLI queries through the Access API, never touches RC SSM directly).
+#
+# Path: /zoa/targets/<deployment_name>/<cluster_name>
+# Value: {"target_type": "rc|mc", "function_url": "...", "vpc_id": "..."}
+#
+# The actual SSM resources are created by each cluster's Terraform module
+# (zoa-lambda), not here. This comment documents the design decision.

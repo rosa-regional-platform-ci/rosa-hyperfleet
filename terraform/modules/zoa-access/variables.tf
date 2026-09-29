@@ -21,10 +21,10 @@ variable "sessions_table_name" {
   default     = "boundary-sessions"
 }
 
-variable "targets_table_name" {
-  description = "Name of the DynamoDB boundary-targets table."
+variable "targets_ssm_prefix" {
+  description = "SSM path prefix for target registration (e.g., /zoa/targets/us-east-1). Each cluster writes its own parameter under this prefix."
   type        = string
-  default     = "boundary-targets"
+  default     = ""
 }
 
 variable "audit_table_name" {

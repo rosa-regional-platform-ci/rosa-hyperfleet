@@ -62,15 +62,14 @@ output "runner_image_uri" {
   value       = var.zoa_runner_image_tag != "" ? "${var.zoa_runner_source_image}:${var.zoa_runner_image_tag}" : ""
 }
 
-# Boundary table outputs (empty when enable_boundary=false)
+# Boundary outputs (empty when enable_boundary=false)
 
 output "sessions_table_name" {
   description = "DynamoDB table name for ZOA boundary sessions"
   value       = var.enable_boundary ? aws_dynamodb_table.boundary_sessions[0].name : ""
 }
 
-output "targets_table_name" {
-  description = "DynamoDB table name for ZOA boundary targets"
-  value       = var.enable_boundary ? aws_dynamodb_table.boundary_targets[0].name : ""
-}
+# Target registration uses SSM Parameter Store, not DynamoDB.
+# Each cluster's Terraform writes /zoa/targets/<deployment>/<cluster>.
+# No table output needed — Access Lambda reads SSM with ambient creds.
 
