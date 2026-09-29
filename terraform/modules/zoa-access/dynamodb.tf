@@ -68,10 +68,25 @@ resource "aws_dynamodb_table" "sessions" {
     type = "S"
   }
 
+  attribute {
+    name = "deadline"
+    type = "S"
+  }
+
   global_secondary_index {
     name            = "date-bucket-index"
     hash_key        = "dateBucket"
     range_key       = "createdAt"
+    projection_type = "ALL"
+  }
+
+  # Reaper index: PK=status, SK=deadline — allows the reaper to efficiently
+  # query only active sessions past their deadline without a full table scan.
+  # Mirrors the execution table's status-index pattern.
+  global_secondary_index {
+    name            = "status-deadline-index"
+    hash_key        = "status"
+    range_key       = "deadline"
     projection_type = "ALL"
   }
 

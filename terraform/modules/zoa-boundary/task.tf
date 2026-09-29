@@ -75,8 +75,18 @@ resource "aws_ecs_task_definition" "boundary" {
           value = var.deployment_name
         },
         {
+          name  = "AWS_REGION"
+          value = data.aws_region.current.region
+        },
+        {
           name  = "ZOA_BREAKGLASS_ROLE_ARN"
           value = ""
+        },
+        # Claude Code Bedrock integration — auto-detects model in the task's region.
+        # AWS_REGION above + CLAUDE_CODE_USE_BEDROCK enables region-local inference.
+        {
+          name  = "CLAUDE_CODE_USE_BEDROCK"
+          value = "1"
         }
       ]
 
