@@ -32,7 +32,7 @@ resource "aws_ecs_task_definition" "boundary" {
           echo ""
 
           echo "Available tools:"
-          for tool in zoa aws kubectl oc jq yq; do
+          for tool in zoa aws kubectl jq; do
             if command -v "$tool" &>/dev/null; then
               echo "  - $tool"
             else
