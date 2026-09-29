@@ -107,8 +107,10 @@ else
     echo "WARNING: no ${CREDS_DIR}/api_url and BUILD_ID not set — CLUSTER_PREFIX unset, log collection disabled" >&2
 fi
 
-E2E_REF="${E2E_REF:-main}"
-E2E_REPO="${E2E_REPO:-https://github.com/openshift-online/rosa-hyperfleet-api.git}"
+# Epic branch only: pair e2e helpers with the pinned API image. Revert to
+# main / openshift-online before landing this PR on main.
+E2E_REF="${E2E_REF:-feature/cedar-authorization}"
+E2E_REPO="${E2E_REPO:-https://github.com/Alcamech/rosa-hyperfleet-api.git}"
 CLI_REF="${CLI_REF:-main}"
 CLI_REPO="${CLI_REPO:-https://github.com/openshift-online/rosa-hyperfleet-cli.git}"
 ROSA_REPO_URL="${ROSA_REPO_URL:-https://github.com/openshift/rosa}"
