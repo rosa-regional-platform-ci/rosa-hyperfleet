@@ -245,3 +245,153 @@ resource "aws_dynamodb_resource_policy" "audit_cross_account" {
     }]
   })
 }
+
+# =============================================================================
+# DynamoDB Table for ZOA Boundary Sessions
+# =============================================================================
+# Stores boundary session lifecycle state (start, active, terminated).
+# PK: sessionId (ECS task ID)
+# TTL: 30 days (short retention — FedRAMP audit coverage is in the audit table)
+#
+# GSI Architecture (5 indexes):
+#   operator-index (PK=operator, SK=createdAt) — `session list` (own sessions)
+#   status-index (PK=status, SK=createdAt) — general status filtering
+#   target-index (PK=targetCluster, SK=createdAt) — filter by target
+#   date-bucket-index (PK=dateBucket, SK=createdAt) — `session history` (day iteration)
+#   status-deadline-index (PK=status, SK=deadline) — reaper (efficient expiry query)
+
+resource "aws_dynamodb_table" "boundary_sessions" {
+  count                       = var.enable_boundary ? 1 : 0
+  name                        = local.sessions_table_name
+  billing_mode                = var.billing_mode
+  hash_key                    = "sessionId"
+  deletion_protection_enabled = var.environment != "ephemeral"
+
+  attribute {
+    name = "sessionId"
+    type = "S"
+  }
+  attribute {
+    name = "operator"
+    type = "S"
+  }
+  attribute {
+    name = "status"
+    type = "S"
+  }
+  attribute {
+    name = "targetCluster"
+    type = "S"
+  }
+  attribute {
+    name = "createdAt"
+    type = "S"
+  }
+  attribute {
+    name = "dateBucket"
+    type = "S"
+  }
+  attribute {
+    name = "deadline"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "operator-index"
+    hash_key        = "operator"
+    range_key       = "createdAt"
+    projection_type = "ALL"
+  }
+
+  global_secondary_index {
+    name            = "status-index"
+    hash_key        = "status"
+    range_key       = "createdAt"
+    projection_type = "ALL"
+  }
+
+  global_secondary_index {
+    name            = "target-index"
+    hash_key        = "targetCluster"
+    range_key       = "createdAt"
+    projection_type = "ALL"
+  }
+
+  global_secondary_index {
+    name            = "date-bucket-index"
+    hash_key        = "dateBucket"
+    range_key       = "createdAt"
+    projection_type = "ALL"
+  }
+
+  global_secondary_index {
+    name            = "status-deadline-index"
+    hash_key        = "status"
+    range_key       = "deadline"
+    projection_type = "ALL"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  point_in_time_recovery {
+    enabled = var.environment != "ephemeral"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.zoa.arn
+  }
+
+  tags = merge(local.common_tags, { Name = local.sessions_table_name })
+}
+
+# =============================================================================
+# DynamoDB Table for ZOA Boundary Targets
+# =============================================================================
+# Registry of RC/MC clusters available for boundary sessions.
+# PK: targetId (e.g., rc, mc01)
+# Each per-VPC deployment registers here; zoa-access reads for discovery.
+
+resource "aws_dynamodb_table" "boundary_targets" {
+  count                       = var.enable_boundary ? 1 : 0
+  name                        = local.targets_table_name
+  billing_mode                = var.billing_mode
+  hash_key                    = "targetId"
+  deletion_protection_enabled = var.environment != "ephemeral"
+
+  attribute {
+    name = "targetId"
+    type = "S"
+  }
+
+  attribute {
+    name = "deploymentName"
+    type = "S"
+  }
+
+  attribute {
+    name = "targetType"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "deployment-index"
+    hash_key        = "deploymentName"
+    range_key       = "targetType"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = var.environment != "ephemeral"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.zoa.arn
+  }
+
+  tags = merge(local.common_tags, { Name = local.targets_table_name })
+}
