@@ -63,6 +63,18 @@ resource "aws_dynamodb_table" "sessions" {
     projection_type = "ALL"
   }
 
+  attribute {
+    name = "dateBucket"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "date-bucket-index"
+    hash_key        = "dateBucket"
+    range_key       = "createdAt"
+    projection_type = "ALL"
+  }
+
   ttl {
     attribute_name = "ttl"
     enabled        = true

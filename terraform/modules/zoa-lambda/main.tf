@@ -566,6 +566,37 @@ resource "aws_scheduler_schedule" "gc" {
   state = var.enable_reconciler ? "ENABLED" : "DISABLED"
 }
 
+# Reaper: RC-only — terminates boundary sessions past their deadline.
+# Runs less frequently than reconciler since session volume is low
+# and deadlines are measured in hours, not seconds.
+resource "aws_scheduler_schedule" "reaper" {
+  count       = var.deployment_target == "rc" && var.enable_boundary ? 1 : 0
+  name        = "${local.function_prefix}-reaper"
+  description = "Triggers ZOA session reaper for ${var.cluster_id} every 5 minutes"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  schedule_expression = "rate(5 minutes)"
+
+  target {
+    arn      = aws_lambda_function.worker.arn
+    role_arn = aws_iam_role.scheduler.arn
+    input    = jsonencode({ route = "reaper" })
+
+    retry_policy {
+      maximum_retry_attempts = 2
+    }
+
+    dead_letter_config {
+      arn = aws_sqs_queue.dlq.arn
+    }
+  }
+
+  state = var.enable_reconciler ? "ENABLED" : "DISABLED"
+}
+
 
 # -----------------------------------------------------------------------------
 # EventBridge Scheduler IAM Role
