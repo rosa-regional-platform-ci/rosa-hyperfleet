@@ -8,6 +8,10 @@ source scripts/pipeline-common/lib.sh
 preflight_check
 config_load management
 
+# Must match RC regional_id so MC ZOA target SSM paths align (e.g. eph-xxx-regional/mc01).
+export TF_VAR_zoa_deployment_name=$(jq -r '.regional_id // "regional"' "deploy/${ENVIRONMENT}/${TARGET_REGION}/pipeline-regional-cluster-inputs/terraform.json" 2>/dev/null || echo "regional")
+export TF_VAR_zoa_sessions_table_name="${TF_VAR_zoa_deployment_name}-zoa-boundary-sessions"
+
 RESOLVED_REGIONAL_ACCOUNT_ID="${REGIONAL_AWS_ACCOUNT_ID}"
 
 # Determine terraform action
@@ -125,6 +129,12 @@ else
     export TF_VAR_zoa_boundary_image=""
 fi
 export TF_VAR_worker_node_ami_id=$(jq -r '.worker_node_ami_id // ""' "$DEPLOY_CONFIG_FILE")
+
+_mc_deploy_name=$(jq -r '.zoa_deployment_name // ""' "$DEPLOY_CONFIG_FILE")
+if [ -n "${_mc_deploy_name}" ]; then
+    export TF_VAR_zoa_deployment_name="${_mc_deploy_name}"
+    export TF_VAR_zoa_sessions_table_name="${TF_VAR_zoa_deployment_name}-zoa-boundary-sessions"
+fi
 
 # ── Phase 2: Apply/Destroy MC infrastructure ─────────────────────────────────
 use_mc_account

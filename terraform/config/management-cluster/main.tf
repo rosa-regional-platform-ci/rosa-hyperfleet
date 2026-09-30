@@ -26,6 +26,10 @@ provider "aws" {
   }
 }
 
+locals {
+  # Empty zoa_deployment_name would produce invalid SSM paths like /zoa/targets//cluster.
+  zoa_targets_ssm_prefix = var.zoa_deployment_name != "" ? "/zoa/targets/${var.zoa_deployment_name}" : ""
+}
 
 # =============================================================================
 # VPC Module
@@ -139,7 +143,7 @@ module "zoa_lambda" {
   # Boundary integration (MC targets register in RC's SSM via cross-account)
   sessions_table_name          = var.zoa_sessions_table_name
   deployment_name              = var.zoa_deployment_name
-  targets_ssm_prefix           = "/zoa/targets/${var.zoa_deployment_name}"
+  targets_ssm_prefix           = local.zoa_targets_ssm_prefix
   vpc_id                       = module.vpc.vpc_id
   boundary_security_group_id   = var.zoa_boundary_image != "" ? module.zoa_boundary[0].security_group_id : ""
   boundary_ecs_cluster_arn     = var.zoa_boundary_image != "" ? module.zoa_boundary[0].ecs_cluster_arn : ""
