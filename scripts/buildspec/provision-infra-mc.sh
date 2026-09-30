@@ -121,13 +121,6 @@ export TF_VAR_zoa_lambda_ecr_url=$(cd "$_RC_TF_DIR" && terraform output -raw zoa
 export TF_VAR_zoa_lambda_image_tag=$(jq -r '.zoa_lambda_image_tag // ""' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_zoa_runner_image_tag=$(jq -r '.zoa_runner_image_tag // ""' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_zoa_runner_source_image=$(jq -r '.zoa_runner_source_image // ""' "$DEPLOY_CONFIG_FILE")
-if [ -n "${TF_VAR_zoa_lambda_image_tag}" ] && [ -n "${TF_VAR_zoa_lambda_ecr_url}" ]; then
-    _zoa_ecr_repo_name="${TF_VAR_zoa_lambda_ecr_url##*/}"
-    _rc_key=$(echo "$_rc_creds" | awk '{print $1}')
-    _rc_secret=$(echo "$_rc_creds" | awk '{print $2}')
-    _rc_token=$(echo "$_rc_creds" | awk '{print $3}')
-    wait_rc_zoa_lambda_ecr_tag "$_rc_key" "$_rc_secret" "$_rc_token" "$_zoa_ecr_repo_name" "${TF_VAR_zoa_lambda_image_tag}"
-fi
 _zoa_boundary_tag=$(jq -r '.zoa_boundary_image_tag // ""' "$DEPLOY_CONFIG_FILE")
 _zoa_boundary_src=$(jq -r '.zoa_boundary_source_image // "quay.io/rrp-dev-ci/zoa-boundary"' "$DEPLOY_CONFIG_FILE")
 if [ -n "${_zoa_boundary_tag}" ]; then

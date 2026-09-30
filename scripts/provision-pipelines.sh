@@ -37,6 +37,8 @@ _CENTRAL_AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-}"
 _CENTRAL_AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}"
 _CENTRAL_AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN:-}"
 
+source scripts/pipeline-common/lib.sh
+
 # Track which target accounts have had state buckets bootstrapped (avoid duplicates)
 BOOTSTRAPPED_ACCOUNTS=""
 
@@ -320,6 +322,9 @@ for region_dir in deploy/${ENVIRONMENT}/*/; do
             fi
         else
             if retry_terraform_apply "${TF_ARGS[@]}"; then
+                use_central_account
+                export ENVIRONMENT TARGET_REGION="${AWS_REGION}" REGIONAL_ID
+                start_regional_infra_pipeline "$REGIONAL_ID" "$AWS_REGION"
                 cd ../../..
             else
                 cd ../../..

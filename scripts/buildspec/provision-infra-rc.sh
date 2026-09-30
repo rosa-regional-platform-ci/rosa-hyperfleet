@@ -204,8 +204,16 @@ if [ "${TERRAFORM_ACTION}" == "apply" ] && [ -f imports.sh ]; then
     source imports.sh
 fi
 
-if [ "${TERRAFORM_ACTION}" == "apply" ] && [ -n "${TF_VAR_zoa_lambda_image_tag}" ]; then
-    wait_central_zoa_deployments_ssm_access 60 10
+set +e
+terraform "${TERRAFORM_ACTION}" -auto-approve
+TERRAFORM_STATUS=$?
+set -e
+
+if [ "$TERRAFORM_STATUS" -ne 0 ]; then
+    exit "$TERRAFORM_STATUS"
 fi
 
-terraform "${TERRAFORM_ACTION}" -auto-approve
+if [ "${TERRAFORM_ACTION}" == "apply" ]; then
+    use_central_account
+    start_management_cluster_pipelines
+fi
