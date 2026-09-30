@@ -144,6 +144,72 @@ _assume_account() {
     fi
 }
 
+# Wait until credentials on AWS profile "central" can read /zoa/deployments/* in SSM.
+# Resync triggers the provisioner and regional pipelines in parallel; regional apply
+# writes deployment discovery via aws.central and may start before the provisioner
+# finishes updating CodeBuild IAM. ParameterNotFound means access is OK; AccessDenied retries.
+wait_central_zoa_deployments_ssm_access() {
+    local max_retries="${1:-60}"
+    local delay_seconds="${2:-10}"
+    local probe_name="/zoa/deployments/_pipeline-ssm-access-probe-${RANDOM}"
+    local attempt=0
+
+    while [ "$attempt" -lt "$max_retries" ]; do
+        attempt=$((attempt + 1))
+        local err=""
+        err=$(AWS_PROFILE=central aws ssm get-parameter \
+            --name "$probe_name" \
+            --region "${TARGET_REGION}" 2>&1) || true
+
+        if echo "$err" | grep -q "ParameterNotFound"; then
+            echo "Central SSM /zoa/deployments access ready (attempt ${attempt}/${max_retries})"
+            return 0
+        fi
+        if echo "$err" | grep -q "AccessDenied"; then
+            echo "Central SSM /zoa/deployments not authorized yet (attempt ${attempt}/${max_retries}), waiting ${delay_seconds}s..."
+            sleep "$delay_seconds"
+            continue
+        fi
+
+        echo "ERROR: Unexpected error checking central SSM access: ${err}" >&2
+        return 1
+    done
+
+    echo "ERROR: Timed out waiting for central SSM /zoa/deployments access after ${max_retries} attempts" >&2
+    return 1
+}
+
+# Wait for a ZOA Lambda image tag to appear in the RC account ECR repo (mirrored by regional apply).
+wait_rc_zoa_lambda_ecr_tag() {
+    local rc_access_key_id="$1"
+    local rc_secret_access_key="$2"
+    local rc_session_token="$3"
+    local repository_name="$4"
+    local image_tag="$5"
+    local max_retries="${6:-90}"
+    local delay_seconds="${7:-30}"
+    local attempt=0
+
+    while [ "$attempt" -lt "$max_retries" ]; do
+        attempt=$((attempt + 1))
+        if AWS_ACCESS_KEY_ID="$rc_access_key_id" \
+            AWS_SECRET_ACCESS_KEY="$rc_secret_access_key" \
+            AWS_SESSION_TOKEN="$rc_session_token" \
+            aws ecr describe-images \
+                --repository-name "$repository_name" \
+                --image-ids "imageTag=${image_tag}" \
+                --region "${TARGET_REGION}" >/dev/null 2>&1; then
+            echo "RC ECR ${repository_name}:${image_tag} ready (attempt ${attempt}/${max_retries})"
+            return 0
+        fi
+        echo "RC ECR ${repository_name}:${image_tag} not ready (attempt ${attempt}/${max_retries}), waiting ${delay_seconds}s..."
+        sleep "$delay_seconds"
+    done
+
+    echo "ERROR: Timed out waiting for RC ECR ${repository_name}:${image_tag}" >&2
+    return 1
+}
+
 # ── Configuration ────────────────────────────────────────────────────────────
 
 # Parse a boolean field from a JSON file. Returns "true" or "false".

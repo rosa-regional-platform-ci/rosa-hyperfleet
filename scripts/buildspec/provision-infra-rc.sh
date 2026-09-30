@@ -204,4 +204,8 @@ if [ "${TERRAFORM_ACTION}" == "apply" ] && [ -f imports.sh ]; then
     source imports.sh
 fi
 
+if [ "${TERRAFORM_ACTION}" == "apply" ] && [ -n "${TF_VAR_zoa_lambda_image_tag}" ]; then
+    wait_central_zoa_deployments_ssm_access 60 10
+fi
+
 terraform "${TERRAFORM_ACTION}" -auto-approve
