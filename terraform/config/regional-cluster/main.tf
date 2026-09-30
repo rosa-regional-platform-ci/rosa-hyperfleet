@@ -487,10 +487,14 @@ module "zoa_lambda" {
   uploader_role_arn    = module.zoa.uploader_role_arn
 
   # Boundary integration
-  enable_boundary     = var.enable_zoa_boundary
-  sessions_table_name = module.zoa.sessions_table_name
-  deployment_name     = var.regional_id
-  targets_ssm_prefix  = "/zoa/targets/${var.regional_id}"
+  enable_boundary              = var.enable_zoa_boundary
+  sessions_table_name          = module.zoa.sessions_table_name
+  deployment_name              = var.regional_id
+  targets_ssm_prefix           = "/zoa/targets/${var.regional_id}"
+  vpc_id                       = module.regional_cluster.vpc_id
+  boundary_security_group_id   = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? module.zoa_boundary[0].security_group_id : ""
+  boundary_ecs_cluster_arn     = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? module.zoa_boundary[0].ecs_cluster_arn : ""
+  boundary_task_definition_arn = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? module.zoa_boundary[0].task_definition_arn : ""
 }
 
 # =============================================================================
