@@ -262,7 +262,6 @@ resource "aws_dynamodb_resource_policy" "audit_cross_account" {
 #   task-id-index (PK=taskId) — identity bridge (ECS task UUID → session → operator)
 
 resource "aws_dynamodb_table" "boundary_sessions" {
-  count                       = var.enable_boundary ? 1 : 0
   name                        = local.sessions_table_name
   billing_mode                = var.billing_mode
   hash_key                    = "sessionId"

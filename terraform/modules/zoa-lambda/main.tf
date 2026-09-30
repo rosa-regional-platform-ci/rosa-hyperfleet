@@ -571,7 +571,7 @@ resource "aws_scheduler_schedule" "gc" {
 # Runs less frequently than reconciler since session volume is low
 # and deadlines are measured in hours, not seconds.
 resource "aws_scheduler_schedule" "reaper" {
-  count       = var.deployment_target == "rc" && var.enable_boundary ? 1 : 0
+  count       = var.deployment_target == "rc" ? 1 : 0
   name        = "${local.function_prefix}-reaper"
   description = "Triggers ZOA session reaper for ${var.cluster_id} every 5 minutes"
 

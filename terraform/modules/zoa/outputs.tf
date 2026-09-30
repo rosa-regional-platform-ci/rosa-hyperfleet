@@ -62,11 +62,9 @@ output "runner_image_uri" {
   value       = var.zoa_runner_image_tag != "" ? "${var.zoa_runner_source_image}:${var.zoa_runner_image_tag}" : ""
 }
 
-# Boundary outputs (empty when enable_boundary=false)
-
 output "sessions_table_name" {
   description = "DynamoDB table name for ZOA boundary sessions"
-  value       = var.enable_boundary ? aws_dynamodb_table.boundary_sessions[0].name : ""
+  value       = aws_dynamodb_table.boundary_sessions.name
 }
 
 # Target registration uses SSM Parameter Store, not DynamoDB.

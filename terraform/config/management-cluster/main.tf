@@ -137,14 +137,13 @@ module "zoa_lambda" {
   data_access_role_arn = var.zoa_data_access_role_arn
 
   # Boundary integration (MC targets register in RC's SSM via cross-account)
-  enable_boundary              = var.enable_zoa_boundary
   sessions_table_name          = var.zoa_sessions_table_name
   deployment_name              = var.zoa_deployment_name
   targets_ssm_prefix           = "/zoa/targets/${var.zoa_deployment_name}"
   vpc_id                       = module.vpc.vpc_id
-  boundary_security_group_id   = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? module.zoa_boundary[0].security_group_id : ""
-  boundary_ecs_cluster_arn     = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? module.zoa_boundary[0].ecs_cluster_arn : ""
-  boundary_task_definition_arn = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? module.zoa_boundary[0].task_definition_arn : ""
+  boundary_security_group_id   = var.zoa_boundary_image != "" ? module.zoa_boundary[0].security_group_id : ""
+  boundary_ecs_cluster_arn     = var.zoa_boundary_image != "" ? module.zoa_boundary[0].ecs_cluster_arn : ""
+  boundary_task_definition_arn = var.zoa_boundary_image != "" ? module.zoa_boundary[0].task_definition_arn : ""
 }
 
 # =============================================================================
@@ -152,7 +151,7 @@ module "zoa_lambda" {
 # =============================================================================
 
 module "zoa_boundary" {
-  count  = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? 1 : 0
+  count  = var.zoa_boundary_image != "" ? 1 : 0
   source = "../../modules/zoa-boundary"
 
   cluster_id                = var.management_id

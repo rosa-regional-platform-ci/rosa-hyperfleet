@@ -61,9 +61,5 @@ variable "zoa_runner_image_tag" {
   default     = "67ef089"
 }
 
-variable "enable_boundary" {
-  description = "Enable ZOA Boundary tables (sessions, targets). Gated to avoid creating unused resources."
-  type        = bool
-  default     = false
-}
+
 
