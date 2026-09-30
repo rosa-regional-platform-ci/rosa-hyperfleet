@@ -505,6 +505,7 @@ module "zoa_access" {
 
   regional_id = var.regional_id
   image_uri   = module.zoa.lambda_image_uri
+  mc_ou_path  = var.mc_ou_path
 
   sessions_table_name = module.zoa.sessions_table_name
   audit_table_name    = module.zoa.audit_table_name

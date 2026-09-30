@@ -1,7 +1,8 @@
 # =============================================================================
 # ZOA Access Lambda Module — RC-Only Session Management
 # =============================================================================
-# Deploys the ZOA Access Lambda behind an API Gateway v2 (HTTP API).
+# Deploys the ZOA Access Lambda with a Function URL (IAM auth) and an
+# OU-trusted invoker role for cross-account SRE access.
 # This runs in the RC account ONLY with NO VPC attachment.
 #
 # The Access Lambda uses the same container image as api/worker Lambdas
@@ -11,7 +12,11 @@
 #   - Approval stubs (501 until approval workflow epic)
 #   - Identity recording (SigV4 caller → DynamoDB)
 #
-# Architecture: SRE laptop → API Gateway → Access Lambda → DynamoDB + ECS
+# Architecture: SRE laptop → sts:AssumeRole (invoker) → Function URL → Lambda → DynamoDB + ECS
+#
+# Cross-account access: The invoker role uses aws:PrincipalOrgPaths (same
+# OU pattern as MC cross-account trust). No Central Account role changes
+# needed — any role in the org OU can assume the invoker role.
 # =============================================================================
 
 data "aws_caller_identity" "current" {}
@@ -129,176 +134,75 @@ resource "aws_lambda_function" "access" {
 }
 
 # =============================================================================
-# API Gateway v2 (HTTP API)
+# Function URL (IAM auth) — replaces API Gateway
 # =============================================================================
+# Function URL with AWS_IAM auth type provides:
+# - SigV4 authentication (unauthenticated requests rejected before code runs)
+# - Native response streaming (APIGW HTTP API does not support streaming)
+# - One fewer service in the critical path (simpler failure domain)
+# - No custom domain needed (SSM autodiscovery provides the URL directly)
 
-resource "aws_apigatewayv2_api" "access" {
-  name          = local.function_name
-  protocol_type = "HTTP"
-  description   = "ZOA Access API for ${var.regional_id} - session management and target discovery"
-
-  tags = local.common_tags
+resource "aws_lambda_function_url" "access" {
+  function_name      = aws_lambda_function.access.function_name
+  authorization_type = "AWS_IAM"
+  invoke_mode        = "RESPONSE_STREAM"
 }
 
-resource "aws_apigatewayv2_stage" "default" {
-  api_id      = aws_apigatewayv2_api.access.id
-  name        = "$default"
-  auto_deploy = true
-
-  tags = local.common_tags
-}
-
-resource "aws_apigatewayv2_integration" "lambda" {
-  api_id                 = aws_apigatewayv2_api.access.id
-  integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.access.invoke_arn
-  payload_format_version = "2.0"
-}
-
-resource "aws_apigatewayv2_route" "proxy" {
-  api_id    = aws_apigatewayv2_api.access.id
-  route_key = "$default"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-}
-
-resource "aws_lambda_permission" "apigw" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.access.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.access.execution_arn}/*/*"
+# Allow the invoker role to call the Function URL
+resource "aws_lambda_permission" "invoker" {
+  statement_id           = "AllowInvokerRole"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.access.function_name
+  principal              = aws_iam_role.invoker.arn
+  function_url_auth_type = "AWS_IAM"
 }
 
 # =============================================================================
-# Custom Domain (optional — gated by var.custom_domain)
+# OU-Trusted Invoker Role — Cross-Account SRE Access
 # =============================================================================
+# SREs authenticate to the Central Account (kinit + rh-aws-saml-login),
+# then assume this role in the RC account to call the Function URL.
+# Trust policy uses aws:PrincipalOrgPaths — same OU pattern as MC
+# cross-account trust (mc_ou_path). No Central Account role changes
+# needed: rh-saml roles already have sts:AssumeRole capability.
 
-resource "aws_apigatewayv2_domain_name" "access" {
-  count       = var.custom_domain != "" ? 1 : 0
-  domain_name = var.custom_domain
+resource "aws_iam_role" "invoker" {
+  name        = "${local.function_name}-invoker"
+  description = "OU-trusted role for SRE access to ZOA Access Lambda Function URL in ${var.regional_id}"
 
-  domain_name_configuration {
-    certificate_arn = var.acm_certificate_arn
-    endpoint_type   = "REGIONAL"
-    security_policy = "TLS_1_2"
-  }
-
-  tags = local.common_tags
-}
-
-resource "aws_apigatewayv2_api_mapping" "access" {
-  count       = var.custom_domain != "" ? 1 : 0
-  api_id      = aws_apigatewayv2_api.access.id
-  domain_name = aws_apigatewayv2_domain_name.access[0].id
-  stage       = aws_apigatewayv2_stage.default.id
-}
-
-resource "aws_route53_record" "access" {
-  count   = var.custom_domain != "" ? 1 : 0
-  zone_id = var.hosted_zone_id
-  name    = var.custom_domain
-  type    = "A"
-
-  alias {
-    name                   = aws_apigatewayv2_domain_name.access[0].domain_name_configuration[0].target_domain_name
-    zone_id                = aws_apigatewayv2_domain_name.access[0].domain_name_configuration[0].hosted_zone_id
-    evaluate_target_health = false
-  }
-}
-
-# =============================================================================
-# WAF WebACL (optional — gated by var.enable_waf)
-# =============================================================================
-
-resource "aws_wafv2_web_acl" "access" {
-  count       = var.enable_waf ? 1 : 0
-  name        = local.function_name
-  description = "WAF for ZOA Access API Gateway in ${var.regional_id}"
-  scope       = "REGIONAL"
-
-  default_action {
-    allow {}
-  }
-
-  rule {
-    name     = "rate-limit"
-    priority = 1
-
-    action {
-      block {}
-    }
-
-    statement {
-      rate_based_statement {
-        limit              = 1000
-        aggregate_key_type = "IP"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        AWS = "*"
       }
-    }
-
-    visibility_config {
-      sampled_requests_enabled   = true
-      cloudwatch_metrics_enabled = true
-      metric_name                = "${local.function_name}-rate-limit"
-    }
-  }
-
-  rule {
-    name     = "aws-common-rules"
-    priority = 2
-
-    override_action {
-      none {}
-    }
-
-    statement {
-      managed_rule_group_statement {
-        name        = "AWSManagedRulesCommonRuleSet"
-        vendor_name = "AWS"
+      Action = "sts:AssumeRole"
+      Condition = {
+        "ForAnyValue:StringLike" = {
+          "aws:PrincipalOrgPaths" = "${var.mc_ou_path}*"
+        }
       }
-    }
+    }]
+  })
 
-    visibility_config {
-      sampled_requests_enabled   = true
-      cloudwatch_metrics_enabled = true
-      metric_name                = "${local.function_name}-common-rules"
-    }
-  }
-
-  rule {
-    name     = "aws-known-bad-inputs"
-    priority = 3
-
-    override_action {
-      none {}
-    }
-
-    statement {
-      managed_rule_group_statement {
-        name        = "AWSManagedRulesKnownBadInputsRuleSet"
-        vendor_name = "AWS"
-      }
-    }
-
-    visibility_config {
-      sampled_requests_enabled   = true
-      cloudwatch_metrics_enabled = true
-      metric_name                = "${local.function_name}-known-bad-inputs"
-    }
-  }
-
-  visibility_config {
-    sampled_requests_enabled   = true
-    cloudwatch_metrics_enabled = true
-    metric_name                = local.function_name
-  }
-
-  tags = local.common_tags
+  tags = merge(local.common_tags, {
+    Name = "${local.function_name}-invoker-role"
+  })
 }
 
-resource "aws_wafv2_web_acl_association" "access" {
-  count        = var.enable_waf ? 1 : 0
-  resource_arn = aws_apigatewayv2_stage.default.arn
-  web_acl_arn  = aws_wafv2_web_acl.access[0].arn
+resource "aws_iam_role_policy" "invoker_function_url" {
+  name = "${local.function_name}-invoker-function-url"
+  role = aws_iam_role.invoker.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "lambda:InvokeFunctionUrl"
+      Resource = aws_lambda_function.access.arn
+    }]
+  })
 }
 
 # =============================================================================
