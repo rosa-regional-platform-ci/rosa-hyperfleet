@@ -255,6 +255,8 @@ resource "aws_codepipeline" "provisioner" {
         file_paths {
           includes = [
             "deploy/${var.environment}/*/pipeline-provisioner-inputs/**",
+            "deploy/${var.environment}/*/pipeline-regional-cluster-inputs/**",
+            "deploy/${var.environment}/*/pipeline-management-cluster-*-inputs/**",
             "terraform/config/pipeline-regional-cluster/**",
             "terraform/config/pipeline-management-cluster/**",
             "terraform/modules/platform-image/**",

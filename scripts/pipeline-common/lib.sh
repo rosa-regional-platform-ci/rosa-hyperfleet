@@ -18,6 +18,9 @@
 #   import_if_needed         Idempotent terraform import
 #   tf_state_value           Read attribute from terraform state
 #   tf_import_summary        Print import summary, fail if errors
+#   start_codepipeline_execution   Start a pipeline run (central account)
+#   start_regional_infra_pipeline  Start ${REGIONAL_ID}-pipe if not already running
+#   start_management_cluster_pipelines  Start all MC pipelines for this region
 
 set -euo pipefail
 
@@ -144,70 +147,71 @@ _assume_account() {
     fi
 }
 
-# Wait until credentials on AWS profile "central" can read /zoa/deployments/* in SSM.
-# Resync triggers the provisioner and regional pipelines in parallel; regional apply
-# writes deployment discovery via aws.central and may start before the provisioner
-# finishes updating CodeBuild IAM. ParameterNotFound means access is OK; AccessDenied retries.
-wait_central_zoa_deployments_ssm_access() {
-    local max_retries="${1:-60}"
-    local delay_seconds="${2:-10}"
-    local probe_name="/zoa/deployments/_pipeline-ssm-access-probe-${RANDOM}"
-    local attempt=0
+# ── CodePipeline orchestration ─────────────────────────────────────────────
+# Deploy config changes (image pins, tfvars) are owned by the pipeline-provisioner
+# webhook. It updates pipeline IAM, then starts regional infra. Regional apply
+# mirrors ZOA images to ECR, then starts MC pipelines. Infra pipelines still
+# auto-trigger directly on terraform module source changes.
 
-    while [ "$attempt" -lt "$max_retries" ]; do
-        attempt=$((attempt + 1))
-        local err=""
-        err=$(AWS_PROFILE=central aws ssm get-parameter \
-            --name "$probe_name" \
-            --region "${TARGET_REGION}" 2>&1) || true
+start_codepipeline_execution() {
+    local pipeline_name="$1"
+    local region="${2:-${TARGET_REGION:-us-east-1}}"
 
-        if echo "$err" | grep -q "ParameterNotFound"; then
-            echo "Central SSM /zoa/deployments access ready (attempt ${attempt}/${max_retries})"
-            return 0
-        fi
-        if echo "$err" | grep -q "AccessDenied"; then
-            echo "Central SSM /zoa/deployments not authorized yet (attempt ${attempt}/${max_retries}), waiting ${delay_seconds}s..."
-            sleep "$delay_seconds"
-            continue
-        fi
+    local status
+    status=$(aws codepipeline list-pipeline-executions \
+        --name "$pipeline_name" \
+        --region "$region" \
+        --max-items 1 \
+        --query 'pipelineExecutionSummaries[0].status' \
+        --output text 2>/dev/null || echo "None")
 
-        echo "ERROR: Unexpected error checking central SSM access: ${err}" >&2
-        return 1
-    done
+    if [ "$status" = "InProgress" ]; then
+        echo "Pipeline ${pipeline_name} already InProgress — skipping duplicate start"
+        return 0
+    fi
 
-    echo "ERROR: Timed out waiting for central SSM /zoa/deployments access after ${max_retries} attempts" >&2
-    return 1
+    echo "Starting CodePipeline: ${pipeline_name} (${region})"
+    aws codepipeline start-pipeline-execution \
+        --name "$pipeline_name" \
+        --region "$region" \
+        --query 'pipelineExecutionId' \
+        --output text
 }
 
-# Wait for a ZOA Lambda image tag to appear in the RC account ECR repo (mirrored by regional apply).
-wait_rc_zoa_lambda_ecr_tag() {
-    local rc_access_key_id="$1"
-    local rc_secret_access_key="$2"
-    local rc_session_token="$3"
-    local repository_name="$4"
-    local image_tag="$5"
-    local max_retries="${6:-90}"
-    local delay_seconds="${7:-30}"
-    local attempt=0
+start_regional_infra_pipeline() {
+    local regional_id="${1:-${REGIONAL_ID:-}}"
+    local region="${2:-${TARGET_REGION:-us-east-1}}"
 
-    while [ "$attempt" -lt "$max_retries" ]; do
-        attempt=$((attempt + 1))
-        if AWS_ACCESS_KEY_ID="$rc_access_key_id" \
-            AWS_SECRET_ACCESS_KEY="$rc_secret_access_key" \
-            AWS_SESSION_TOKEN="$rc_session_token" \
-            aws ecr describe-images \
-                --repository-name "$repository_name" \
-                --image-ids "imageTag=${image_tag}" \
-                --region "${TARGET_REGION}" >/dev/null 2>&1; then
-            echo "RC ECR ${repository_name}:${image_tag} ready (attempt ${attempt}/${max_retries})"
-            return 0
+    if [ -z "$regional_id" ]; then
+        echo "ERROR: regional_id is required to start regional infra pipeline" >&2
+        return 1
+    fi
+
+    local pipeline_name="${regional_id}-pipe"
+    start_codepipeline_execution "$pipeline_name" "$region"
+}
+
+start_management_cluster_pipelines() {
+    local environment="${ENVIRONMENT:-staging}"
+    local target_region="${TARGET_REGION:-us-east-1}"
+
+    shopt -s nullglob
+    local configs=(deploy/"${environment}"/"${target_region}"/pipeline-provisioner-inputs/management-cluster-*.json)
+    shopt -u nullglob
+
+    if [ ${#configs[@]} -eq 0 ]; then
+        echo "No management cluster pipeline configs found — skipping MC pipeline starts"
+        return 0
+    fi
+
+    for cfg in "${configs[@]}"; do
+        local management_id
+        management_id=$(jq -r '.management_id // empty' "$cfg")
+        if [ -z "$management_id" ]; then
+            continue
         fi
-        echo "RC ECR ${repository_name}:${image_tag} not ready (attempt ${attempt}/${max_retries}), waiting ${delay_seconds}s..."
-        sleep "$delay_seconds"
+        start_codepipeline_execution "${management_id}-pipe" "$target_region"
     done
-
-    echo "ERROR: Timed out waiting for RC ECR ${repository_name}:${image_tag}" >&2
-    return 1
 }
 
 # ── Configuration ────────────────────────────────────────────────────────────
