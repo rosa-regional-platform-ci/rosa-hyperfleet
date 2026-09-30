@@ -253,12 +253,13 @@ resource "aws_dynamodb_resource_policy" "audit_cross_account" {
 # PK: sessionId (ECS task ID)
 # TTL: 30 days (short retention — FedRAMP audit coverage is in the audit table)
 #
-# GSI Architecture (5 indexes):
+# GSI Architecture (6 indexes):
 #   operator-index (PK=operator, SK=createdAt) — `session list` (own sessions)
 #   status-index (PK=status, SK=createdAt) — general status filtering
 #   target-index (PK=targetCluster, SK=createdAt) — filter by target
 #   date-bucket-index (PK=dateBucket, SK=createdAt) — `session history` (day iteration)
 #   status-deadline-index (PK=status, SK=deadline) — reaper (efficient expiry query)
+#   task-id-index (PK=taskId) — identity bridge (ECS task UUID → session → operator)
 
 resource "aws_dynamodb_table" "boundary_sessions" {
   count                       = var.enable_boundary ? 1 : 0
@@ -295,6 +296,10 @@ resource "aws_dynamodb_table" "boundary_sessions" {
     name = "deadline"
     type = "S"
   }
+  attribute {
+    name = "taskId"
+    type = "S"
+  }
 
   global_secondary_index {
     name            = "operator-index"
@@ -328,6 +333,12 @@ resource "aws_dynamodb_table" "boundary_sessions" {
     name            = "status-deadline-index"
     hash_key        = "status"
     range_key       = "deadline"
+    projection_type = "ALL"
+  }
+
+  global_secondary_index {
+    name            = "task-id-index"
+    hash_key        = "taskId"
     projection_type = "ALL"
   }
 
