@@ -1,9 +1,11 @@
 # =============================================================================
 # ZOA Deployment Autodiscovery — SSM Parameter Store
 # =============================================================================
-# Written by the RC Terraform pipeline. Read by the SRE CLI for deployment
-# discovery. Lives in the RC account for dev/ephemeral (var.ssm_account_id
-# empty) or in the Central Account for int/stage/prod.
+# Written by the RC Terraform pipeline into the Central Account so the SRE
+# CLI can discover all deployments from a single account. The aws.central
+# provider is configured by the RC config — in pipelines it uses a named
+# profile pointing at the central account; for local dev it falls through
+# to ambient credentials.
 #
 # The parameter stores a JSON object with the deployment's Function URL,
 # invoker role ARN, and metadata. Multiple deployments (including ephemeral)
@@ -11,6 +13,7 @@
 # =============================================================================
 
 resource "aws_ssm_parameter" "deployment" {
+  provider    = aws.central
   name        = "/zoa/deployments/${var.deployment_name}"
   type        = "String"
   description = "ZOA deployment discovery for ${var.deployment_name}"
