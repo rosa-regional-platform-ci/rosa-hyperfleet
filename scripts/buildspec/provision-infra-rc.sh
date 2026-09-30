@@ -173,10 +173,10 @@ export TF_VAR_zoa_lambda_image_tag=$(jq -r '.zoa_lambda_image_tag // ""' "$DEPLO
 export TF_VAR_zoa_runner_image_tag=$(jq -r '.zoa_runner_image_tag // ""' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_zoa_lambda_source_image=$(jq -r '.zoa_lambda_source_image // ""' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_zoa_runner_source_image=$(jq -r '.zoa_runner_source_image // ""' "$DEPLOY_CONFIG_FILE")
-_zoa_boundary_tag=$(jq -r '.zoa_boundary_image_tag // ""' "$DEPLOY_CONFIG_FILE")
-_zoa_boundary_src=$(jq -r '.zoa_boundary_source_image // "quay.io/rrp-dev-ci/zoa-boundary"' "$DEPLOY_CONFIG_FILE")
-if [ -n "${_zoa_boundary_tag}" ]; then
-    export TF_VAR_zoa_boundary_image="${_zoa_boundary_src}:${_zoa_boundary_tag}"
+_zoa_boundary_image_tag=$(jq -r '.zoa_boundary_image_tag // ""' "$DEPLOY_CONFIG_FILE")
+_zoa_boundary_source_image=$(jq -r '.zoa_boundary_source_image // "quay.io/rrp-dev-ci/zoa-boundary"' "$DEPLOY_CONFIG_FILE")
+if [ -n "${_zoa_boundary_image_tag}" ]; then
+    export TF_VAR_zoa_boundary_image="${_zoa_boundary_source_image}:${_zoa_boundary_image_tag}"
 else
     export TF_VAR_zoa_boundary_image=""
 fi
@@ -204,16 +204,4 @@ if [ "${TERRAFORM_ACTION}" == "apply" ] && [ -f imports.sh ]; then
     source imports.sh
 fi
 
-set +e
 terraform "${TERRAFORM_ACTION}" -auto-approve
-TERRAFORM_STATUS=$?
-set -e
-
-if [ "$TERRAFORM_STATUS" -ne 0 ]; then
-    exit "$TERRAFORM_STATUS"
-fi
-
-if [ "${TERRAFORM_ACTION}" == "apply" ]; then
-    use_central_account
-    start_management_cluster_pipelines
-fi
