@@ -9,7 +9,7 @@
 #   - API Lambda: Function URL with native Go streaming. Handles CLI
 #     requests and sync auto-approved TA execution.
 #   - Worker Lambda: Standard handler. Handles all scheduled work (reconciler,
-#     GC) and async TA execution via self-invocation from reconciler.
+#     GC, reaper) and async TA execution via self-invocation from reconciler.
 #
 # Data layer (DynamoDB, S3, KMS) lives in the RC account. MC deployments use
 # cross-account IAM policies on those resources.
@@ -113,12 +113,18 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
         "dynamodb:Query",
         "dynamodb:DescribeTable",
       ]
-      Resource = [
-        "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.dynamodb_table_name}",
-        "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.dynamodb_table_name}/index/*",
-        "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.audit_table_name}",
-        "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.audit_table_name}/index/*",
-      ]
+      Resource = concat(
+        [
+          "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.dynamodb_table_name}",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.dynamodb_table_name}/index/*",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.audit_table_name}",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.audit_table_name}/index/*",
+        ],
+        var.sessions_table_name != "" ? [
+          "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.sessions_table_name}",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:*:table/${var.sessions_table_name}/index/*",
+        ] : [],
+      )
     }]
   })
 }
@@ -567,13 +573,11 @@ resource "aws_scheduler_schedule" "gc" {
   state = var.enable_reconciler ? "ENABLED" : "DISABLED"
 }
 
-# Reaper: RC-only — terminates boundary sessions past their deadline.
-# Runs less frequently than reconciler since session volume is low
-# and deadlines are measured in hours, not seconds.
+# Reaper: same per-VPC Worker schedule as reconciler/GC. Session rows live in RC
+# DynamoDB; each worker lists expired sessions and stops ECS tasks for this cluster only.
 resource "aws_scheduler_schedule" "reaper" {
-  count       = var.deployment_target == "rc" ? 1 : 0
   name        = "${local.function_prefix}-reaper"
-  description = "Triggers ZOA session reaper for ${var.cluster_id} every 5 minutes"
+  description = "Triggers ZOA boundary session reaper for ${var.cluster_id} every 5 minutes"
 
   flexible_time_window {
     mode = "OFF"
@@ -595,7 +599,31 @@ resource "aws_scheduler_schedule" "reaper" {
     }
   }
 
-  state = var.enable_reconciler ? "ENABLED" : "DISABLED"
+  state = var.enable_reconciler && var.sessions_table_name != "" ? "ENABLED" : "DISABLED"
+}
+
+# Worker reaper: StopTask on boundary ECS cluster in this VPC/account only.
+resource "aws_iam_role_policy" "lambda_boundary_ecs_reaper" {
+  count = var.boundary_ecs_cluster_arn != "" ? 1 : 0
+  name  = "${local.function_prefix}-boundary-ecs-reaper"
+  role  = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "ecs:StopTask",
+        "ecs:DescribeTasks",
+      ]
+      Resource = "*"
+      Condition = {
+        ArnEquals = {
+          "ecs:cluster" = var.boundary_ecs_cluster_arn
+        }
+      }
+    }]
+  })
 }
 
 

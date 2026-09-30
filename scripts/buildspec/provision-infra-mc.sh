@@ -8,10 +8,6 @@ source scripts/pipeline-common/lib.sh
 preflight_check
 config_load management
 
-# Must match RC regional_id so MC ZOA target SSM paths align (e.g. eph-xxx-regional/mc01).
-export TF_VAR_zoa_deployment_name=$(jq -r '.regional_id // "regional"' "deploy/${ENVIRONMENT}/${TARGET_REGION}/pipeline-regional-cluster-inputs/terraform.json" 2>/dev/null || echo "regional")
-export TF_VAR_zoa_sessions_table_name="${TF_VAR_zoa_deployment_name}-zoa-boundary-sessions"
-
 RESOLVED_REGIONAL_ACCOUNT_ID="${REGIONAL_AWS_ACCOUNT_ID}"
 
 # Determine terraform action
@@ -108,6 +104,7 @@ else
     export TF_VAR_zoa_table_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_table_arn 2>/dev/null | grep -E '^arn:' || echo "")
     export TF_VAR_zoa_audit_table_name=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_audit_table_name 2>/dev/null || echo "")
     export TF_VAR_zoa_audit_table_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_audit_table_arn 2>/dev/null | grep -E '^arn:' || echo "")
+    export TF_VAR_zoa_sessions_table_name=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_sessions_table_name 2>/dev/null || echo "")
     export TF_VAR_zoa_uploader_role_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_uploader_role_arn 2>/dev/null | grep -E '^arn:' || echo "")
     export TF_VAR_zoa_data_access_role_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_data_access_role_arn 2>/dev/null | grep -E '^arn:' || echo "")
 fi
@@ -121,6 +118,7 @@ export TF_VAR_zoa_lambda_ecr_url=$(cd "$_RC_TF_DIR" && terraform output -raw zoa
 export TF_VAR_zoa_lambda_image_tag=$(jq -r '.zoa_lambda_image_tag // ""' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_zoa_runner_image_tag=$(jq -r '.zoa_runner_image_tag // ""' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_zoa_runner_source_image=$(jq -r '.zoa_runner_source_image // ""' "$DEPLOY_CONFIG_FILE")
+# Boundary ECS pulls Quay directly (no RC ECR mirror); compose full ref for TF_VAR_zoa_boundary_image.
 _zoa_boundary_image_tag=$(jq -r '.zoa_boundary_image_tag // ""' "$DEPLOY_CONFIG_FILE")
 _zoa_boundary_source_image=$(jq -r '.zoa_boundary_source_image // "quay.io/rrp-dev-ci/zoa-boundary"' "$DEPLOY_CONFIG_FILE")
 if [ -n "${_zoa_boundary_image_tag}" ]; then
@@ -130,10 +128,10 @@ else
 fi
 export TF_VAR_worker_node_ami_id=$(jq -r '.worker_node_ami_id // ""' "$DEPLOY_CONFIG_FILE")
 
-_mc_deploy_name=$(jq -r '.zoa_deployment_name // ""' "$DEPLOY_CONFIG_FILE")
-if [ -n "${_mc_deploy_name}" ]; then
-    export TF_VAR_zoa_deployment_name="${_mc_deploy_name}"
-    export TF_VAR_zoa_sessions_table_name="${TF_VAR_zoa_deployment_name}-zoa-boundary-sessions"
+# Deployment id for /zoa/targets/<deployment>/<cluster> and central /zoa/deployments/* (rendered in deploy JSON).
+export TF_VAR_zoa_deployment_name=$(jq -r '.zoa_deployment_name // empty' "$DEPLOY_CONFIG_FILE")
+if [ -z "${TF_VAR_zoa_deployment_name}" ]; then
+    export TF_VAR_zoa_deployment_name=$(jq -r '.regional_id // "regional"' "deploy/${ENVIRONMENT}/${TARGET_REGION}/pipeline-regional-cluster-inputs/terraform.json" 2>/dev/null || echo "regional")
 fi
 
 # ── Phase 2: Apply/Destroy MC infrastructure ─────────────────────────────────

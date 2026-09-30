@@ -61,5 +61,3 @@ variable "zoa_runner_image_tag" {
   default     = "67ef089"
 }
 
-
-

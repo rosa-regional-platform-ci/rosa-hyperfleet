@@ -412,6 +412,11 @@ output "zoa_audit_table_name" {
   value       = module.zoa.audit_table_name
 }
 
+output "zoa_sessions_table_name" {
+  description = "DynamoDB table name for ZOA boundary sessions (single table in RC, all clusters)"
+  value       = module.zoa.sessions_table_name
+}
+
 output "zoa_bucket_name" {
   description = "S3 bucket name for ZOA outputs"
   value       = module.zoa.bucket_name
