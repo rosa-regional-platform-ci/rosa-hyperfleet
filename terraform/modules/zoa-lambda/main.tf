@@ -760,16 +760,18 @@ resource "aws_ssm_parameter" "zoa_target" {
   type  = "String"
 
   value = jsonencode({
-    target_id         = var.cluster_id
-    deployment_name   = var.deployment_name
-    target_type       = var.deployment_target
-    vpc_id            = var.private_subnet_ids != null ? "" : ""
-    subnet_ids        = join(",", var.private_subnet_ids)
-    security_group_id = var.cluster_security_group_id
-    function_url      = aws_lambda_function_url.api.function_url
-    account_id        = data.aws_caller_identity.current.account_id
-    region            = data.aws_region.current.name
-    status            = "ready"
+    target_id           = var.cluster_id
+    deployment_name     = var.deployment_name
+    target_type         = var.deployment_target
+    vpc_id              = var.vpc_id
+    subnet_ids          = join(",", var.private_subnet_ids)
+    security_group_id   = var.boundary_security_group_id
+    ecs_cluster_arn     = var.boundary_ecs_cluster_arn
+    task_definition_arn = var.boundary_task_definition_arn
+    function_url        = aws_lambda_function_url.api.function_url
+    account_id          = data.aws_caller_identity.current.account_id
+    region              = data.aws_region.current.name
+    status              = "ready"
   })
 
   tags = merge(local.common_tags, {

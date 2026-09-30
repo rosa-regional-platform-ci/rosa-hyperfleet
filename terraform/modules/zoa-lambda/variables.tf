@@ -230,3 +230,27 @@ variable "targets_ssm_prefix" {
   type        = string
   default     = ""
 }
+
+variable "vpc_id" {
+  description = "VPC ID where this Lambda is deployed. Written to SSM target metadata for informational / session tracking purposes."
+  type        = string
+  default     = ""
+}
+
+variable "boundary_security_group_id" {
+  description = "Security group ID for ZOA Boundary ECS tasks. Written to SSM target for Access Lambda to use in RunTask."
+  type        = string
+  default     = ""
+}
+
+variable "boundary_ecs_cluster_arn" {
+  description = "ARN of the ZOA Boundary ECS cluster. Written to SSM target for Access Lambda to use in RunTask."
+  type        = string
+  default     = ""
+}
+
+variable "boundary_task_definition_arn" {
+  description = "ARN of the ZOA Boundary ECS task definition. Written to SSM target for Access Lambda to use in RunTask."
+  type        = string
+  default     = ""
+}
