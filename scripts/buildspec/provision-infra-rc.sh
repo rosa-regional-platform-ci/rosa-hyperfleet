@@ -173,6 +173,7 @@ export TF_VAR_zoa_lambda_image_tag=$(jq -r '.zoa_lambda_image_tag // ""' "$DEPLO
 export TF_VAR_zoa_runner_image_tag=$(jq -r '.zoa_runner_image_tag // ""' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_zoa_lambda_source_image=$(jq -r '.zoa_lambda_source_image // ""' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_zoa_runner_source_image=$(jq -r '.zoa_runner_source_image // ""' "$DEPLOY_CONFIG_FILE")
+# Boundary ECS pulls Quay directly (no ECR skopeo mirror); compose full ref for TF_VAR_zoa_boundary_image.
 _zoa_boundary_image_tag=$(jq -r '.zoa_boundary_image_tag // ""' "$DEPLOY_CONFIG_FILE")
 _zoa_boundary_source_image=$(jq -r '.zoa_boundary_source_image // "quay.io/rrp-dev-ci/zoa-boundary"' "$DEPLOY_CONFIG_FILE")
 if [ -n "${_zoa_boundary_image_tag}" ]; then
