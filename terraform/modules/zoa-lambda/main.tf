@@ -48,7 +48,8 @@ locals {
     MAX_CONCURRENT_PER_TARGET         = tostring(var.max_concurrent_per_target)
     ASYNC_SCHEDULING_OVERHEAD_SECONDS = tostring(var.async_scheduling_overhead_seconds)
     LOG_LEVEL                         = var.log_level
-  }, var.data_access_role_arn != "" ? { DATA_STORE_ROLE_ARN = var.data_access_role_arn } : {})
+    }, var.data_access_role_arn != "" ? { DATA_STORE_ROLE_ARN = var.data_access_role_arn } : {},
+  var.sessions_table_name != "" ? { SESSIONS_TABLE = var.sessions_table_name } : {})
 
   common_tags = {
     Component = "zoa"
@@ -739,5 +740,39 @@ resource "aws_cloudwatch_log_group" "worker" {
 
   tags = merge(local.common_tags, {
     Name = "${local.function_prefix}-worker-logs"
+  })
+}
+
+# =============================================================================
+# SSM Target Registration — Self-registers this cluster as a ZOA target
+# =============================================================================
+# Each cluster's Terraform writes its own metadata to SSM. The ZOA Access
+# Lambda reads these parameters to know where to create ECS tasks.
+# On terraform destroy, the parameter is auto-removed (no orphans, no GC).
+#
+# For RC deployments: written locally (same account as Access Lambda).
+# For MC deployments: written cross-account to the RC account via the
+#   zoa-data-access role (extended with SSM permissions).
+
+resource "aws_ssm_parameter" "zoa_target" {
+  count = var.targets_ssm_prefix != "" ? 1 : 0
+  name  = "${var.targets_ssm_prefix}/${var.cluster_id}"
+  type  = "String"
+
+  value = jsonencode({
+    target_id         = var.cluster_id
+    deployment_name   = var.deployment_name
+    target_type       = var.deployment_target
+    vpc_id            = var.private_subnet_ids != null ? "" : ""
+    subnet_ids        = join(",", var.private_subnet_ids)
+    security_group_id = var.cluster_security_group_id
+    function_url      = aws_lambda_function_url.api.function_url
+    account_id        = data.aws_caller_identity.current.account_id
+    region            = data.aws_region.current.name
+    status            = "ready"
+  })
+
+  tags = merge(local.common_tags, {
+    Name = "${local.function_prefix}-target-registration"
   })
 }

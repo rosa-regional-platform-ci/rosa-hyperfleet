@@ -161,6 +161,15 @@ resource "aws_iam_role_policy" "task_ssm" {
           "logs:PutLogEvents"
         ]
         Resource = "${aws_cloudwatch_log_group.boundary.arn}:*"
+      },
+      {
+        Sid    = "KMSForECSExec"
+        Effect = "Allow"
+        Action = [
+          "kms:GenerateDataKey",
+          "kms:Decrypt",
+        ]
+        Resource = aws_kms_key.boundary_logs.arn
       }
     ]
   })
@@ -182,6 +191,54 @@ resource "aws_iam_role_policy" "task_ssm_params" {
         Resource = "arn:aws:ssm:${data.aws_region.current.region}:${local.account_id}:parameter/zoa/deployments/*"
       }
     ]
+  })
+}
+
+# Lambda Function URL — ZOA CLI calls the per-VPC Lambda from inside the container.
+# Function URLs are public HTTPS endpoints; traffic goes through NAT Gateway.
+resource "aws_iam_role_policy" "task_lambda" {
+  name = "lambda-function-url"
+  role = aws_iam_role.task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid    = "InvokeFunctionURL"
+      Effect = "Allow"
+      Action = [
+        "lambda:InvokeFunctionUrl",
+      ]
+      Resource = var.zoa_lambda_function_arn
+      Condition = {
+        StringEquals = {
+          "lambda:FunctionUrlAuthType" = "AWS_IAM"
+        }
+      }
+    }]
+  })
+}
+
+# Bedrock — Claude Code uses Amazon Bedrock for AI assistance.
+# Scoped to deployment region only (no cross-region inference).
+resource "aws_iam_role_policy" "task_bedrock" {
+  count = length(var.allowed_bedrock_models) > 0 ? 1 : 0
+  name  = "bedrock-invoke"
+  role  = aws_iam_role.task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid    = "BedrockInvokeModel"
+      Effect = "Allow"
+      Action = [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream",
+      ]
+      Resource = [
+        for model in var.allowed_bedrock_models :
+        "arn:aws:bedrock:${data.aws_region.current.region}::foundation-model/${model}"
+      ]
+    }]
   })
 }
 

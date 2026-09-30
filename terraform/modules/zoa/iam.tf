@@ -203,3 +203,26 @@ resource "aws_iam_role_policy" "data_access_kms" {
     }]
   })
 }
+
+# SSM: MC pipelines write target metadata to RC account's SSM.
+# Path: /zoa/targets/<deployment>/<cluster> — auto-removed on terraform destroy.
+resource "aws_iam_role_policy" "data_access_ssm" {
+  count = var.enable_boundary ? 1 : 0
+  name  = "${var.regional_id}-zoa-data-access-ssm"
+  role  = aws_iam_role.data_access.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid    = "TargetRegistration"
+      Effect = "Allow"
+      Action = [
+        "ssm:PutParameter",
+        "ssm:DeleteParameter",
+        "ssm:GetParameter",
+        "ssm:AddTagsToResource",
+      ]
+      Resource = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/zoa/targets/*"
+    }]
+  })
+}

@@ -135,6 +135,32 @@ module "zoa_lambda" {
   kms_key_arn          = var.zoa_kms_key_arn
   uploader_role_arn    = var.zoa_uploader_role_arn
   data_access_role_arn = var.zoa_data_access_role_arn
+
+  # Boundary integration (MC targets register in RC's SSM via cross-account)
+  enable_boundary     = var.enable_zoa_boundary
+  sessions_table_name = var.zoa_sessions_table_name
+  deployment_name     = var.zoa_deployment_name
+  targets_ssm_prefix  = "/zoa/targets/${var.zoa_deployment_name}"
+}
+
+# =============================================================================
+# ZOA Boundary (ECS Fargate tasks — MC VPC)
+# =============================================================================
+
+module "zoa_boundary" {
+  count  = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? 1 : 0
+  source = "../../modules/zoa-boundary"
+
+  cluster_id                = var.management_id
+  cluster_name              = module.management_cluster.cluster_name
+  cluster_security_group_id = module.vpc.cluster_security_group_id
+  vpc_id                    = module.vpc.vpc_id
+  private_subnet_ids        = module.vpc.private_subnet_ids
+  deployment_name           = var.zoa_deployment_name
+
+  boundary_image          = var.zoa_boundary_image
+  zoa_function_url        = module.zoa_lambda[0].api_function_url
+  zoa_lambda_function_arn = module.zoa_lambda[0].api_function_arn
 }
 
 # =============================================================================

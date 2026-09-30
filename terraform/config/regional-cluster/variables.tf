@@ -486,6 +486,28 @@ variable "zoa_runner_source_image" {
   default     = "quay.io/rrp-dev-ci/zoa-runner"
 }
 
+# =============================================================================
+# ZOA Boundary Variables
+# =============================================================================
+
+variable "enable_zoa_boundary" {
+  description = "Enable ZOA Boundary infrastructure (Access Lambda, ECS tasks, sessions table). Default false — enable per-region when boundary image is available."
+  type        = bool
+  default     = false
+}
+
+variable "zoa_boundary_image" {
+  description = "Container image for ZOA Boundary ECS tasks (from Konflux/ECR). Required when enable_zoa_boundary=true."
+  type        = string
+  default     = ""
+}
+
+variable "zoa_boundary_source_image" {
+  description = "Source registry image for ZOA Boundary (mirrored to ECR). Override together with zoa_boundary_image_tag."
+  type        = string
+  default     = "quay.io/rrp-dev-ci/zoa-boundary"
+}
+
 variable "worker_node_ami_id" {
   description = "Custom AMI ID for the Karpenter bootstrap managed node group. Empty (default) uses the EKS-optimized AL2023 AMI. When set, the node group switches to a CUSTOM AMI and the launch template supplies nodeadm bootstrap user_data (assumes a nodeadm-compatible image, e.g. RHEL/AL2023)."
   type        = string

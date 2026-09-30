@@ -453,6 +453,7 @@ module "zoa" {
   eks_cluster_name        = module.regional_cluster.cluster_name
   mc_ou_path              = var.mc_ou_path
   environment             = var.environment
+  enable_boundary         = var.enable_zoa_boundary
   zoa_lambda_image_tag    = var.zoa_lambda_image_tag
   zoa_runner_image_tag    = var.zoa_runner_image_tag
   zoa_lambda_source_image = var.zoa_lambda_source_image
@@ -484,6 +485,50 @@ module "zoa_lambda" {
   artifact_bucket_arn  = module.zoa.bucket_arn
   kms_key_arn          = module.zoa.kms_key_arn
   uploader_role_arn    = module.zoa.uploader_role_arn
+
+  # Boundary integration
+  enable_boundary     = var.enable_zoa_boundary
+  sessions_table_name = module.zoa.sessions_table_name
+  deployment_name     = var.regional_id
+  targets_ssm_prefix  = "/zoa/targets/${var.regional_id}"
+}
+
+# =============================================================================
+# ZOA Access Lambda (Boundary session management — RC only)
+# =============================================================================
+
+module "zoa_access" {
+  count  = var.enable_zoa_boundary && var.zoa_lambda_image_tag != "" ? 1 : 0
+  source = "../../modules/zoa-access"
+
+  regional_id = var.regional_id
+  image_uri   = module.zoa.lambda_image_uri
+
+  sessions_table_name = module.zoa.sessions_table_name
+  audit_table_name    = module.zoa.audit_table_name
+  targets_ssm_prefix  = "/zoa/targets/${var.regional_id}"
+  kms_key_arn         = module.zoa.kms_key_arn
+  deployment_name     = var.regional_id
+}
+
+# =============================================================================
+# ZOA Boundary (ECS Fargate tasks — RC VPC)
+# =============================================================================
+
+module "zoa_boundary" {
+  count  = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? 1 : 0
+  source = "../../modules/zoa-boundary"
+
+  cluster_id                = var.regional_id
+  cluster_name              = module.regional_cluster.cluster_name
+  cluster_security_group_id = module.regional_cluster.cluster_security_group_id
+  vpc_id                    = module.regional_cluster.vpc_id
+  private_subnet_ids        = module.regional_cluster.private_subnet_ids
+  deployment_name           = var.regional_id
+
+  boundary_image          = var.zoa_boundary_image
+  zoa_function_url        = module.zoa_lambda[0].api_function_url
+  zoa_lambda_function_arn = module.zoa_lambda[0].api_function_arn
 }
 
 # =============================================================================
