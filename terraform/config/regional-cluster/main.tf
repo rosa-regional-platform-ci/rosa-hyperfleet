@@ -453,7 +453,6 @@ module "zoa" {
   eks_cluster_name        = module.regional_cluster.cluster_name
   mc_ou_path              = var.mc_ou_path
   environment             = var.environment
-  enable_boundary         = var.enable_zoa_boundary
   zoa_lambda_image_tag    = var.zoa_lambda_image_tag
   zoa_runner_image_tag    = var.zoa_runner_image_tag
   zoa_lambda_source_image = var.zoa_lambda_source_image
@@ -487,14 +486,13 @@ module "zoa_lambda" {
   uploader_role_arn    = module.zoa.uploader_role_arn
 
   # Boundary integration
-  enable_boundary              = var.enable_zoa_boundary
   sessions_table_name          = module.zoa.sessions_table_name
   deployment_name              = var.regional_id
   targets_ssm_prefix           = "/zoa/targets/${var.regional_id}"
   vpc_id                       = module.regional_cluster.vpc_id
-  boundary_security_group_id   = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? module.zoa_boundary[0].security_group_id : ""
-  boundary_ecs_cluster_arn     = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? module.zoa_boundary[0].ecs_cluster_arn : ""
-  boundary_task_definition_arn = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? module.zoa_boundary[0].task_definition_arn : ""
+  boundary_security_group_id   = var.zoa_boundary_image != "" ? module.zoa_boundary[0].security_group_id : ""
+  boundary_ecs_cluster_arn     = var.zoa_boundary_image != "" ? module.zoa_boundary[0].ecs_cluster_arn : ""
+  boundary_task_definition_arn = var.zoa_boundary_image != "" ? module.zoa_boundary[0].task_definition_arn : ""
 }
 
 # =============================================================================
@@ -502,7 +500,7 @@ module "zoa_lambda" {
 # =============================================================================
 
 module "zoa_access" {
-  count  = var.enable_zoa_boundary && var.zoa_lambda_image_tag != "" ? 1 : 0
+  count  = var.zoa_lambda_image_tag != "" ? 1 : 0
   source = "../../modules/zoa-access"
 
   regional_id = var.regional_id
@@ -520,7 +518,7 @@ module "zoa_access" {
 # =============================================================================
 
 module "zoa_boundary" {
-  count  = var.enable_zoa_boundary && var.zoa_boundary_image != "" ? 1 : 0
+  count  = var.zoa_boundary_image != "" ? 1 : 0
   source = "../../modules/zoa-boundary"
 
   cluster_id                = var.regional_id

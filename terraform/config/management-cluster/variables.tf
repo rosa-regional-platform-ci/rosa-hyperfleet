@@ -185,14 +185,8 @@ variable "zoa_data_access_role_arn" {
   default     = ""
 }
 
-variable "enable_zoa_boundary" {
-  description = "Enable ZOA Boundary infrastructure (ECS tasks in this MC's VPC). Default false."
-  type        = bool
-  default     = false
-}
-
 variable "zoa_boundary_image" {
-  description = "Container image for ZOA Boundary ECS tasks (from Konflux/ECR)."
+  description = "Container image for ZOA Boundary ECS tasks (from Konflux/ECR). Empty disables boundary deployment."
   type        = string
   default     = ""
 }

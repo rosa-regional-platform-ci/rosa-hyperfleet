@@ -207,12 +207,6 @@ variable "dynamodb_ttl_days" {
   default     = 365
 }
 
-variable "enable_boundary" {
-  description = "Controls whether boundary-related security group rules and Lambda resource policies are added for the ZOA Boundary task role. Set to true when the zoa-boundary module is deployed alongside this module."
-  type        = bool
-  default     = false
-}
-
 variable "sessions_table_name" {
   description = "DynamoDB table name for ZOA boundary sessions. Set when boundary is enabled — required for the reaper (worker) and identity bridge (api)."
   type        = string
