@@ -503,6 +503,11 @@ module "zoa_access" {
   count  = var.zoa_lambda_image_tag != "" ? 1 : 0
   source = "../../modules/zoa-access"
 
+  providers = {
+    aws         = aws
+    aws.central = aws.central
+  }
+
   regional_id = var.regional_id
   image_uri   = module.zoa.lambda_image_uri
   mc_ou_path  = var.mc_ou_path
