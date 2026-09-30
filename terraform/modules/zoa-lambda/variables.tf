@@ -212,3 +212,21 @@ variable "enable_boundary" {
   type        = bool
   default     = false
 }
+
+variable "sessions_table_name" {
+  description = "DynamoDB table name for ZOA boundary sessions. Set when boundary is enabled — required for the reaper (worker) and identity bridge (api)."
+  type        = string
+  default     = ""
+}
+
+variable "deployment_name" {
+  description = "Deployment name (e.g. us-east-1, us-east-1-eph-abc123). Used for SSM target registration."
+  type        = string
+  default     = ""
+}
+
+variable "targets_ssm_prefix" {
+  description = "SSM prefix for target registration (e.g. /zoa/targets/us-east-1). Each cluster writes its own SSM parameter under this prefix."
+  type        = string
+  default     = ""
+}

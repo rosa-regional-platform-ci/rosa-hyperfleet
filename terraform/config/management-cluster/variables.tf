@@ -185,6 +185,29 @@ variable "zoa_data_access_role_arn" {
   default     = ""
 }
 
+variable "enable_zoa_boundary" {
+  description = "Enable ZOA Boundary infrastructure (ECS tasks in this MC's VPC). Default false."
+  type        = bool
+  default     = false
+}
+
+variable "zoa_boundary_image" {
+  description = "Container image for ZOA Boundary ECS tasks (from Konflux/ECR)."
+  type        = string
+  default     = ""
+}
+
+variable "zoa_sessions_table_name" {
+  description = "DynamoDB table name for ZOA boundary sessions (in RC account, read from RC state)."
+  type        = string
+  default     = ""
+}
+
+variable "zoa_deployment_name" {
+  description = "ZOA deployment name (e.g. us-east-1). Used for SSM target registration and boundary PS1."
+  type        = string
+  default     = ""
+}
 
 variable "oidc_bucket_name" {
   description = "S3 bucket name for regional OIDC discovery documents (read from RC terraform state)"

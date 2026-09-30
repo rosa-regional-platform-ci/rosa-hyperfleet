@@ -56,6 +56,23 @@ variable "memory" {
   default     = "1024"
 }
 
+variable "zoa_lambda_function_arn" {
+  description = "ARN of the per-VPC ZOA Lambda function. Used in task role IAM to allow lambda:InvokeFunctionUrl."
+  type        = string
+}
+
+variable "allowed_bedrock_models" {
+  description = "List of Bedrock model ID patterns allowed for boundary tasks. Empty disables Bedrock IAM. Default: Haiku only for cost control."
+  type        = list(string)
+  default     = ["anthropic.claude-3-5-haiku-*"]
+}
+
+variable "enable_bedrock_logging" {
+  description = "Enable Bedrock model invocation logging to CloudWatch (metadata only — token counts, model ID, identity. No payload capture)."
+  type        = bool
+  default     = false
+}
+
 variable "breakglass_role_arns" {
   description = "IAM role ARNs the boundary task role may assume for break-glass access. Empty by default — populated by the break-glass epic."
   type        = list(string)
