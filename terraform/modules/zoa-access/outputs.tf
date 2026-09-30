@@ -2,14 +2,14 @@
 # ZOA Access Module Outputs
 # =============================================================================
 
-output "api_gateway_url" {
-  description = "API Gateway endpoint URL for the ZOA Access API"
-  value       = aws_apigatewayv2_api.access.api_endpoint
+output "function_url" {
+  description = "Function URL endpoint for the ZOA Access Lambda"
+  value       = aws_lambda_function_url.access.function_url
 }
 
-output "api_gateway_id" {
-  description = "API Gateway ID"
-  value       = aws_apigatewayv2_api.access.id
+output "invoker_role_arn" {
+  description = "ARN of the OU-trusted invoker role (SREs assume this to call the Function URL)"
+  value       = aws_iam_role.invoker.arn
 }
 
 output "lambda_function_arn" {

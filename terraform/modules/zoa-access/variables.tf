@@ -1,8 +1,8 @@
 # =============================================================================
 # ZOA Access Lambda Module Variables
 # =============================================================================
-# RC-only module — deploys the Access Lambda behind API Gateway for session
-# lifecycle management and target discovery. No VPC attachment.
+# RC-only module — deploys the Access Lambda with Function URL (IAM auth)
+# and an OU-trusted invoker role for cross-account SRE access.
 # =============================================================================
 
 variable "regional_id" {
@@ -42,34 +42,9 @@ variable "deployment_name" {
   type        = string
 }
 
-variable "custom_domain" {
-  description = "Custom domain name for API Gateway (e.g., zoa-access.us-east-1.int0.rosa.devshift.net). Empty string disables custom domain."
+variable "mc_ou_path" {
+  description = "AWS Organizations OU path for cross-account trust (shared across all accounts in the environment, named mc_ou_path for historical reasons). Used by the invoker role trust policy."
   type        = string
-  default     = ""
-}
-
-variable "hosted_zone_id" {
-  description = "Route53 hosted zone ID for the custom domain. Required when custom_domain is set."
-  type        = string
-  default     = ""
-}
-
-variable "acm_certificate_arn" {
-  description = "ACM certificate ARN for the custom domain TLS. Required when custom_domain is set."
-  type        = string
-  default     = ""
-}
-
-variable "enable_waf" {
-  description = "Enable WAF WebACL on the API Gateway (rate limiting, AWS managed rules)."
-  type        = bool
-  default     = false
-}
-
-variable "ssm_account_id" {
-  description = "AWS account ID where the SSM /zoa/deployments parameter lives (Central Account). Empty string means same account (dev/ephemeral)."
-  type        = string
-  default     = ""
 }
 
 variable "mc_account_ids" {
