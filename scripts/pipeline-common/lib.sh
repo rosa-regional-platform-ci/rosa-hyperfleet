@@ -18,9 +18,6 @@
 #   import_if_needed         Idempotent terraform import
 #   tf_state_value           Read attribute from terraform state
 #   tf_import_summary        Print import summary, fail if errors
-#   start_codepipeline_execution   Start a pipeline run (central account)
-#   start_regional_infra_pipeline  Start ${REGIONAL_ID}-pipe if not already running
-#   start_management_cluster_pipelines  Start all MC pipelines for this region
 
 set -euo pipefail
 
@@ -145,73 +142,6 @@ _assume_account() {
         echo "ERROR: Assumed wrong account. Expected $account_id, got $assumed_account" >&2
         return 1
     fi
-}
-
-# ── CodePipeline orchestration ─────────────────────────────────────────────
-# Deploy config changes (image pins, tfvars) are owned by the pipeline-provisioner
-# webhook. It updates pipeline IAM, then starts regional infra. Regional apply
-# mirrors ZOA images to ECR, then starts MC pipelines. Infra pipelines still
-# auto-trigger directly on terraform module source changes.
-
-start_codepipeline_execution() {
-    local pipeline_name="$1"
-    local region="${2:-${TARGET_REGION:-us-east-1}}"
-
-    local status
-    status=$(aws codepipeline list-pipeline-executions \
-        --name "$pipeline_name" \
-        --region "$region" \
-        --max-items 1 \
-        --query 'pipelineExecutionSummaries[0].status' \
-        --output text 2>/dev/null || echo "None")
-
-    if [ "$status" = "InProgress" ]; then
-        echo "Pipeline ${pipeline_name} already InProgress — skipping duplicate start"
-        return 0
-    fi
-
-    echo "Starting CodePipeline: ${pipeline_name} (${region})"
-    aws codepipeline start-pipeline-execution \
-        --name "$pipeline_name" \
-        --region "$region" \
-        --query 'pipelineExecutionId' \
-        --output text
-}
-
-start_regional_infra_pipeline() {
-    local regional_id="${1:-${REGIONAL_ID:-}}"
-    local region="${2:-${TARGET_REGION:-us-east-1}}"
-
-    if [ -z "$regional_id" ]; then
-        echo "ERROR: regional_id is required to start regional infra pipeline" >&2
-        return 1
-    fi
-
-    local pipeline_name="${regional_id}-pipe"
-    start_codepipeline_execution "$pipeline_name" "$region"
-}
-
-start_management_cluster_pipelines() {
-    local environment="${ENVIRONMENT:-staging}"
-    local target_region="${TARGET_REGION:-us-east-1}"
-
-    shopt -s nullglob
-    local configs=(deploy/"${environment}"/"${target_region}"/pipeline-provisioner-inputs/management-cluster-*.json)
-    shopt -u nullglob
-
-    if [ ${#configs[@]} -eq 0 ]; then
-        echo "No management cluster pipeline configs found — skipping MC pipeline starts"
-        return 0
-    fi
-
-    for cfg in "${configs[@]}"; do
-        local management_id
-        management_id=$(jq -r '.management_id // empty' "$cfg")
-        if [ -z "$management_id" ]; then
-            continue
-        fi
-        start_codepipeline_execution "${management_id}-pipe" "$target_region"
-    done
 }
 
 # ── Configuration ────────────────────────────────────────────────────────────
