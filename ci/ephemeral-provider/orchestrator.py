@@ -165,14 +165,56 @@ class EphemeralEnvOrchestrator:
         mounted) so that config changes are picked up alongside code changes.
         """
         self._setup_aws()
+        self.central_monitor = PipelineMonitor(self.aws.session)
+        self.target_monitor = PipelineMonitor(self.aws.target_session)
 
         git = GitManager(self.creds_dir, self.repo, self.branch,
                          eph_branch_name=self.eph_branch_name)
         self.git = git
+        provisioner_known = self.central_monitor.get_execution_ids(self.provisioner_name)
+        pipeline_known = self.target_monitor.snapshot_pipeline_executions(self.pipeline_prefix)
+
         git.resync_eph_branch(self.eph_prefix)
 
         self._inject_ephemeral_config(git)
         git.render_and_push("ci: resync ephemeral environment config", force=True)
+
+        self._wait_for_resync_pipelines(provisioner_known, pipeline_known)
+
+    def _wait_for_resync_pipelines(
+        self,
+        provisioner_known: set[str],
+        pipeline_known: dict[str, set[str]],
+    ):
+        """Wait for resync pipelines: provisioner first, then regional, then MC."""
+        log.info("Waiting for resync pipelines (provisioner, then regional, then MC)...")
+
+        provisioner_exec_id = self.central_monitor.wait_for_new_execution(
+            self.provisioner_name, provisioner_known
+        )
+        self.central_monitor.wait_for_completion(self.provisioner_name, provisioner_exec_id)
+
+        new_pipelines = self.target_monitor.discover_pipelines(
+            self.pipeline_prefix, pipeline_known
+        )
+        regional = sorted(
+            (name, exec_id)
+            for name, exec_id in new_pipelines
+            if name.endswith("-regional-pipe")
+        )
+        mc_pipelines = sorted(
+            (name, exec_id)
+            for name, exec_id in new_pipelines
+            if "-mc" in name and name.endswith("-pipe")
+        )
+
+        for name, exec_id in regional:
+            self.target_monitor.wait_for_completion(name, exec_id)
+
+        for name, exec_id in mc_pipelines:
+            self.target_monitor.wait_for_completion(name, exec_id)
+
+        log.info("Resync pipelines completed successfully.")
 
     def collect_codebuild_logs(self):
         """Download CloudWatch logs for all CodeBuild projects matching our ephemeral prefix.
