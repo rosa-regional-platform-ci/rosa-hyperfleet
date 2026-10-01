@@ -112,7 +112,8 @@ resource "aws_lambda_function" "access" {
   role          = aws_iam_role.lambda.arn
   package_type  = "Image"
   image_uri     = var.image_uri
-  architectures = ["arm64"]
+  # Must match zoa-lambda (x86_64) and quay.io/rrp-dev-ci/zoa-lambda image builds (linux/amd64).
+  architectures = ["x86_64"]
   timeout       = 30
   memory_size   = 256
 
