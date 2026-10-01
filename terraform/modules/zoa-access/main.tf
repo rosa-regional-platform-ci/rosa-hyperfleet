@@ -322,6 +322,12 @@ resource "aws_iam_role_policy" "lambda_ecs" {
         }
       },
       {
+        Sid    = "TagBoundaryTasks"
+        Effect = "Allow"
+        Action = ["ecs:TagResource"]
+        Resource = "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task/${var.regional_id}-zoa-boundary/*"
+      },
+      {
         Effect   = "Allow"
         Action   = "iam:PassRole"
         Resource = "*"
