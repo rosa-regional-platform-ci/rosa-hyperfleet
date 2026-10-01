@@ -149,5 +149,3 @@ resource "aws_kms_key_policy" "zoa" {
 }
 
 data "aws_caller_identity" "current" {}
-
-data "aws_region" "current" {}

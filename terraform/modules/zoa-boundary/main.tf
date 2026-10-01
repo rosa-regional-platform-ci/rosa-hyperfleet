@@ -92,7 +92,7 @@ resource "aws_cloudwatch_log_group" "boundary" {
   retention_in_days = local.effective_log_retention_days
   kms_key_id        = local.encryption_kms_arn
 
-  depends_on = var.kms_key_arn == "" ? [aws_kms_key.boundary_logs[0]] : []
+  depends_on = [aws_kms_key.boundary_logs]
 
   tags = local.common_tags
 }
@@ -110,7 +110,7 @@ resource "aws_cloudwatch_log_group" "bedrock_invocations" {
   retention_in_days = local.effective_log_retention_days
   kms_key_id        = local.encryption_kms_arn
 
-  depends_on = var.kms_key_arn == "" ? [aws_kms_key.boundary_logs[0]] : []
+  depends_on = [aws_kms_key.boundary_logs]
 
   tags = merge(local.common_tags, {
     Name = "${var.cluster_id}-bedrock-invocations"
@@ -240,10 +240,10 @@ resource "aws_ecs_cluster" "boundary" {
     }
   }
 
-  depends_on = concat(
-    [aws_cloudwatch_log_group.boundary],
-    var.kms_key_arn == "" ? [aws_kms_key.boundary_logs[0]] : [],
-  )
+  depends_on = [
+    aws_cloudwatch_log_group.boundary,
+    aws_kms_key.boundary_logs,
+  ]
 
   tags = local.common_tags
 }
