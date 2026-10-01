@@ -153,6 +153,14 @@ resource "aws_iam_role_policy" "task_ssm" {
         Resource = "*"
       },
       {
+        Sid    = "CloudWatchLogsDescribeGroups"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups",
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "CloudWatchLogs"
         Effect = "Allow"
         Action = [
@@ -166,8 +174,9 @@ resource "aws_iam_role_policy" "task_ssm" {
         Sid    = "KMSForECSExec"
         Effect = "Allow"
         Action = [
-          "kms:GenerateDataKey",
+          "kms:GenerateDataKey*",
           "kms:Decrypt",
+          "kms:DescribeKey",
         ]
         Resource = local.encryption_kms_arn
       }

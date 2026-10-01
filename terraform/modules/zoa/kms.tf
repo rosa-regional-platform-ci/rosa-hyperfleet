@@ -154,7 +154,8 @@ resource "aws_kms_key_policy" "zoa" {
         }
         Action = [
           "kms:Decrypt",
-          "kms:GenerateDataKey",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey",
         ]
         Resource = "*"
       },
