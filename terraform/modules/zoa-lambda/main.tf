@@ -782,6 +782,8 @@ resource "aws_cloudwatch_log_group" "worker" {
 #   zoa-data-access role (extended with SSM permissions).
 
 resource "aws_ssm_parameter" "zoa_target" {
+  provider = aws.targets_ssm
+
   count = var.targets_ssm_prefix != "" ? 1 : 0
   name  = "${var.targets_ssm_prefix}/${var.cluster_id}"
   type  = "String"

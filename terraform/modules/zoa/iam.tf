@@ -112,21 +112,39 @@ resource "aws_iam_role" "data_access" {
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = {
-        AWS = "*"
-      }
-      Action = "sts:AssumeRole"
-      Condition = {
-        "ForAnyValue:StringLike" = {
-          "aws:PrincipalOrgPaths" = "${var.mc_ou_path}*"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          AWS = "*"
         }
-        ArnLike = {
-          "aws:PrincipalArn" = "arn:aws:iam::*:role/*-zoa-lambda"
+        Action = "sts:AssumeRole"
+        Condition = {
+          "ForAnyValue:StringLike" = {
+            "aws:PrincipalOrgPaths" = "${var.mc_ou_path}*"
+          }
+          ArnLike = {
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/*-zoa-lambda"
+          }
         }
-      }
-    }]
+      },
+      {
+        Sid    = "AllowMCTerraformTargetRegistration"
+        Effect = "Allow"
+        Principal = {
+          AWS = "*"
+        }
+        Action = "sts:AssumeRole"
+        Condition = {
+          "ForAnyValue:StringLike" = {
+            "aws:PrincipalOrgPaths" = "${var.mc_ou_path}*"
+          }
+          ArnLike = {
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/OrganizationAccountAccessRole"
+          }
+        }
+      },
+    ]
   })
 
   tags = merge(local.common_tags, {
