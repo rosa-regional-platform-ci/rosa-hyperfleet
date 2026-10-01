@@ -148,13 +148,22 @@ resource "aws_lambda_function_url" "access" {
   invoke_mode        = "RESPONSE_STREAM"
 }
 
-# Allow the invoker role to call the Function URL
+# Allow the invoker role to call the Function URL (resource-based policy).
+# AWS requires both InvokeFunctionUrl and InvokeFunction (InvokedViaFunctionUrl) since Oct 2025.
 resource "aws_lambda_permission" "invoker" {
   statement_id           = "AllowInvokerRole"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = aws_lambda_function.access.function_name
   principal              = aws_iam_role.invoker.arn
   function_url_auth_type = "AWS_IAM"
+}
+
+resource "aws_lambda_permission" "invoker_invoke_function" {
+  statement_id             = "AllowInvokerRoleInvokeFunction"
+  action                   = "lambda:InvokeFunction"
+  function_name            = aws_lambda_function.access.function_name
+  principal                = aws_iam_role.invoker.arn
+  invoked_via_function_url = true
 }
 
 # =============================================================================
@@ -202,11 +211,23 @@ resource "aws_iam_role_policy" "invoker_function_url" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = "lambda:InvokeFunctionUrl"
-      Resource = aws_lambda_function.access.arn
-    }]
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "lambda:InvokeFunctionUrl"
+        Resource = aws_lambda_function.access.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = "lambda:InvokeFunction"
+        Resource = aws_lambda_function.access.arn
+        Condition = {
+          Bool = {
+            "lambda:InvokedViaFunctionUrl" = "true"
+          }
+        }
+      },
+    ]
   })
 }
 
