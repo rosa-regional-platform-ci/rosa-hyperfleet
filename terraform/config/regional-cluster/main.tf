@@ -485,10 +485,10 @@ module "zoa_lambda" {
   kms_key_arn          = module.zoa.kms_key_arn
   uploader_role_arn    = module.zoa.uploader_role_arn
 
-  # Boundary integration
+  # Boundary integration — use deployment_name (e.g. us-east-1-eph-xxx), not regional_id.
   sessions_table_name          = module.zoa.sessions_table_name
-  deployment_name              = var.regional_id
-  targets_ssm_prefix           = "/zoa/targets/${var.regional_id}"
+  deployment_name              = var.deployment_name
+  targets_ssm_prefix           = "/zoa/targets/${var.deployment_name}"
   vpc_id                       = module.regional_cluster.vpc_id
   boundary_security_group_id   = var.zoa_boundary_image != "" ? module.zoa_boundary[0].security_group_id : ""
   boundary_ecs_cluster_arn     = var.zoa_boundary_image != "" ? module.zoa_boundary[0].ecs_cluster_arn : ""
@@ -514,9 +514,9 @@ module "zoa_access" {
 
   sessions_table_name = module.zoa.sessions_table_name
   audit_table_name    = module.zoa.audit_table_name
-  targets_ssm_prefix  = "/zoa/targets/${var.regional_id}"
+  targets_ssm_prefix  = "/zoa/targets/${var.deployment_name}"
   kms_key_arn         = module.zoa.kms_key_arn
-  deployment_name     = var.regional_id
+  deployment_name     = var.deployment_name
 }
 
 # =============================================================================
@@ -532,7 +532,7 @@ module "zoa_boundary" {
   cluster_security_group_id = module.regional_cluster.cluster_security_group_id
   vpc_id                    = module.regional_cluster.vpc_id
   private_subnet_ids        = module.regional_cluster.private_subnet_ids
-  deployment_name           = var.regional_id
+  deployment_name           = var.deployment_name
 
   boundary_image          = var.zoa_boundary_image
   zoa_function_url        = module.zoa_lambda[0].api_function_url

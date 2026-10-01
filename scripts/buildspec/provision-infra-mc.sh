@@ -131,7 +131,11 @@ export TF_VAR_worker_node_ami_id=$(jq -r '.worker_node_ami_id // ""' "$DEPLOY_CO
 # Deployment id for /zoa/targets/<deployment>/<cluster> and central /zoa/deployments/* (rendered in deploy JSON).
 export TF_VAR_zoa_deployment_name=$(jq -r '.zoa_deployment_name // empty' "$DEPLOY_CONFIG_FILE")
 if [ -z "${TF_VAR_zoa_deployment_name}" ]; then
-    export TF_VAR_zoa_deployment_name=$(jq -r '.regional_id // "regional"' "deploy/${ENVIRONMENT}/${TARGET_REGION}/pipeline-regional-cluster-inputs/terraform.json" 2>/dev/null || echo "regional")
+    export TF_VAR_zoa_deployment_name=$(jq -r '.deployment_name // empty' "deploy/${ENVIRONMENT}/${TARGET_REGION}/pipeline-regional-cluster-inputs/terraform.json" 2>/dev/null || echo "")
+fi
+if [ -z "${TF_VAR_zoa_deployment_name}" ]; then
+    echo "ERROR: zoa_deployment_name not set in MC deploy config or RC deployment_name" >&2
+    exit 1
 fi
 
 # ── Phase 2: Apply/Destroy MC infrastructure ─────────────────────────────────

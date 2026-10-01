@@ -1,11 +1,11 @@
 # =============================================================================
 # ZOA Deployment Autodiscovery — SSM Parameter Store
 # =============================================================================
-# Written by the RC Terraform pipeline into the Central Account so the SRE
-# CLI can discover all deployments from a single account. The aws.central
-# provider is configured by the RC config — in pipelines it uses a named
-# profile pointing at the central account; for local dev it falls through
-# to ambient credentials.
+# Written by RC Terraform into the Central Account. Parameter name is
+# deployment_name (HyperFleet config: us-east-1 or us-east-1-eph-<id>), not
+# regional_id (eph-<id>-regional). The aws.central provider is configured by
+# the RC config — in pipelines it uses a named profile pointing at the central
+# account; for local dev it falls through to ambient credentials.
 #
 # The parameter stores a JSON object with the deployment's Function URL,
 # invoker role ARN, and metadata. Multiple deployments (including ephemeral)

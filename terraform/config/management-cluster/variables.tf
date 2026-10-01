@@ -198,7 +198,7 @@ variable "zoa_sessions_table_name" {
 }
 
 variable "zoa_deployment_name" {
-  description = "ZOA deployment name (e.g. us-east-1). Used for SSM target registration and boundary PS1."
+  description = "ZOA logical deployment name (same as RC deployment_name: aws region, or region-eph_prefix for ephemeral). Used for SSM /zoa/targets/<deployment>/ and boundary config."
   type        = string
   default     = ""
 }
