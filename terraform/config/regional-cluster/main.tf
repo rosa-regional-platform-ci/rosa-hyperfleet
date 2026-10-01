@@ -514,6 +514,8 @@ module "zoa_access" {
     aws.central = aws.central
   }
 
+  depends_on = [module.zoa]
+
   regional_id = var.regional_id
   image_uri   = module.zoa.lambda_image_uri
 

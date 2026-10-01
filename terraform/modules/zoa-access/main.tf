@@ -33,69 +33,13 @@ locals {
 }
 
 # =============================================================================
-# KMS Key for CloudWatch Log Encryption (FedRAMP AU-09)
-# =============================================================================
-
-resource "aws_kms_key" "access_logs" {
-  description             = "KMS key for ZOA Access Lambda CloudWatch log encryption (FedRAMP AU-09)"
-  deletion_window_in_days = 30
-  enable_key_rotation     = true
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "EnableRootAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
-        }
-        Action   = "kms:*"
-        Resource = "*"
-      },
-      {
-        Sid    = "AllowCloudWatchLogs"
-        Effect = "Allow"
-        Principal = {
-          Service = "logs.${data.aws_region.current.name}.amazonaws.com"
-        }
-        Action = [
-          "kms:Encrypt",
-          "kms:Decrypt",
-          "kms:ReEncrypt*",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
-        ]
-        Resource = "*"
-        Condition = {
-          ArnLike = {
-            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.function_name}"
-          }
-        }
-      }
-    ]
-  })
-
-  tags = merge(local.common_tags, {
-    Name = "${local.function_name}-logs-kms"
-  })
-}
-
-resource "aws_kms_alias" "access_logs" {
-  name          = "alias/${local.function_name}-logs"
-  target_key_id = aws_kms_key.access_logs.key_id
-}
-
-# =============================================================================
-# CloudWatch Log Group
+# CloudWatch Log Group (encrypted with shared ZOA CMK)
 # =============================================================================
 
 resource "aws_cloudwatch_log_group" "access" {
   name              = "/aws/lambda/${local.function_name}"
   retention_in_days = 365
-  kms_key_id        = aws_kms_key.access_logs.arn
-
-  depends_on = [aws_kms_key.access_logs]
+  kms_key_id        = var.kms_key_arn
 
   tags = merge(local.common_tags, {
     Name = "${local.function_name}-logs"
@@ -308,9 +252,9 @@ resource "aws_iam_role_policy" "lambda_ecs" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "RunTaskOnTaggedClusterAndTaskDef"
-        Effect = "Allow"
-        Action = ["ecs:RunTask"]
+        Sid      = "RunTaskOnTaggedClusterAndTaskDef"
+        Effect   = "Allow"
+        Action   = ["ecs:RunTask"]
         Resource = "*"
         Condition = {
           StringEquals = {
@@ -333,9 +277,9 @@ resource "aws_iam_role_policy" "lambda_ecs" {
         }
       },
       {
-        Sid    = "TagBoundaryTasks"
-        Effect = "Allow"
-        Action = ["ecs:TagResource"]
+        Sid      = "TagBoundaryTasks"
+        Effect   = "Allow"
+        Action   = ["ecs:TagResource"]
         Resource = "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task/${var.regional_id}-zoa-boundary/*"
       },
       {

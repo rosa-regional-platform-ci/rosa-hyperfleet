@@ -123,6 +123,8 @@ resource "aws_kms_key_policy" "zoa" {
             "kms:EncryptionContext:aws:logs:arn" = [
               "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${var.regional_id}/zoa-boundary",
               "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${var.regional_id}/zoa-boundary:*",
+              "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.regional_id}-zoa-access",
+              "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.regional_id}-zoa-access:*",
             ]
           }
         }
