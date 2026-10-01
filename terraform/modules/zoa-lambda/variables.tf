@@ -243,6 +243,12 @@ variable "boundary_ecs_cluster_arn" {
   default     = ""
 }
 
+variable "enable_boundary_ecs_reaper" {
+  description = "Grant Worker Lambda ECS StopTask on the boundary cluster (reaper). Must be known at plan time; set when ZOA Boundary is deployed in this VPC."
+  type        = bool
+  default     = false
+}
+
 variable "boundary_task_definition_arn" {
   description = "ARN of the ZOA Boundary ECS task definition. Written to SSM target for Access Lambda to use in RunTask."
   type        = string

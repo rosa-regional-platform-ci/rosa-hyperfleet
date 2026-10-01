@@ -604,7 +604,7 @@ resource "aws_scheduler_schedule" "reaper" {
 
 # Worker reaper: StopTask on boundary ECS cluster in this VPC/account only.
 resource "aws_iam_role_policy" "lambda_boundary_ecs_reaper" {
-  count = var.boundary_ecs_cluster_arn != "" ? 1 : 0
+  count = var.enable_boundary_ecs_reaper ? 1 : 0
   name  = "${local.function_prefix}-boundary-ecs-reaper"
   role  = aws_iam_role.lambda.id
 

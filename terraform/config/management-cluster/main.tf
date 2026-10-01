@@ -148,6 +148,7 @@ module "zoa_lambda" {
   boundary_security_group_id   = var.zoa_boundary_image != "" ? module.zoa_boundary[0].security_group_id : ""
   boundary_ecs_cluster_arn     = var.zoa_boundary_image != "" ? module.zoa_boundary[0].ecs_cluster_arn : ""
   boundary_task_definition_arn = var.zoa_boundary_image != "" ? module.zoa_boundary[0].task_definition_arn : ""
+  enable_boundary_ecs_reaper   = var.zoa_boundary_image != ""
 }
 
 # =============================================================================
