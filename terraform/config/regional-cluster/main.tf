@@ -520,10 +520,10 @@ module "zoa_access" {
   central_account_id         = data.aws_caller_identity.central.account_id
   trusted_assumer_role_names = var.zoa_access_trusted_assumer_role_names
 
-  sessions_table_name = module.zoa.sessions_table_name
-  audit_table_name    = module.zoa.audit_table_name
-  targets_ssm_prefix  = "/zoa/targets/${var.deployment_name}"
-  kms_key_arn         = module.zoa.kms_key_arn
+  sessions_table_name      = module.zoa.sessions_table_name
+  audit_table_name         = module.zoa.audit_table_name
+  targets_ssm_prefix       = "/zoa/targets/${var.deployment_name}"
+  kms_key_arn              = module.zoa.kms_key_arn
   deployment_name          = var.deployment_name
   boundary_ecs_cluster_arn = module.zoa_boundary.ecs_cluster_arn
 }
@@ -545,6 +545,7 @@ module "zoa_boundary" {
   boundary_image          = var.zoa_boundary_image
   zoa_function_url        = module.zoa_lambda.api_function_url
   zoa_lambda_function_arn = module.zoa_lambda.api_function_arn
+  kms_key_arn             = module.zoa.kms_key_arn
 }
 
 # =============================================================================

@@ -6,6 +6,8 @@
 locals {
   container_name               = "zoa-boundary"
   effective_log_retention_days = max(365, var.log_retention_days)
+  # Shared ZOA CMK (RC) or per-cluster boundary_logs key (MC / unset).
+  encryption_kms_arn = var.kms_key_arn != "" ? var.kms_key_arn : one(aws_kms_key.boundary_logs[*].arn)
 
   common_tags = merge(
     var.tags,
@@ -25,6 +27,8 @@ data "aws_region" "current" {}
 # =============================================================================
 
 resource "aws_kms_key" "boundary_logs" {
+  count = var.kms_key_arn == "" ? 1 : 0
+
   description             = "KMS key for ZOA Boundary ECS CloudWatch log encryption (FedRAMP AU-09)"
   deletion_window_in_days = 30
   enable_key_rotation     = true
@@ -57,7 +61,10 @@ resource "aws_kms_key" "boundary_logs" {
         Resource = "*"
         Condition = {
           ArnLike = {
-            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${var.cluster_id}/zoa-boundary"
+            "kms:EncryptionContext:aws:logs:arn" = [
+              "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${var.cluster_id}/zoa-boundary",
+              "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${var.cluster_id}/zoa-boundary:*",
+            ]
           }
         }
       }
@@ -70,8 +77,10 @@ resource "aws_kms_key" "boundary_logs" {
 }
 
 resource "aws_kms_alias" "boundary_logs" {
+  count = var.kms_key_arn == "" ? 1 : 0
+
   name          = "alias/${var.cluster_id}-zoa-boundary-logs"
-  target_key_id = aws_kms_key.boundary_logs.key_id
+  target_key_id = aws_kms_key.boundary_logs[0].key_id
 }
 
 # =============================================================================
@@ -81,9 +90,9 @@ resource "aws_kms_alias" "boundary_logs" {
 resource "aws_cloudwatch_log_group" "boundary" {
   name              = "/ecs/${var.cluster_id}/zoa-boundary"
   retention_in_days = local.effective_log_retention_days
-  kms_key_id        = aws_kms_key.boundary_logs.arn
+  kms_key_id        = local.encryption_kms_arn
 
-  depends_on = [aws_kms_key.boundary_logs]
+  depends_on = var.kms_key_arn == "" ? [aws_kms_key.boundary_logs[0]] : []
 
   tags = local.common_tags
 }
@@ -99,9 +108,9 @@ resource "aws_cloudwatch_log_group" "bedrock_invocations" {
   count             = var.enable_bedrock_logging ? 1 : 0
   name              = "/aws/bedrock/model-invocations"
   retention_in_days = local.effective_log_retention_days
-  kms_key_id        = aws_kms_key.boundary_logs.arn
+  kms_key_id        = local.encryption_kms_arn
 
-  depends_on = [aws_kms_key.boundary_logs]
+  depends_on = var.kms_key_arn == "" ? [aws_kms_key.boundary_logs[0]] : []
 
   tags = merge(local.common_tags, {
     Name = "${var.cluster_id}-bedrock-invocations"
@@ -215,10 +224,13 @@ resource "aws_ecs_cluster" "boundary" {
     value = "enabled"
   }
 
-  # Enable ECS Exec with encrypted sessions (FedRAMP AU-09)
+  # ECS Exec (FedRAMP AU-09): session data channel + exec transcript logging.
+  # - kms_key_id: CMK for TLS/exec payload (task role + caller need kms:Decrypt/GenerateDataKey).
+  # - cloud_watch_encryption_enabled=true REQUIRES the log group below to use the same CMK
+  #   (see AWS ECS Exec logging docs). Do not copy bastion (no exec CMK / no CW encryption flag).
   configuration {
     execute_command_configuration {
-      kms_key_id = aws_kms_key.boundary_logs.id
+      kms_key_id = local.encryption_kms_arn
       logging    = "OVERRIDE"
 
       log_configuration {
@@ -227,6 +239,11 @@ resource "aws_ecs_cluster" "boundary" {
       }
     }
   }
+
+  depends_on = concat(
+    [aws_cloudwatch_log_group.boundary],
+    var.kms_key_arn == "" ? [aws_kms_key.boundary_logs[0]] : [],
+  )
 
   tags = local.common_tags
 }

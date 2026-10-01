@@ -169,7 +169,7 @@ resource "aws_iam_role_policy" "task_ssm" {
           "kms:GenerateDataKey",
           "kms:Decrypt",
         ]
-        Resource = aws_kms_key.boundary_logs.arn
+        Resource = local.encryption_kms_arn
       }
     ]
   })

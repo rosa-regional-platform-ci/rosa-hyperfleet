@@ -104,8 +104,50 @@ resource "aws_kms_key_policy" "zoa" {
         ]
         Resource = "*"
       },
+      {
+        Sid    = "AllowCloudWatchLogsBoundaryExec"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${data.aws_region.current.name}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey",
+        ]
+        Resource = "*"
+        Condition = {
+          ArnLike = {
+            "kms:EncryptionContext:aws:logs:arn" = [
+              "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${var.regional_id}/zoa-boundary",
+              "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${var.regional_id}/zoa-boundary:*",
+            ]
+          }
+        }
+      },
+      {
+        Sid    = "AllowBoundaryTaskRolesKMS"
+        Effect = "Allow"
+        Principal = {
+          AWS = "*"
+        }
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+        ]
+        Resource = "*"
+        Condition = {
+          ArnLike = {
+            "aws:PrincipalArn" = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.regional_id}-zoa-boundary-*"
+          }
+        }
+      },
     ]
   })
 }
 
 data "aws_caller_identity" "current" {}
+
+data "aws_region" "current" {}

@@ -79,6 +79,12 @@ variable "breakglass_role_arns" {
   default     = []
 }
 
+variable "kms_key_arn" {
+  description = "Optional shared ZOA CMK for ECS Exec and boundary CloudWatch logs. When set, no dedicated boundary_logs key is created (use on regional cluster). MC accounts leave empty until cross-account log encryption is defined."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Additional tags to apply to all resources"
   type        = map(string)
