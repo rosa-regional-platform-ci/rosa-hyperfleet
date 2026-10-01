@@ -16,7 +16,6 @@ aws configure set aws_secret_access_key "$_CENTRAL_AWS_SECRET_ACCESS_KEY" --prof
 aws configure set aws_session_token     "$_CENTRAL_AWS_SESSION_TOKEN"     --profile central
 aws configure set region                "${TARGET_REGION}"                --profile central
 export TF_VAR_central_aws_profile="central"
-export TF_VAR_central_account_id="${CENTRAL_ACCOUNT_ID}"
 
 export TF_VAR_zoa_access_trusted_assumer_role_names=$(jq -c '.zoa_access_trusted_assumer_role_names // ["OrganizationAccountAccessRole"]' "$DEPLOY_CONFIG_FILE")
 

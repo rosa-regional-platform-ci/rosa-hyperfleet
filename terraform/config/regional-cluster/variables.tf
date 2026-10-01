@@ -48,13 +48,7 @@ variable "target_account_id" {
 }
 
 variable "central_aws_profile" {
-  description = "AWS CLI profile for central account credentials. Set by pipeline, empty for local dev."
-  type        = string
-  default     = ""
-}
-
-variable "central_account_id" {
-  description = "Central account ID for ZOA Access invoker trust. When empty, derived from the aws.central provider caller identity (pipeline sets profile central after preflight_check)."
+  description = "AWS CLI profile for central account credentials. Pipelines set this to \"central\" (buildspec writes profile from CodeBuild home creds). Required for cross-account central SSM and ZOA Access invoker trust account ID."
   type        = string
   default     = ""
 }

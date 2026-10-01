@@ -513,7 +513,7 @@ module "zoa_access" {
   regional_id = var.regional_id
   image_uri   = module.zoa.lambda_image_uri
 
-  central_account_id         = var.central_account_id != "" ? var.central_account_id : data.aws_caller_identity.central.account_id
+  central_account_id         = data.aws_caller_identity.central.account_id
   trusted_assumer_role_names = var.zoa_access_trusted_assumer_role_names
 
   sessions_table_name = module.zoa.sessions_table_name
