@@ -239,6 +239,8 @@ resource "aws_iam_role_policy" "data_access_ssm" {
         "ssm:GetParameter",
         "ssm:GetParameters",
         "ssm:AddTagsToResource",
+        "ssm:ListTagsForResource",
+        "ssm:RemoveTagsFromResource",
       ]
       Resource = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/zoa/targets/*"
     }, {
