@@ -146,6 +146,18 @@ resource "aws_kms_key_policy" "zoa" {
           }
         }
       },
+      {
+        Sid    = "AllowOrganizationAccountAccessRoleECSExec"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/OrganizationAccountAccessRole"
+        }
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+        ]
+        Resource = "*"
+      },
     ]
   })
 }

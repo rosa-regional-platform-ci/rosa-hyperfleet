@@ -87,12 +87,18 @@ resource "aws_kms_alias" "boundary_logs" {
 # CloudWatch Log Group
 # =============================================================================
 
+resource "terraform_data" "shared_kms_ready" {
+  count = var.kms_key_arn != "" ? 1 : 0
+
+  input = var.kms_key_arn
+}
+
 resource "aws_cloudwatch_log_group" "boundary" {
   name              = "/ecs/${var.cluster_id}/zoa-boundary"
   retention_in_days = local.effective_log_retention_days
   kms_key_id        = local.encryption_kms_arn
 
-  depends_on = [aws_kms_key.boundary_logs]
+  depends_on = concat(aws_kms_key.boundary_logs[*], terraform_data.shared_kms_ready[*])
 
   tags = local.common_tags
 }
@@ -240,10 +246,11 @@ resource "aws_ecs_cluster" "boundary" {
     }
   }
 
-  depends_on = [
-    aws_cloudwatch_log_group.boundary,
-    aws_kms_key.boundary_logs,
-  ]
+  depends_on = concat(
+    [aws_cloudwatch_log_group.boundary],
+    aws_kms_key.boundary_logs[*],
+    terraform_data.shared_kms_ready[*],
+  )
 
   tags = local.common_tags
 }

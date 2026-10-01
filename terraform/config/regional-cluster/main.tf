@@ -537,6 +537,8 @@ module "zoa_access" {
 module "zoa_boundary" {
   source = "../../modules/zoa-boundary"
 
+  depends_on = [module.zoa]
+
   cluster_id                = var.regional_id
   cluster_name              = module.regional_cluster.cluster_name
   cluster_security_group_id = module.regional_cluster.cluster_security_group_id
