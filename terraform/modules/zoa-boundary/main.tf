@@ -98,7 +98,11 @@ resource "aws_cloudwatch_log_group" "boundary" {
   retention_in_days = local.effective_log_retention_days
   kms_key_id        = local.encryption_kms_arn
 
-  depends_on = concat(aws_kms_key.boundary_logs[*], terraform_data.shared_kms_ready[*])
+  # depends_on must be a static list (no concat()); resource addresses cover all instances.
+  depends_on = [
+    aws_kms_key.boundary_logs,
+    terraform_data.shared_kms_ready,
+  ]
 
   tags = local.common_tags
 }
@@ -246,11 +250,11 @@ resource "aws_ecs_cluster" "boundary" {
     }
   }
 
-  depends_on = concat(
-    [aws_cloudwatch_log_group.boundary],
-    aws_kms_key.boundary_logs[*],
-    terraform_data.shared_kms_ready[*],
-  )
+  depends_on = [
+    aws_cloudwatch_log_group.boundary,
+    aws_kms_key.boundary_logs,
+    terraform_data.shared_kms_ready,
+  ]
 
   tags = local.common_tags
 }
