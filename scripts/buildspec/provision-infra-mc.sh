@@ -185,8 +185,15 @@ terraform init -reconfigure \
     -backend-config="region=${TF_STATE_REGION}" \
     -backend-config="use_lockfile=true"
 
-if [ "${TERRAFORM_ACTION}" == "apply" ] && [ -f imports.sh ]; then
-    source imports.sh
+if [ "${TERRAFORM_ACTION}" == "apply" ]; then
+    migrate_mc_zoa_target_ssm_identity_if_needed \
+        "${RESOLVED_REGIONAL_ACCOUNT_ID}" \
+        "${TF_VAR_zoa_deployment_name}" \
+        "${TF_VAR_management_id}"
+    if [ -f imports.sh ]; then
+        source imports.sh
+    fi
+    tf_import_summary
 fi
 
 set +e
