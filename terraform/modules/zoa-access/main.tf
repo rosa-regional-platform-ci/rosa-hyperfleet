@@ -2,7 +2,7 @@
 # ZOA Access Lambda Module — RC-Only Session Management
 # =============================================================================
 # Deploys the ZOA Access Lambda with a Function URL (IAM auth) and an
-# OU-trusted invoker role for cross-account SRE access.
+# Central-account-trusted invoker role for cross-account SRE access.
 # This runs in the RC account ONLY with NO VPC attachment.
 #
 # The Access Lambda uses the same container image as api/worker Lambdas
@@ -14,9 +14,9 @@
 #
 # Architecture: SRE laptop → sts:AssumeRole (invoker) → Function URL → Lambda → DynamoDB + ECS
 #
-# Cross-account access: The invoker role uses aws:PrincipalOrgPaths (same
-# OU pattern as MC cross-account trust). No Central Account role changes
-# needed — any role in the org OU can assume the invoker role.
+# Cross-account access: SREs authenticate in the environment Central Account,
+# then assume this invoker role in the RC account to call the Function URL.
+# Trust is scoped to configured role names in the central account only.
 # =============================================================================
 
 data "aws_caller_identity" "current" {}
@@ -158,29 +158,34 @@ resource "aws_lambda_permission" "invoker" {
 }
 
 # =============================================================================
-# OU-Trusted Invoker Role — Cross-Account SRE Access
+# Central-Trusted Invoker Role — Cross-Account SRE Access
 # =============================================================================
-# SREs authenticate to the Central Account (kinit + rh-aws-saml-login),
+# SREs use credentials in the environment Central Account (today
+# OrganizationAccountAccessRole via dev profiles; future scoped SAML role),
 # then assume this role in the RC account to call the Function URL.
-# Trust policy uses aws:PrincipalOrgPaths — same OU pattern as MC
-# cross-account trust (mc_ou_path). No Central Account role changes
-# needed: rh-saml roles already have sts:AssumeRole capability.
+
+locals {
+  trusted_assumer_principal_arns = [
+    for role_name in var.trusted_assumer_role_names :
+    "arn:aws:iam::${var.central_account_id}:role/${role_name}"
+  ]
+}
 
 resource "aws_iam_role" "invoker" {
   name        = "${local.function_name}-invoker"
-  description = "OU-trusted role for SRE access to ZOA Access Lambda Function URL in ${var.regional_id}"
+  description = "Central-trusted role for SRE access to ZOA Access Lambda Function URL in ${var.regional_id}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
       Principal = {
-        AWS = "*"
+        AWS = local.trusted_assumer_principal_arns
       }
       Action = "sts:AssumeRole"
       Condition = {
-        "ForAnyValue:StringLike" = {
-          "aws:PrincipalOrgPaths" = "${var.mc_ou_path}*"
+        StringEquals = {
+          "aws:PrincipalAccount" = var.central_account_id
         }
       }
     }]

@@ -39,6 +39,7 @@
   "zoa_runner_source_image": "quay.io/rrp-dev-ci/zoa-runner",
   "zoa_boundary_image_tag": "3235e3a",
   "zoa_boundary_source_image": "quay.io/rrp-dev-ci/zoa-boundary",
+  "zoa_access_trusted_assumer_role_names": ["OrganizationAccountAccessRole"],
   "worker_node_ami_id": "ami-08534dafc055ff299",
   "worker_node_root_volume_size": 50,
   "management_clusters_info": [{"account_id": "ssm:///infra/stage/us-east-1/mc01/account_id", "id": "mc01"}]

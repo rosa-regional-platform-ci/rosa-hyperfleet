@@ -2,7 +2,7 @@
 # ZOA Access Lambda Module Variables
 # =============================================================================
 # RC-only module — deploys the Access Lambda with Function URL (IAM auth)
-# and an OU-trusted invoker role for cross-account SRE access.
+# and a central-account-trusted invoker role for cross-account SRE access.
 # =============================================================================
 
 variable "regional_id" {
@@ -42,9 +42,26 @@ variable "deployment_name" {
   type        = string
 }
 
-variable "mc_ou_path" {
-  description = "AWS Organizations OU path for cross-account trust (shared across all accounts in the environment, named mc_ou_path for historical reasons). Used by the invoker role trust policy."
+variable "central_account_id" {
+  description = "AWS account ID of the environment Central Account (pipeline/CodeBuild home account). Only principals in this account may assume the invoker role."
   type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]{12}$", var.central_account_id))
+    error_message = "central_account_id must be a 12-digit AWS account ID."
+  }
+}
+
+variable "trusted_assumer_role_names" {
+  description = "IAM role names in the Central Account allowed to assume the invoker role (full role ARNs are derived). Add future Red Hat SAML hub roles here."
+  type        = list(string)
+
+  default = ["OrganizationAccountAccessRole"]
+
+  validation {
+    condition     = length(var.trusted_assumer_role_names) > 0
+    error_message = "trusted_assumer_role_names must contain at least one role name."
+  }
 }
 
 variable "mc_account_ids" {

@@ -8,7 +8,7 @@ output "function_url" {
 }
 
 output "invoker_role_arn" {
-  description = "ARN of the OU-trusted invoker role (SREs assume this to call the Function URL)"
+  description = "ARN of the central-trusted invoker role (SREs assume this to call the Function URL)"
   value       = aws_iam_role.invoker.arn
 }
 

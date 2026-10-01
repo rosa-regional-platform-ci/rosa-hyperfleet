@@ -42,6 +42,10 @@ provider "aws" {
   use_fips_endpoint = can(regex("^(us|us-gov)-", var.region)) ? true : false
 }
 
+data "aws_caller_identity" "central" {
+  provider = aws.central
+}
+
 # When PagerDuty is disabled, a dummy token lets the provider initialize
 # without PAGERDUTY_TOKEN. When enabled, null falls through to the env var.
 provider "pagerduty" {
@@ -508,7 +512,9 @@ module "zoa_access" {
 
   regional_id = var.regional_id
   image_uri   = module.zoa.lambda_image_uri
-  mc_ou_path  = var.mc_ou_path
+
+  central_account_id         = var.central_account_id != "" ? var.central_account_id : data.aws_caller_identity.central.account_id
+  trusted_assumer_role_names = var.zoa_access_trusted_assumer_role_names
 
   sessions_table_name = module.zoa.sessions_table_name
   audit_table_name    = module.zoa.audit_table_name

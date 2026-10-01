@@ -53,6 +53,18 @@ variable "central_aws_profile" {
   default     = ""
 }
 
+variable "central_account_id" {
+  description = "Central account ID for ZOA Access invoker trust. When empty, derived from the aws.central provider caller identity (pipeline sets profile central after preflight_check)."
+  type        = string
+  default     = ""
+}
+
+variable "zoa_access_trusted_assumer_role_names" {
+  description = "Central Account IAM role names allowed to assume the ZOA Access invoker role. Extend when Red Hat SAML hub roles are provisioned."
+  type        = list(string)
+  default     = ["OrganizationAccountAccessRole"]
+}
+
 variable "app_code" {
   description = "Application code for tagging (CMDB Application ID)"
   type        = string
