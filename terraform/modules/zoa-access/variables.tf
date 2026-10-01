@@ -70,6 +70,11 @@ variable "mc_account_ids" {
   default     = []
 }
 
+variable "boundary_ecs_cluster_arn" {
+  description = "ARN of the RC ZOA Boundary ECS cluster. Used to scope StopTask/DescribeTasks (tasks lack Component=zoa; see worker reaper in zoa-lambda)."
+  type        = string
+}
+
 variable "tags" {
   description = "Additional tags to apply to all resources."
   type        = map(string)

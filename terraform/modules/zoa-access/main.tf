@@ -308,16 +308,27 @@ resource "aws_iam_role_policy" "lambda_ecs" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "RunTaskOnTaggedClusterAndTaskDef"
+        Effect = "Allow"
+        Action = ["ecs:RunTask"]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Component" = "zoa"
+          }
+        }
+      },
+      {
+        Sid    = "StopAndDescribeTasksInBoundaryCluster"
         Effect = "Allow"
         Action = [
-          "ecs:RunTask",
           "ecs:StopTask",
           "ecs:DescribeTasks",
         ]
         Resource = "*"
         Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Component" = "zoa"
+          ArnEquals = {
+            "ecs:cluster" = var.boundary_ecs_cluster_arn
           }
         }
       },

@@ -524,7 +524,8 @@ module "zoa_access" {
   audit_table_name    = module.zoa.audit_table_name
   targets_ssm_prefix  = "/zoa/targets/${var.deployment_name}"
   kms_key_arn         = module.zoa.kms_key_arn
-  deployment_name     = var.deployment_name
+  deployment_name          = var.deployment_name
+  boundary_ecs_cluster_arn = module.zoa_boundary.ecs_cluster_arn
 }
 
 # =============================================================================
