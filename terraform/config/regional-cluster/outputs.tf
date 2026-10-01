@@ -459,5 +459,5 @@ output "zoa_lambda_ecr_url" {
 
 output "zoa_api_function_url" {
   description = "Function URL for the ZOA API Lambda (used by rosa-boundary CLI)"
-  value       = try(module.zoa_lambda[0].api_function_url, "")
+  value       = module.zoa_lambda.api_function_url
 }

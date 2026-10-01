@@ -187,13 +187,7 @@ variable "zoa_jobs_namespace" {
   default     = "zoa-jobs"
 }
 
-# --- Feature flags ---
-
-variable "enable_reconciler" {
-  description = "Enable the EventBridge reconciler and GC schedules (disable for testing)"
-  type        = bool
-  default     = true
-}
+# --- Application tuning ---
 
 variable "log_level" {
   description = "Application log level for ZOA Lambda functions (debug, info, warn, error). Tunable without code change."
@@ -241,12 +235,6 @@ variable "boundary_ecs_cluster_arn" {
   description = "ARN of the ZOA Boundary ECS cluster. Written to SSM target for Access Lambda to use in RunTask."
   type        = string
   default     = ""
-}
-
-variable "enable_boundary_ecs_reaper" {
-  description = "Grant Worker Lambda ECS StopTask on the boundary cluster (reaper). Must be known at plan time; set when ZOA Boundary is deployed in this VPC."
-  type        = bool
-  default     = false
 }
 
 variable "boundary_task_definition_arn" {

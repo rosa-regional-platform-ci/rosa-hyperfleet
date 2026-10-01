@@ -53,6 +53,11 @@ variable "zoa_lambda_image_tag" {
   description = "Immutable image tag for the ZOA Lambda. Used for source→ECR mirroring."
   type        = string
   default     = "67ef089"
+
+  validation {
+    condition     = var.zoa_lambda_image_tag != ""
+    error_message = "zoa_lambda_image_tag must be set; HyperFleet always deploys the full ZOA stack."
+  }
 }
 
 variable "zoa_runner_image_tag" {

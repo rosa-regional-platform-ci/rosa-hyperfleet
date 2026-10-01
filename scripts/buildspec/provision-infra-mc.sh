@@ -121,11 +121,11 @@ export TF_VAR_zoa_runner_source_image=$(jq -r '.zoa_runner_source_image // ""' "
 # Boundary ECS pulls Quay directly (no RC ECR mirror); compose full ref for TF_VAR_zoa_boundary_image.
 _zoa_boundary_image_tag=$(jq -r '.zoa_boundary_image_tag // ""' "$DEPLOY_CONFIG_FILE")
 _zoa_boundary_source_image=$(jq -r '.zoa_boundary_source_image // "quay.io/rrp-dev-ci/zoa-boundary"' "$DEPLOY_CONFIG_FILE")
-if [ -n "${_zoa_boundary_image_tag}" ]; then
-    export TF_VAR_zoa_boundary_image="${_zoa_boundary_source_image}:${_zoa_boundary_image_tag}"
-else
-    export TF_VAR_zoa_boundary_image=""
+if [ -z "${_zoa_boundary_image_tag}" ]; then
+    echo "ERROR: zoa_boundary_image_tag must be set in deploy config (full ZOA stack is always deployed)" >&2
+    exit 1
 fi
+export TF_VAR_zoa_boundary_image="${_zoa_boundary_source_image}:${_zoa_boundary_image_tag}"
 export TF_VAR_worker_node_ami_id=$(jq -r '.worker_node_ami_id // ""' "$DEPLOY_CONFIG_FILE")
 
 # Deployment id for /zoa/targets/<deployment>/<cluster> and central /zoa/deployments/* (rendered in deploy JSON).

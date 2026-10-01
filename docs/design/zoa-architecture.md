@@ -220,7 +220,7 @@ terraform/modules/zoa-lambda/   → Per-VPC compute (one per target VPC: RC + ea
 | CloudWatch Logs             | Log groups with 365-day retention, KMS-encrypted (customer-managed key, consistent with platform standard). JSON structured logging.                                  |
 | EKS access entry            | Grants Lambda execution role access to target EKS cluster with a Kubernetes group for RBAC binding.                                                                   |
 | Security group              | Egress to EKS API (443) and AWS service endpoints. No inbound rules (Function URL handles ingress).                                                                   |
-| EventBridge Scheduler       | Two schedules: reconciler (1m) + GC (5m). Both gated by `enable_reconciler` variable.                                                                                 |
+| EventBridge Scheduler       | Three schedules: reconciler (1m), GC (5m), and boundary reaper (5m). Always enabled when ZOA Lambda is deployed.                                                       |
 
 ### RC/MC Config Wiring
 
@@ -241,7 +241,6 @@ All configuration is via Terraform variables that map to Lambda environment vari
 | `reconciler_deadline_seconds` | 55      | `RECONCILER_DEADLINE_SECONDS` | Code-level deadline for reconciler/GC ticks         |
 | `max_batch_per_tick`          | 30      | `MAX_BATCH_PER_TICK`          | Items processed per scheduled phase per tick        |
 | `lambda_memory_size`          | 512     | (Lambda config)               | Memory in MB (CPU scales proportionally)            |
-| `enable_reconciler`           | true    | (EventBridge state)           | Toggle EventBridge schedules on/off                 |
 | `dynamodb_ttl_days`           | 365     | `DYNAMODB_TTL_DAYS`           | Record retention (FedRAMP: minimum 365 days)        |
 | `write_cooldown_seconds`      | 300     | `WRITE_COOLDOWN_SECONDS`      | Per-target rate limit between same write TA         |
 | `max_concurrent_per_target`   | 10      | `MAX_CONCURRENT_PER_TARGET`   | Max parallel pending+running executions per target  |

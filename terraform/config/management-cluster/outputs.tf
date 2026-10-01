@@ -173,5 +173,5 @@ output "kube_applier_role_arn" {
 
 output "zoa_api_function_url" {
   description = "ZOA API Lambda Function URL (per-VPC endpoint for this MC)"
-  value       = try(module.zoa_lambda[0].api_function_url, "")
+  value       = module.zoa_lambda.api_function_url
 }

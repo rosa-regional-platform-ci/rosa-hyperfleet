@@ -114,7 +114,6 @@ module "bastion" {
 # =============================================================================
 
 module "zoa_lambda" {
-  count  = var.zoa_lambda_ecr_url != "" ? 1 : 0
   source = "../../modules/zoa-lambda"
 
   cluster_id        = var.management_id
@@ -145,10 +144,9 @@ module "zoa_lambda" {
   deployment_name              = var.zoa_deployment_name
   targets_ssm_prefix           = local.zoa_targets_ssm_prefix
   vpc_id                       = module.vpc.vpc_id
-  boundary_security_group_id   = var.zoa_boundary_image != "" ? module.zoa_boundary[0].security_group_id : ""
-  boundary_ecs_cluster_arn     = var.zoa_boundary_image != "" ? module.zoa_boundary[0].ecs_cluster_arn : ""
-  boundary_task_definition_arn = var.zoa_boundary_image != "" ? module.zoa_boundary[0].task_definition_arn : ""
-  enable_boundary_ecs_reaper   = var.zoa_boundary_image != ""
+  boundary_security_group_id   = module.zoa_boundary.security_group_id
+  boundary_ecs_cluster_arn     = module.zoa_boundary.ecs_cluster_arn
+  boundary_task_definition_arn = module.zoa_boundary.task_definition_arn
 }
 
 # =============================================================================
@@ -156,7 +154,6 @@ module "zoa_lambda" {
 # =============================================================================
 
 module "zoa_boundary" {
-  count  = var.zoa_boundary_image != "" ? 1 : 0
   source = "../../modules/zoa-boundary"
 
   cluster_id                = var.management_id
@@ -167,8 +164,8 @@ module "zoa_boundary" {
   deployment_name           = var.zoa_deployment_name
 
   boundary_image          = var.zoa_boundary_image
-  zoa_function_url        = module.zoa_lambda[0].api_function_url
-  zoa_lambda_function_arn = module.zoa_lambda[0].api_function_arn
+  zoa_function_url        = module.zoa_lambda.api_function_url
+  zoa_lambda_function_arn = module.zoa_lambda.api_function_arn
 }
 
 # =============================================================================

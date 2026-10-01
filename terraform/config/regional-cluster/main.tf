@@ -460,7 +460,6 @@ module "zoa" {
 }
 
 module "zoa_lambda" {
-  count  = var.zoa_lambda_image_tag != "" ? 1 : 0
   source = "../../modules/zoa-lambda"
 
   cluster_id        = var.regional_id
@@ -490,10 +489,9 @@ module "zoa_lambda" {
   deployment_name              = var.deployment_name
   targets_ssm_prefix           = "/zoa/targets/${var.deployment_name}"
   vpc_id                       = module.regional_cluster.vpc_id
-  boundary_security_group_id   = var.zoa_boundary_image != "" ? module.zoa_boundary[0].security_group_id : ""
-  boundary_ecs_cluster_arn     = var.zoa_boundary_image != "" ? module.zoa_boundary[0].ecs_cluster_arn : ""
-  boundary_task_definition_arn = var.zoa_boundary_image != "" ? module.zoa_boundary[0].task_definition_arn : ""
-  enable_boundary_ecs_reaper   = var.zoa_boundary_image != ""
+  boundary_security_group_id   = module.zoa_boundary.security_group_id
+  boundary_ecs_cluster_arn     = module.zoa_boundary.ecs_cluster_arn
+  boundary_task_definition_arn = module.zoa_boundary.task_definition_arn
 }
 
 # =============================================================================
@@ -501,7 +499,6 @@ module "zoa_lambda" {
 # =============================================================================
 
 module "zoa_access" {
-  count  = var.zoa_lambda_image_tag != "" ? 1 : 0
   source = "../../modules/zoa-access"
 
   providers = {
@@ -525,7 +522,6 @@ module "zoa_access" {
 # =============================================================================
 
 module "zoa_boundary" {
-  count  = var.zoa_boundary_image != "" ? 1 : 0
   source = "../../modules/zoa-boundary"
 
   cluster_id                = var.regional_id
@@ -536,8 +532,8 @@ module "zoa_boundary" {
   deployment_name           = var.deployment_name
 
   boundary_image          = var.zoa_boundary_image
-  zoa_function_url        = module.zoa_lambda[0].api_function_url
-  zoa_lambda_function_arn = module.zoa_lambda[0].api_function_arn
+  zoa_function_url        = module.zoa_lambda.api_function_url
+  zoa_lambda_function_arn = module.zoa_lambda.api_function_arn
 }
 
 # =============================================================================

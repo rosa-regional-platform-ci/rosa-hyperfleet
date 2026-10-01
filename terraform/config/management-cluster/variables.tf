@@ -116,7 +116,11 @@ variable "rhobs_api_url" {
 variable "zoa_lambda_ecr_url" {
   description = "ECR repository URL for ZOA Lambda (RC output, cross-account pull via OU policy)"
   type        = string
-  default     = ""
+
+  validation {
+    condition     = var.zoa_lambda_ecr_url != ""
+    error_message = "zoa_lambda_ecr_url must be set from regional cluster outputs; HyperFleet always deploys the full ZOA stack on MC."
+  }
 }
 
 variable "zoa_lambda_image_tag" {
@@ -186,9 +190,13 @@ variable "zoa_data_access_role_arn" {
 }
 
 variable "zoa_boundary_image" {
-  description = "Container image for ZOA Boundary ECS tasks (from Konflux/ECR). Empty disables boundary deployment."
+  description = "Full container image reference for ZOA Boundary ECS tasks (source:tag, set by buildspec from deploy config)."
   type        = string
-  default     = ""
+
+  validation {
+    condition     = var.zoa_boundary_image != ""
+    error_message = "zoa_boundary_image must be set; HyperFleet always deploys the full ZOA stack."
+  }
 }
 
 variable "zoa_sessions_table_name" {

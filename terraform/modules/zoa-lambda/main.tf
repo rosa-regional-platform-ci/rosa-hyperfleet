@@ -543,7 +543,7 @@ resource "aws_scheduler_schedule" "reconciler" {
     }
   }
 
-  state = var.enable_reconciler ? "ENABLED" : "DISABLED"
+  state = "ENABLED"
 }
 
 resource "aws_scheduler_schedule" "gc" {
@@ -570,7 +570,7 @@ resource "aws_scheduler_schedule" "gc" {
     }
   }
 
-  state = var.enable_reconciler ? "ENABLED" : "DISABLED"
+  state = "ENABLED"
 }
 
 # Reaper: same per-VPC Worker schedule as reconciler/GC. Session rows live in RC
@@ -599,14 +599,13 @@ resource "aws_scheduler_schedule" "reaper" {
     }
   }
 
-  state = var.enable_reconciler && var.sessions_table_name != "" ? "ENABLED" : "DISABLED"
+  state = "ENABLED"
 }
 
 # Worker reaper: StopTask on boundary ECS cluster in this VPC/account only.
 resource "aws_iam_role_policy" "lambda_boundary_ecs_reaper" {
-  count = var.enable_boundary_ecs_reaper ? 1 : 0
-  name  = "${local.function_prefix}-boundary-ecs-reaper"
-  role  = aws_iam_role.lambda.id
+  name = "${local.function_prefix}-boundary-ecs-reaper"
+  role = aws_iam_role.lambda.id
 
   policy = jsonencode({
     Version = "2012-10-17"

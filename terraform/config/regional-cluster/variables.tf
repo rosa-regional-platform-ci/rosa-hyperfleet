@@ -466,6 +466,11 @@ variable "zoa_lambda_image_tag" {
   description = "Immutable tag for the ZOA Lambda image (Quay→ECR mirroring). Override with a CI-built tag to validate a zoa PR."
   type        = string
   default     = "67ef089"
+
+  validation {
+    condition     = var.zoa_lambda_image_tag != ""
+    error_message = "zoa_lambda_image_tag must be set; HyperFleet always deploys the full ZOA stack."
+  }
 }
 
 variable "zoa_runner_image_tag" {
@@ -491,9 +496,13 @@ variable "zoa_runner_source_image" {
 # =============================================================================
 
 variable "zoa_boundary_image" {
-  description = "Container image for ZOA Boundary ECS tasks (from Konflux/ECR). Empty disables boundary deployment (same pattern as zoa_lambda_image_tag gating zoa_lambda)."
+  description = "Full container image reference for ZOA Boundary ECS tasks (source:tag, set by buildspec from deploy config)."
   type        = string
-  default     = ""
+
+  validation {
+    condition     = var.zoa_boundary_image != ""
+    error_message = "zoa_boundary_image must be set; HyperFleet always deploys the full ZOA stack."
+  }
 }
 
 variable "worker_node_ami_id" {

@@ -159,7 +159,7 @@ regional_cluster:
   # @used-by regional_cluster.zoa_runner_source_image pipeline-management-cluster-inputs/terraform.json.j2
   # @used-by regional_cluster.zoa_runner_source_image pipeline-regional-cluster-inputs/terraform.json.j2
   zoa_runner_source_image: "quay.io/rrp-dev-ci/zoa-runner"
-  # @doc regional_cluster.zoa_boundary_image_tag Immutable tag for the ZOA Boundary ECS image. Empty skips boundary ECS/Access compute; data plane (sessions table, IAM) remains. Same commit tag as Lambda/Runner when bumped together.
+  # @doc regional_cluster.zoa_boundary_image_tag Immutable tag for the ZOA Boundary ECS image. Required; same commit tag as Lambda/Runner when bumped together.
   # @used-by regional_cluster.zoa_boundary_image_tag pipeline-management-cluster-inputs/terraform.json.j2
   # @used-by regional_cluster.zoa_boundary_image_tag pipeline-regional-cluster-inputs/terraform.json.j2
   zoa_boundary_image_tag: "3235e3a"
