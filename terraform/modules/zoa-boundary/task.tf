@@ -19,20 +19,47 @@ resource "aws_ecs_task_definition" "boundary" {
       name      = local.container_name
       image     = var.boundary_image
       essential = true
+      # Grace period for SIGTERM before SIGKILL (Fargate default scale); allows exec/CW flush on stop.
+      stopTimeout = 30
+      user        = "1000"
 
       entryPoint = ["/bin/bash", "-c"]
       command = [
         <<-EOF
           set -euo pipefail
+          export PATH="/usr/local/bin:/usr/local/aws-cli/v2/current/bin:$${PATH:-/usr/bin:/bin}"
 
           echo "=== ZOA Boundary Session ==="
           echo "Started at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "Cluster:    $ZOA_TARGET"
           echo "Deployment: $ZOA_DEPLOYMENT"
+          echo "User:       $(id -un) (uid=$(id -u))"
           echo ""
 
+          mkdir -p /home/sre/.claude
+          {
+            echo "# Active ZOA Boundary session"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Deployment | $ZOA_DEPLOYMENT |"
+            echo "| Target | $ZOA_TARGET |"
+            echo "| AWS region | $AWS_REGION |"
+            echo "| ZOA API | $ZOA_API_URL |"
+            echo ""
+            echo "See CLAUDE.md for architecture and allowed tools."
+          } > /home/sre/.claude/ZOA_SESSION.md
+
+          # ECS Exec transcript logging requires script + cat in the image (AWS ECS Exec docs).
+          for bin in script cat; do
+            if ! command -v "$bin" &>/dev/null; then
+              echo "FATAL: missing $bin — ECS Exec cannot upload session transcripts to CloudWatch"
+              exit 1
+            fi
+          done
+
           echo "Available tools:"
-          for tool in zoa aws kubectl jq; do
+          for tool in zoa aws kubectl jq claude script; do
             if command -v "$tool" &>/dev/null; then
               echo "  - $tool"
             else
@@ -44,23 +71,21 @@ resource "aws_ecs_task_definition" "boundary" {
           export PS1="[\u@zoa:$ZOA_DEPLOYMENT/$ZOA_TARGET] \w \$ "
 
           echo "=== Boundary ready for connections ==="
-          echo "Execute TAs with: zoa run <action> [args]"
+          echo "Execute TAs with: zoa run <action> [args] --jira TICKET"
           echo "List actions:     zoa actions"
           echo ""
 
-          # Keep container running for ECS Exec sessions
           echo "Boundary is ready. Waiting for ECS Exec connections..."
           echo "Container will stay running until the task is stopped."
           echo ""
 
-          # Infinite wait - container stays alive for exec sessions
           while true; do
             sleep 3600
           done
         EOF
       ]
 
-      environment = [
+      environment = flatten([
         {
           name  = "ZOA_API_URL"
           value = var.zoa_function_url
@@ -81,20 +106,30 @@ resource "aws_ecs_task_definition" "boundary" {
           name  = "ZOA_BREAKGLASS_ROLE_ARN"
           value = ""
         },
-        # Claude Code Bedrock integration — auto-detects model in the task's region.
-        # AWS_REGION above + CLAUDE_CODE_USE_BEDROCK enables region-local inference.
+        {
+          name  = "HOME"
+          value = "/home/sre"
+        },
         {
           name  = "CLAUDE_CODE_USE_BEDROCK"
           value = "1"
-        }
-      ]
+        },
+        {
+          name  = "DISABLE_AUTOUPDATER"
+          value = "1"
+        },
+        var.claude_bedrock_model_id != "" ? [{
+          name  = "ANTHROPIC_MODEL"
+          value = var.claude_bedrock_model_id
+        }] : [],
+      ])
 
       logConfiguration = {
         logDriver = "awslogs"
         options = {
           awslogs-group         = aws_cloudwatch_log_group.boundary.name
           awslogs-region        = data.aws_region.current.region
-          awslogs-stream-prefix = "boundary"
+          awslogs-stream-prefix = "container"
         }
       }
 
@@ -161,14 +196,17 @@ resource "aws_iam_role_policy" "task_ssm" {
         Resource = "*"
       },
       {
-        Sid    = "CloudWatchLogs"
+        Sid    = "CloudWatchLogsExecSessions"
         Effect = "Allow"
         Action = [
           "logs:CreateLogStream",
           "logs:DescribeLogStreams",
           "logs:PutLogEvents"
         ]
-        Resource = "${aws_cloudwatch_log_group.boundary.arn}:*"
+        Resource = [
+          aws_cloudwatch_log_group.boundary_exec.arn,
+          "${aws_cloudwatch_log_group.boundary_exec.arn}:*",
+        ]
       },
       {
         Sid    = "KMSForECSExec"
@@ -227,27 +265,42 @@ resource "aws_iam_role_policy" "task_lambda" {
   })
 }
 
-# Bedrock — Claude Code uses Amazon Bedrock for AI assistance.
-# Scoped to deployment region only (no cross-region inference).
+# Bedrock — Claude Code uses Amazon Bedrock (Haiku 4.5 only by default).
 resource "aws_iam_role_policy" "task_bedrock" {
-  count = length(var.allowed_bedrock_models) > 0 ? 1 : 0
+  count = (length(var.allowed_bedrock_models) > 0 || length(var.allowed_bedrock_inference_profiles) > 0) ? 1 : 0
   name  = "bedrock-invoke"
   role  = aws_iam_role.task.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "BedrockInvokeModel"
-      Effect = "Allow"
-      Action = [
-        "bedrock:InvokeModel",
-        "bedrock:InvokeModelWithResponseStream",
-      ]
-      Resource = [
-        for model in var.allowed_bedrock_models :
-        "arn:aws:bedrock:${data.aws_region.current.region}::foundation-model/${model}"
-      ]
-    }]
+    Statement = [
+      {
+        Sid    = "BedrockInvokeModel"
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+        ]
+        Resource = concat(
+          [
+            for model in var.allowed_bedrock_models :
+            "arn:aws:bedrock:${data.aws_region.current.region}::foundation-model/${model}"
+          ],
+          [
+            for profile in var.allowed_bedrock_inference_profiles :
+            "arn:aws:bedrock:${data.aws_region.current.region}:${local.account_id}:inference-profile/${profile}"
+          ],
+        )
+      },
+      {
+        Sid    = "BedrockListInferenceProfiles"
+        Effect = "Allow"
+        Action = [
+          "bedrock:ListInferenceProfiles",
+        ]
+        Resource = "*"
+      },
+    ]
   })
 }
 

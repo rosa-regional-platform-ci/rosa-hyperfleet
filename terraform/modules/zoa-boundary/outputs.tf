@@ -34,13 +34,23 @@ output "execution_role_arn" {
 }
 
 output "log_group_name" {
-  description = "CloudWatch log group name for boundary logs"
+  description = "CloudWatch log group for boundary container stdout (awslogs driver)"
   value       = aws_cloudwatch_log_group.boundary.name
 }
 
 output "log_group_arn" {
-  description = "CloudWatch log group ARN for boundary logs"
+  description = "ARN of the boundary container CloudWatch log group"
   value       = aws_cloudwatch_log_group.boundary.arn
+}
+
+output "exec_log_group_name" {
+  description = "CloudWatch log group for ECS Exec session transcripts (SSM interactive shell I/O)"
+  value       = aws_cloudwatch_log_group.boundary_exec.name
+}
+
+output "exec_log_group_arn" {
+  description = "ARN of the boundary ECS Exec session CloudWatch log group"
+  value       = aws_cloudwatch_log_group.boundary_exec.arn
 }
 
 output "container_name" {

@@ -13,7 +13,7 @@ output "api_function_arn" {
 }
 
 output "api_function_url" {
-  description = "Function URL for the API Lambda (used by rosa-boundary CLI)"
+  description = "Function URL for the API Lambda (used by ZOA boundary tasks and CLI)"
   value       = aws_lambda_function_url.api.function_url
 }
 

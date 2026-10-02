@@ -1,13 +1,24 @@
 # ECS Fargate ZOA Boundary Module
 # Provides audited ZOA sessions in private EKS cluster VPCs via ECS Exec (SSM).
-# Unlike the bastion module, boundary tasks have NO standing EKS access — all
-# operations go through per-VPC Lambda Function URLs using the ZOA CLI.
+# Boundary tasks have no standing EKS access (HyperFleet bastion may grant cluster access).
+# All operations go through per-VPC Lambda Function URLs using the ZOA CLI.
 
 locals {
   container_name               = "zoa-boundary"
   effective_log_retention_days = max(365, var.log_retention_days)
   # Shared ZOA CMK (RC) or per-cluster boundary_logs key (MC / unset).
   encryption_kms_arn = var.kms_key_arn != "" ? var.kms_key_arn : one(aws_kms_key.boundary_logs[*].arn)
+
+  # CloudWatch: container stdout (task startup) vs ECS Exec session transcripts (audit).
+  boundary_container_log_group_name = "/ecs/${var.cluster_id}/zoa-boundary"
+  boundary_exec_log_group_name      = "/ecs/${var.cluster_id}/zoa-boundary/ssm-sessions"
+
+  boundary_logs_kms_encryption_context_arns = [
+    "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:${local.boundary_container_log_group_name}",
+    "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:${local.boundary_container_log_group_name}:*",
+    "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:${local.boundary_exec_log_group_name}",
+    "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:${local.boundary_exec_log_group_name}:*",
+  ]
 
   common_tags = merge(
     var.tags,
@@ -61,10 +72,7 @@ resource "aws_kms_key" "boundary_logs" {
         Resource = "*"
         Condition = {
           ArnLike = {
-            "kms:EncryptionContext:aws:logs:arn" = [
-              "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${var.cluster_id}/zoa-boundary",
-              "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${var.cluster_id}/zoa-boundary:*",
-            ]
+            "kms:EncryptionContext:aws:logs:arn" = local.boundary_logs_kms_encryption_context_arns
           }
         }
       }
@@ -84,7 +92,7 @@ resource "aws_kms_alias" "boundary_logs" {
 }
 
 # =============================================================================
-# CloudWatch Log Group
+# CloudWatch Log Groups (same CMK — container vs ECS Exec session I/O)
 # =============================================================================
 
 resource "terraform_data" "shared_kms_ready" {
@@ -94,7 +102,7 @@ resource "terraform_data" "shared_kms_ready" {
 }
 
 resource "aws_cloudwatch_log_group" "boundary" {
-  name              = "/ecs/${var.cluster_id}/zoa-boundary"
+  name              = local.boundary_container_log_group_name
   retention_in_days = local.effective_log_retention_days
   kms_key_id        = local.encryption_kms_arn
 
@@ -104,7 +112,24 @@ resource "aws_cloudwatch_log_group" "boundary" {
     terraform_data.shared_kms_ready,
   ]
 
-  tags = local.common_tags
+  tags = merge(local.common_tags, {
+    Name = "${var.cluster_id}-zoa-boundary-container-logs"
+  })
+}
+
+resource "aws_cloudwatch_log_group" "boundary_exec" {
+  name              = local.boundary_exec_log_group_name
+  retention_in_days = local.effective_log_retention_days
+  kms_key_id        = local.encryption_kms_arn
+
+  depends_on = [
+    aws_kms_key.boundary_logs,
+    terraform_data.shared_kms_ready,
+  ]
+
+  tags = merge(local.common_tags, {
+    Name = "${var.cluster_id}-zoa-boundary-exec-logs"
+  })
 }
 
 # =============================================================================
@@ -236,15 +261,15 @@ resource "aws_ecs_cluster" "boundary" {
 
   # ECS Exec (FedRAMP AU-09): session data channel + exec transcript logging.
   # - kms_key_id: CMK for TLS/exec payload (task role + caller need kms:Decrypt/GenerateDataKey).
-  # - cloud_watch_encryption_enabled=true REQUIRES the log group below to use the same CMK
-  #   (see AWS ECS Exec logging docs). Do not copy bastion (no exec CMK / no CW encryption flag).
+  # - cloud_watch_encryption_enabled=true REQUIRES the exec log group to use the same CMK
+  #   (see AWS ECS Exec logging docs).
   configuration {
     execute_command_configuration {
       kms_key_id = local.encryption_kms_arn
       logging    = "OVERRIDE"
 
       log_configuration {
-        cloud_watch_log_group_name     = aws_cloudwatch_log_group.boundary.name
+        cloud_watch_log_group_name     = aws_cloudwatch_log_group.boundary_exec.name
         cloud_watch_encryption_enabled = true
       }
     }
@@ -252,6 +277,7 @@ resource "aws_ecs_cluster" "boundary" {
 
   depends_on = [
     aws_cloudwatch_log_group.boundary,
+    aws_cloudwatch_log_group.boundary_exec,
     aws_kms_key.boundary_logs,
     terraform_data.shared_kms_ready,
   ]

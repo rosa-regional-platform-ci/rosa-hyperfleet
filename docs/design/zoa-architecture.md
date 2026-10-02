@@ -86,12 +86,12 @@ Today, SREs call the per-VPC Lambda Function URL directly from their laptop:
 
 The Function URL's resource-based policy restricts which IAM principals can invoke it. Caller identity is immutable (derived from SigV4, not from request body).
 
-#### Target State (with rosa-boundary + ZOA Access Lambda)
+#### Target State (with ZOA boundary + ZOA Access Lambda)
 
 Two distinct authentication domains will protect ZOA endpoints:
 
 ```
-SRE Laptop                                      rosa-boundary (ECS task in target VPC)
+SRE Laptop                                      ZOA boundary (ECS task in target VPC)
     │                                                       │
     │ kinit → rh-aws-saml-login                             │ ECS task IAM role
     │ → Jump Account IAM role                               │ (injected at task creation)
@@ -101,7 +101,7 @@ ZOA Access API Gateway                          Lambda Function URL (per-VPC)
 (public, IAM auth, custom domain)               (private, IAM auth, no custom domain)
     │                                                       │
     │ Resource policy:                                      │ Resource-based policy:
-    │ ONLY Jump Account roles                               │ ONLY rosa-boundary task roles
+    │ ONLY Jump Account roles                               │ ONLY ZOA boundary task roles
     │                                                       │
     ▼                                                       ▼
 ZOA Access Lambda                               ZOA Lambda (per-VPC)
@@ -112,16 +112,16 @@ ZOA Access Lambda                               ZOA Lambda (per-VPC)
 
 1. `kinit` (requires Red Hat VPN — only step that does)
 2. `rh-aws-saml-login jump-account-{env}` → temporary IAM role in Jump Account
-3. `rosa-boundary start-task --region R --target T` → calls ZOA Access API Gateway (SigV4, custom domain derived from `--region`)
+3. `zoa session start --deployment D --target T` → calls ZOA Access API Gateway (SigV4, custom domain derived from region/target)
 4. ZOA Access Lambda creates an ECS Fargate task in the target VPC, injects `ZOA_ENDPOINT` (Function URL)
 5. SRE connects to the container via AWS SSM (`aws ecs execute-command`) → interactive shell
 
-**From rosa-boundary** (all TA operations):
+**From ZOA boundary** (all TA operations):
 
 1. SRE is inside the ECS container (connected via SSM session)
 2. ECS task role provides SigV4 identity automatically
 3. `zoa` CLI reads `ZOA_ENDPOINT` env var → calls the per-VPC Lambda Function URL
-4. Lambda validates that the caller ARN matches the rosa-boundary task role for this VPC
+4. Lambda validates that the caller ARN matches the ZOA boundary task role for this VPC
 
 **From laptop** (approvals — no container needed):
 
@@ -129,7 +129,7 @@ ZOA Access Lambda                               ZOA Lambda (per-VPC)
 2. ZOA Access Lambda writes `status=approved` to DynamoDB
 3. Per-VPC Lambda reconciler picks it up on next tick
 
-This separation means: a compromised laptop credential (Jump Account role) cannot execute TAs — it can only create sessions and approve requests. A compromised rosa-boundary task role can only reach its own VPC's Lambda — it has no path to other clusters.
+This separation means: a compromised laptop credential (Jump Account role) cannot execute TAs — it can only create sessions and approve requests. A compromised ZOA boundary task role can only reach its own VPC's Lambda — it has no path to other clusters.
 
 ### Execution Modes (Sync vs Async)
 
@@ -335,12 +335,12 @@ A dedicated Lambda (no VPC attachment, in the RC account) behind a public API Ga
 | VPC-attached               | No                                               | Yes (direct EKS access)                                                                                                                                                        |
 | Cold start                 | ~200ms (no VPC)                                  | Under 100ms to over 1s ([AWS docs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtime-environment.html)); VPC adds < 50ms with Hyperplane. Go is in the fastest tier. |
 | Must work when EKS is down | Yes (session creation bootstraps access)         | Partially (TAs need EKS)                                                                                                                                                       |
-| Permitted callers          | Jump Account roles only (API GW resource policy) | rosa-boundary task roles only (Lambda resource policy)                                                                                                                         |
+| Permitted callers          | Jump Account roles only (API GW resource policy) | ZOA boundary task roles only (Lambda resource policy)                                                                                                                         |
 | WAF protection             | Yes (IP-based rules, geo-blocking)               | Not needed (callers are ECS tasks in same VPC)                                                                                                                                 |
 
 Responsibilities:
 
-- **Session management**: `ecs:RunTask` to create rosa-boundary containers in target VPCs, inject `ZOA_ENDPOINT`
+- **Session management**: `ecs:RunTask` to create ZOA boundary containers in target VPCs, inject `ZOA_API_URL`
 - **Approval/rejection**: write `approved`/`rejected` status to DynamoDB (per-VPC reconciler handles activation)
 - **Placement routing**: resolve target cluster → VPC → Function URL from `boundary-targets` DynamoDB table
 - **Cross-account session creation**: `sts:AssumeRole` into MC account to run ECS tasks there
@@ -364,7 +364,7 @@ All current TAs declare `authorization.approval: none`. The data model supports 
 
 ```mermaid
 sequenceDiagram
-    participant SRE as SRE (rosa-boundary)
+    participant SRE as SRE (ZOA boundary)
     participant Lambda as Per-VPC Lambda
     participant DDB as DynamoDB
     participant Approver as Approver (laptop)
@@ -393,9 +393,9 @@ sequenceDiagram
 - Notification: SNS → Slack/PagerDuty for approval requests
 - Approver validation: approver != requester, same LDAP group, SigV4 identity verified
 
-### rosa-boundary Integration
+### ZOA boundary integration
 
-ZOA CLI will run from a `rosa-boundary` ECS Fargate container — a pre-authenticated shell that operators `exec` into:
+ZOA CLI runs from a **ZOA boundary** ECS Fargate container — an audited shell that operators join via ECS Exec:
 
 - **Placement**: ZOA Access Lambda creates the container in the target VPC (direct network path to private EKS)
 - **Identity bridge**: ECS task ARN → DynamoDB lookup → SRE identity (all CLI calls attributed to the originating SRE)

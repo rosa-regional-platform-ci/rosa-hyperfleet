@@ -61,10 +61,22 @@ variable "zoa_lambda_function_arn" {
   type        = string
 }
 
+variable "claude_bedrock_model_id" {
+  description = "Bedrock model or inference profile ID for Claude Code (ANTHROPIC_MODEL on the boundary task). Infra-owned default: Haiku 4.5."
+  type        = string
+  default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+}
+
 variable "allowed_bedrock_models" {
-  description = "List of Bedrock model ID patterns allowed for boundary tasks. Empty disables Bedrock IAM. Default: Haiku only for cost control."
+  description = "Foundation-model ID patterns (Bedrock IAM) allowed for boundary tasks. Empty disables Bedrock IAM."
   type        = list(string)
-  default     = ["anthropic.claude-3-5-haiku-*"]
+  default     = ["anthropic.claude-haiku-4-5-*"]
+}
+
+variable "allowed_bedrock_inference_profiles" {
+  description = "Inference profile ID suffix patterns (after inference-profile/) for Bedrock IAM. Scoped to this account and region."
+  type        = list(string)
+  default     = ["us.anthropic.claude-haiku-4-5-*"]
 }
 
 variable "enable_bedrock_logging" {
