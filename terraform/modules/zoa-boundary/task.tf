@@ -298,9 +298,10 @@ resource "aws_iam_role_policy" "task_bedrock" {
           "bedrock:InvokeModelWithResponseStream",
           "bedrock:GetInferenceProfile",
         ]
-        Resource = [
-          data.aws_bedrock_inference_profile.claude_haiku.inference_profile_arn,
-        ]
+        Resource = concat(
+          [data.aws_bedrock_inference_profile.claude_haiku.inference_profile_arn],
+          local.claude_bedrock_foundation_model_arns,
+        )
       },
       {
         Sid    = "BedrockListInferenceProfiles"

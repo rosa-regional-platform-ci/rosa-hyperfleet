@@ -11,4 +11,7 @@ data "aws_bedrock_inference_profile" "claude_haiku" {
 
 locals {
   claude_bedrock_invoke_model_id = data.aws_bedrock_inference_profile.claude_haiku.inference_profile_id
+  claude_bedrock_foundation_model_arns = [
+    for m in data.aws_bedrock_inference_profile.claude_haiku.models : m.model_arn
+  ]
 }

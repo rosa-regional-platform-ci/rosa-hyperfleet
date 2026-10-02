@@ -23,4 +23,4 @@ Baked files live under **`/home/sre`**: `.claude/CLAUDE.md`, `.claude/ZOA_SESSIO
 
 Haiku 4.5 on Bedrock requires a **system inference profile**; application profiles sourced from the in-region foundation model are rejected by AWS. Override `claude_bedrock_inference_profile_id` per region if a different profile is approved.
 
-Task IAM: `bedrock:InvokeModel` on the profile ARN, scoped Marketplace subscribe via `aws:CalledViaLast = bedrock.amazonaws.com`.
+Task IAM: `bedrock:InvokeModel` / `InvokeModelWithResponseStream` on the configured inference profile ARN and that profile’s backing foundation models (geo profile destination regions). Marketplace subscribe via `aws:CalledViaLast = bedrock.amazonaws.com`.
