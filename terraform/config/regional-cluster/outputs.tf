@@ -457,6 +457,11 @@ output "zoa_lambda_ecr_url" {
   value       = module.zoa.lambda_ecr_url
 }
 
+output "zoa_access_lambda_role_arn" {
+  description = "ARN of the ZOA Access Lambda execution role (MC boundary IAM trusts this for cross-account ECS)"
+  value       = module.zoa_access.lambda_role_arn
+}
+
 output "zoa_api_function_url" {
   description = "Function URL for the ZOA API Lambda (used by ZOA boundary tasks and CLI)"
   value       = module.zoa_lambda.api_function_url

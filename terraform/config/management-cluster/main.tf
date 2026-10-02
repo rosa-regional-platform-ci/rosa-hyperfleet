@@ -199,6 +199,9 @@ module "zoa_boundary" {
   boundary_image          = var.zoa_boundary_image
   zoa_function_url        = module.zoa_lambda.api_function_url
   zoa_lambda_function_arn = module.zoa_lambda.api_function_arn
+  kms_key_arn             = var.zoa_kms_key_arn
+
+  access_lambda_role_arn = var.zoa_access_lambda_role_arn
 }
 
 # =============================================================================

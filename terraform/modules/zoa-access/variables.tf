@@ -81,6 +81,11 @@ variable "boundary_ecs_exec_command" {
   default     = "runuser -u sre -- /bin/bash -l"
 }
 
+variable "exec_scoped_role_arn" {
+  description = "RC boundary exec-scoped IAM role ARN (from zoa-boundary module). Used as default for RC targets and EXEC_SCOPED_ROLE_ARN on the Lambda."
+  type        = string
+}
+
 variable "tags" {
   description = "Additional tags to apply to all resources."
   type        = map(string)

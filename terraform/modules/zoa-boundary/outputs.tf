@@ -70,6 +70,16 @@ output "run_task_command" {
   EOT
 }
 
+output "exec_scoped_role_arn" {
+  description = "IAM role ARN vended on session join for per-task ECS Exec"
+  value       = aws_iam_role.exec_scoped.arn
+}
+
+output "boundary_access_role_arn" {
+  description = "IAM role ARN assumed by RC Access Lambda for cross-account RunTask/StopTask"
+  value       = aws_iam_role.boundary_access.arn
+}
+
 output "ecs_exec_interactive_command" {
   description = "Interactive shell command for ecs:ExecuteCommand (also ZOA_ECS_EXEC_COMMAND on the task and Access Lambda env)"
   value       = var.ecs_exec_interactive_command

@@ -211,6 +211,17 @@ variable "zoa_deployment_name" {
   default     = ""
 }
 
+variable "zoa_access_lambda_role_arn" {
+  description = "ARN of the RC ZOA Access Lambda execution role (from regional cluster outputs). Required for MC boundary cross-account IAM trust."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.zoa_access_lambda_role_arn == "" || can(regex("^arn:aws:iam::[0-9]{12}:role/", var.zoa_access_lambda_role_arn))
+    error_message = "zoa_access_lambda_role_arn must be empty or a valid IAM role ARN."
+  }
+}
+
 variable "oidc_bucket_name" {
   description = "S3 bucket name for regional OIDC discovery documents (read from RC terraform state)"
   type        = string

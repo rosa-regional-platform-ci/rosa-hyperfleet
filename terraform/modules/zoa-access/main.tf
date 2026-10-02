@@ -63,13 +63,15 @@ resource "aws_lambda_function" "access" {
 
   environment {
     variables = {
-      HANDLER_MODE       = "access"
-      SESSIONS_TABLE     = var.sessions_table_name
-      TARGETS_SSM_PREFIX = var.targets_ssm_prefix
-      AUDIT_TABLE        = var.audit_table_name
-      KMS_KEY_ARN        = var.kms_key_arn
-      DEPLOYMENT_NAME    = var.deployment_name
-      ZOA_ECS_EXEC_COMMAND = var.boundary_ecs_exec_command
+      HANDLER_MODE                     = "access"
+      SESSIONS_TABLE                   = var.sessions_table_name
+      TARGETS_SSM_PREFIX               = var.targets_ssm_prefix
+      AUDIT_TABLE                      = var.audit_table_name
+      KMS_KEY_ARN                      = var.kms_key_arn
+      DEPLOYMENT_NAME                  = var.deployment_name
+      ZOA_ECS_EXEC_COMMAND             = var.boundary_ecs_exec_command
+      EXEC_SCOPED_ROLE_ARN             = var.exec_scoped_role_arn
+      EXEC_CREDENTIAL_DURATION_SECONDS = "3600"
     }
   }
 
@@ -297,22 +299,33 @@ resource "aws_iam_role_policy" "lambda_ecs" {
   })
 }
 
-# STS: AssumeRole for cross-account ECS access (MC accounts)
+# STS: cross-account boundary ECS + exec credential vending (MC targets)
 resource "aws_iam_role_policy" "lambda_sts" {
-  count = length(var.mc_account_ids) > 0 ? 1 : 0
-  name  = "${local.function_name}-sts"
-  role  = aws_iam_role.lambda.id
+  name = "${local.function_name}-sts"
+  role = aws_iam_role.lambda.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = "sts:AssumeRole"
-      Resource = [
-        for account_id in var.mc_account_ids :
-        "arn:aws:iam::${account_id}:role/*-zoa-boundary-access"
-      ]
-    }]
+    Statement = [
+      {
+        Sid    = "AssumeExecScopedRoles"
+        Effect = "Allow"
+        Action = "sts:AssumeRole"
+        Resource = concat(
+          [var.exec_scoped_role_arn],
+          [for account_id in var.mc_account_ids : "arn:aws:iam::${account_id}:role/*-zoa-boundary-exec-scoped"],
+        )
+      },
+      {
+        Sid    = "AssumeBoundaryAccessRoles"
+        Effect = "Allow"
+        Action = "sts:AssumeRole"
+        Resource = [
+          for account_id in var.mc_account_ids :
+          "arn:aws:iam::${account_id}:role/*-zoa-boundary-access"
+        ]
+      },
+    ]
   })
 }
 

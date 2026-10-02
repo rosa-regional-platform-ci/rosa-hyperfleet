@@ -6,19 +6,11 @@
 locals {
   container_name               = "zoa-boundary"
   effective_log_retention_days = max(365, var.log_retention_days)
-  # Shared ZOA CMK (RC) or per-cluster boundary_logs key (MC / unset).
-  encryption_kms_arn = var.kms_key_arn != "" ? var.kms_key_arn : one(aws_kms_key.boundary_logs[*].arn)
+  encryption_kms_arn           = var.kms_key_arn
 
   # CloudWatch: container stdout (task startup) vs ECS Exec session transcripts (audit).
   boundary_container_log_group_name = "/ecs/${var.cluster_id}/zoa-boundary"
   boundary_exec_log_group_name      = "/ecs/${var.cluster_id}/zoa-boundary/ssm-sessions"
-
-  boundary_logs_kms_encryption_context_arns = [
-    "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:${local.boundary_container_log_group_name}",
-    "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:${local.boundary_container_log_group_name}:*",
-    "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:${local.boundary_exec_log_group_name}",
-    "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:${local.boundary_exec_log_group_name}:*",
-  ]
 
   common_tags = merge(
     var.tags,
@@ -34,83 +26,13 @@ locals {
 data "aws_region" "current" {}
 
 # =============================================================================
-# FedRAMP AU-09: KMS Key for ZOA Boundary CloudWatch Log Encryption
+# CloudWatch Log Groups (regional ZOA CMK — container vs ECS Exec session I/O)
 # =============================================================================
-
-resource "aws_kms_key" "boundary_logs" {
-  count = var.kms_key_arn == "" ? 1 : 0
-
-  description             = "KMS key for ZOA Boundary ECS CloudWatch log encryption (FedRAMP AU-09)"
-  deletion_window_in_days = 30
-  enable_key_rotation     = true
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "EnableRootAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
-        }
-        Action   = "kms:*"
-        Resource = "*"
-      },
-      {
-        Sid    = "AllowCloudWatchLogs"
-        Effect = "Allow"
-        Principal = {
-          Service = "logs.${data.aws_region.current.region}.amazonaws.com"
-        }
-        Action = [
-          "kms:Encrypt",
-          "kms:Decrypt",
-          "kms:ReEncrypt*",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
-        ]
-        Resource = "*"
-        Condition = {
-          ArnLike = {
-            "kms:EncryptionContext:aws:logs:arn" = local.boundary_logs_kms_encryption_context_arns
-          }
-        }
-      }
-    ]
-  })
-
-  tags = merge(local.common_tags, {
-    Name = "${var.cluster_id}-zoa-boundary-logs"
-  })
-}
-
-resource "aws_kms_alias" "boundary_logs" {
-  count = var.kms_key_arn == "" ? 1 : 0
-
-  name          = "alias/${var.cluster_id}-zoa-boundary-logs"
-  target_key_id = aws_kms_key.boundary_logs[0].key_id
-}
-
-# =============================================================================
-# CloudWatch Log Groups (same CMK — container vs ECS Exec session I/O)
-# =============================================================================
-
-resource "terraform_data" "shared_kms_ready" {
-  count = var.kms_key_arn != "" ? 1 : 0
-
-  input = var.kms_key_arn
-}
 
 resource "aws_cloudwatch_log_group" "boundary" {
   name              = local.boundary_container_log_group_name
   retention_in_days = local.effective_log_retention_days
   kms_key_id        = local.encryption_kms_arn
-
-  # depends_on must be a static list (no concat()); resource addresses cover all instances.
-  depends_on = [
-    aws_kms_key.boundary_logs,
-    terraform_data.shared_kms_ready,
-  ]
 
   tags = merge(local.common_tags, {
     Name = "${var.cluster_id}-zoa-boundary-container-logs"
@@ -121,11 +43,6 @@ resource "aws_cloudwatch_log_group" "boundary_exec" {
   name              = local.boundary_exec_log_group_name
   retention_in_days = local.effective_log_retention_days
   kms_key_id        = local.encryption_kms_arn
-
-  depends_on = [
-    aws_kms_key.boundary_logs,
-    terraform_data.shared_kms_ready,
-  ]
 
   tags = merge(local.common_tags, {
     Name = "${var.cluster_id}-zoa-boundary-exec-logs"
@@ -144,8 +61,6 @@ resource "aws_cloudwatch_log_group" "bedrock_invocations" {
   name              = "/aws/bedrock/model-invocations"
   retention_in_days = local.effective_log_retention_days
   kms_key_id        = local.encryption_kms_arn
-
-  depends_on = [aws_kms_key.boundary_logs]
 
   tags = merge(local.common_tags, {
     Name = "${var.cluster_id}-bedrock-invocations"
@@ -278,8 +193,6 @@ resource "aws_ecs_cluster" "boundary" {
   depends_on = [
     aws_cloudwatch_log_group.boundary,
     aws_cloudwatch_log_group.boundary_exec,
-    aws_kms_key.boundary_logs,
-    terraform_data.shared_kms_ready,
   ]
 
   tags = local.common_tags

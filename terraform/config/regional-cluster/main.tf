@@ -514,21 +514,23 @@ module "zoa_access" {
     aws.central = aws.central
   }
 
-  depends_on = [module.zoa]
+  depends_on = [module.zoa, module.zoa_boundary]
 
   regional_id = var.regional_id
   image_uri   = module.zoa.lambda_image_uri
 
   central_account_id         = data.aws_caller_identity.central.account_id
   trusted_assumer_role_names = var.zoa_access_trusted_assumer_role_names
+  mc_account_ids             = local.mc_account_ids
 
-  sessions_table_name      = module.zoa.sessions_table_name
-  audit_table_name         = module.zoa.audit_table_name
-  targets_ssm_prefix       = "/zoa/targets/${var.deployment_name}"
-  kms_key_arn              = module.zoa.kms_key_arn
-  deployment_name          = var.deployment_name
-  boundary_ecs_cluster_arn = module.zoa_boundary.ecs_cluster_arn
+  sessions_table_name       = module.zoa.sessions_table_name
+  audit_table_name          = module.zoa.audit_table_name
+  targets_ssm_prefix        = "/zoa/targets/${var.deployment_name}"
+  kms_key_arn               = module.zoa.kms_key_arn
+  deployment_name           = var.deployment_name
+  boundary_ecs_cluster_arn  = module.zoa_boundary.ecs_cluster_arn
   boundary_ecs_exec_command = module.zoa_boundary.ecs_exec_interactive_command
+  exec_scoped_role_arn        = module.zoa_boundary.exec_scoped_role_arn
 }
 
 # =============================================================================
@@ -551,6 +553,8 @@ module "zoa_boundary" {
   zoa_function_url        = module.zoa_lambda.api_function_url
   zoa_lambda_function_arn = module.zoa_lambda.api_function_arn
   kms_key_arn             = module.zoa.kms_key_arn
+
+  access_lambda_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.regional_id}-zoa-access-lambda"
 }
 
 # =============================================================================

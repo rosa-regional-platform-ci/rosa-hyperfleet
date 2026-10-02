@@ -4,7 +4,7 @@ ECS Fargate cluster and task definition for ZOA Boundary sessions (ECS Exec + ZO
 
 ## CloudWatch log groups (single KMS CMK)
 
-Both groups use the same key: `kms_key_arn` when set (RC shared ZOA CMK), otherwise `aws_kms_key.boundary_logs` per deployment.
+Both groups use the regional ZOA CMK (`kms_key_arn` = RC `module.zoa.kms_key_arn`), including MC deployments via cross-account key policy in `module.zoa`.
 
 | Purpose | Log group | Stream prefix / pattern | Written by |
 | -------- | --------- | ------------------------ | ---------- |

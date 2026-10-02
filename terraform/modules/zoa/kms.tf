@@ -132,27 +132,37 @@ resource "aws_kms_key_policy" "zoa" {
         }
       },
       {
-        Sid    = "AllowBoundaryTaskRolesKMS"
+        Sid    = "AllowCrossAccountCloudWatchLogsBoundaryExec"
         Effect = "Allow"
         Principal = {
-          AWS = "*"
+          Service = "logs.${data.aws_region.current.name}.amazonaws.com"
         }
         Action = [
+          "kms:Encrypt",
           "kms:Decrypt",
-          "kms:GenerateDataKey",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey",
         ]
         Resource = "*"
         Condition = {
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.regional_id}-zoa-boundary-*"
+            "kms:EncryptionContext:aws:logs:arn" = [
+              "arn:aws:logs:${data.aws_region.current.name}:*:log-group:/ecs/*/zoa-boundary",
+              "arn:aws:logs:${data.aws_region.current.name}:*:log-group:/ecs/*/zoa-boundary:*",
+              "arn:aws:logs:${data.aws_region.current.name}:*:log-group:/ecs/*/zoa-boundary/ssm-sessions",
+              "arn:aws:logs:${data.aws_region.current.name}:*:log-group:/ecs/*/zoa-boundary/ssm-sessions:*",
+              "arn:aws:logs:${data.aws_region.current.name}:*:log-group:/aws/bedrock/model-invocations",
+              "arn:aws:logs:${data.aws_region.current.name}:*:log-group:/aws/bedrock/model-invocations:*",
+            ]
           }
         }
       },
       {
-        Sid    = "AllowOrganizationAccountAccessRoleECSExec"
+        Sid    = "AllowLocalBoundaryRolesECSExecKMS"
         Effect = "Allow"
         Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/OrganizationAccountAccessRole"
+          AWS = "*"
         }
         Action = [
           "kms:Decrypt",
@@ -160,6 +170,32 @@ resource "aws_kms_key_policy" "zoa" {
           "kms:DescribeKey",
         ]
         Resource = "*"
+        Condition = {
+          ArnLike = {
+            "aws:PrincipalArn" = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/*-zoa-boundary-*"
+          }
+        }
+      },
+      {
+        Sid    = "AllowCrossAccountBoundaryRolesECSExecKMS"
+        Effect = "Allow"
+        Principal = {
+          AWS = "*"
+        }
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey",
+        ]
+        Resource = "*"
+        Condition = {
+          "ForAnyValue:StringLike" = {
+            "aws:PrincipalOrgPaths" = "${var.mc_ou_path}*"
+          }
+          StringLike = {
+            "aws:PrincipalArn" = "arn:*:iam::*:role/*-zoa-boundary-*"
+          }
+        }
       },
     ]
   })

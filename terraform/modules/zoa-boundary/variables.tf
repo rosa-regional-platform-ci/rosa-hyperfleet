@@ -98,9 +98,18 @@ variable "breakglass_role_arns" {
 }
 
 variable "kms_key_arn" {
-  description = "Optional shared ZOA CMK for ECS Exec and boundary CloudWatch logs. When set, no dedicated boundary_logs key is created (use on regional cluster). MC accounts leave empty until cross-account log encryption is defined."
+  description = "Regional ZOA CMK (module.zoa.kms_key_arn from the RC account) for ECS Exec and boundary CloudWatch logs. MC boundary uses the same RC key; key policy grants are in module.zoa."
   type        = string
-  default     = ""
+
+  validation {
+    condition     = var.kms_key_arn != ""
+    error_message = "kms_key_arn is required; boundary does not create a dedicated KMS key."
+  }
+}
+
+variable "access_lambda_role_arn" {
+  description = "ARN of the RC ZOA Access Lambda execution role allowed to assume boundary-access and exec-scoped roles in this account."
+  type        = string
 }
 
 variable "tags" {

@@ -107,6 +107,7 @@ else
     export TF_VAR_zoa_sessions_table_name=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_sessions_table_name 2>/dev/null || echo "")
     export TF_VAR_zoa_uploader_role_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_uploader_role_arn 2>/dev/null | grep -E '^arn:' || echo "")
     export TF_VAR_zoa_data_access_role_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_data_access_role_arn 2>/dev/null | grep -E '^arn:' || echo "")
+    export TF_VAR_zoa_access_lambda_role_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_access_lambda_role_arn 2>/dev/null | grep -E '^arn:' || echo "")
 fi
 
 # ── Phase 1b: ZOA Lambda image reference ──────────────────────────────────────
