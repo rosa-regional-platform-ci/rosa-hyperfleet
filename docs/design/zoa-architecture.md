@@ -1,6 +1,6 @@
 # Zero Operator Access (ZOA) — Architecture
 
-**Last Updated Date**: 2026-09-14
+**Last Updated Date**: 2026-10-02
 
 ## Summary
 
@@ -26,7 +26,8 @@ Each target VPC (RC and every MC) gets an independent pair of Lambda functions f
 | Lambda     | Invoke Mode       | Trigger                             | Purpose                                                           | Timeout | Concurrency |
 | ---------- | ----------------- | ----------------------------------- | ----------------------------------------------------------------- | ------- | ----------- |
 | **API**    | `RESPONSE_STREAM` | Function URL (IAM auth)             | HTTP handler for CLI, sync TA execution, streaming responses      | 300s    | 50          |
-| **Worker** | `BUFFERED`        | EventBridge Scheduler + self-invoke | Reconciler (1m), GC (5m), async/approved TA execution via fan-out | 300s    | 10          |
+| **Worker** | `BUFFERED`        | EventBridge Scheduler + self-invoke | Reconciler (1m), GC (5m), boundary reaper (5m), async/approved TA | 300s    | 10          |
+| **Access** | `BUFFERED`        | Function URL (IAM auth)             | Boundary session lifecycle, target discovery (RC, no VPC)         | 300s    | (module)    |
 
 Both use `lambda.Start()` from `aws-lambda-go`. The API Lambda uses a native Go streaming adapter (`LambdaFunctionURLStreamingResponse`) supporting responses up to 200MB — no external proxy or sidecar. The Worker uses standard JSON responses for EventBridge and self-invocation events.
 
@@ -76,60 +77,52 @@ graph TD
 
 ### Authentication & Caller Boundaries
 
-#### Current State
+#### Per-VPC API Lambda (Trusted Actions)
 
-Today, SREs call the per-VPC Lambda Function URL directly from their laptop:
+SREs inside a **ZOA boundary** container call the local per-VPC API Lambda Function URL (`ZOA_API_URL`, IAM auth). The ECS task role provides SigV4 identity; the API Lambda records caller ARN on every execution and (for boundary tasks) resolves the originating SRE via the identity bridge (task UUID → DynamoDB session).
 
-1. `kinit` (requires Red Hat VPN) → `rh-aws-saml-login` → IAM role with `lambda:InvokeFunctionUrl` permission
-2. `zoa` CLI calls the Function URL directly (SigV4 with the operator's IAM role)
-3. Lambda extracts caller identity from SigV4 headers (Account ID, ARN, session name) and records it on every execution
+Operators with laptop credentials that can invoke the API Function URL directly may still run `zoa run` against RC/MC endpoints for development and platform recovery — the resource policy controls who may invoke. Production investigations should use boundary sessions so shell I/O is captured in CloudWatch Exec logs.
 
-The Function URL's resource-based policy restricts which IAM principals can invoke it. Caller identity is immutable (derived from SigV4, not from request body).
+#### ZOA Access Lambda + ZOA boundary (sessions)
 
-#### Target State (with ZOA boundary + ZOA Access Lambda)
-
-Two distinct authentication domains will protect ZOA endpoints:
+Two authentication domains separate **session management** from **TA execution**:
 
 ```
 SRE Laptop                                      ZOA boundary (ECS task in target VPC)
     │                                                       │
-    │ kinit → rh-aws-saml-login                             │ ECS task IAM role
-    │ → Jump Account IAM role                               │ (injected at task creation)
+    │ Central Account → invoker role                        │ ECS task IAM role
+    │ (Function URL SigV4)                                  │ (injected at RunTask)
     │                                                       │
     ▼                                                       ▼
-ZOA Access API Gateway                          Lambda Function URL (per-VPC)
-(public, IAM auth, custom domain)               (private, IAM auth, no custom domain)
+ZOA Access Function URL                         Per-VPC API Function URL
+(IAM auth, RC Lambda, no VPC)                   (IAM auth, VPC-attached)
     │                                                       │
-    │ Resource policy:                                      │ Resource-based policy:
-    │ ONLY Jump Account roles                               │ ONLY ZOA boundary task roles
+    │ Invoker role + resource policy                        │ ZOA boundary task roles only
     │                                                       │
     ▼                                                       ▼
-ZOA Access Lambda                               ZOA Lambda (per-VPC)
-(session mgmt, approvals)                       (TA execution, break-glass)
+ZOA Access Lambda                               API Lambda (same VPC)
+(sessions, RunTask, discovery)                  (TA execution)
 ```
 
-**From laptop** (session management + approvals only):
+**From laptop** (session management):
 
-1. `kinit` (requires Red Hat VPN — only step that does)
-2. `rh-aws-saml-login jump-account-{env}` → temporary IAM role in Jump Account
-3. `zoa session start --deployment D --target T` → calls ZOA Access API Gateway (SigV4, custom domain derived from region/target)
-4. ZOA Access Lambda creates an ECS Fargate task in the target VPC, injects `ZOA_ENDPOINT` (Function URL)
-5. SRE connects to the container via AWS SSM (`aws ecs execute-command`) → interactive shell
+1. Authenticate to the Central Account and assume the ZOA Access **invoker** role (same pattern as other HyperFleet central roles).
+2. `zoa session start <deployment> <target>` — positional args, e.g. `zoa session start us-east-1 mc01` (flags `-d`/`-t` for scripts).
+3. CLI calls the **ZOA Access Function URL** (discovered via SSM / config), not API Gateway.
+4. Access Lambda runs `ecs:RunTask` in the target VPC (cross-account for MC), sets `ZOA_API_URL`, enables ECS Exec.
+5. `zoa session join <deployment>/<session-id>` opens an interactive shell (ECS Exec + `session-manager-plugin`).
 
-**From ZOA boundary** (all TA operations):
+**From ZOA boundary** (TA operations):
 
-1. SRE is inside the ECS container (connected via SSM session)
-2. ECS task role provides SigV4 identity automatically
-3. `zoa` CLI reads `ZOA_ENDPOINT` env var → calls the per-VPC Lambda Function URL
-4. Lambda validates that the caller ARN matches the ZOA boundary task role for this VPC
+1. SRE works in the ECS Exec shell.
+2. `zoa run …` uses `ZOA_API_URL` → per-VPC API Lambda Function URL.
+3. API Lambda validates the caller against the boundary task role for that VPC.
 
-**From laptop** (approvals — no container needed):
+**Session enforcement:** Worker Lambda **reaper** (EventBridge every 5m, `route=reaper`) terminates boundary tasks when the session deadline passes (`pkg/scheduler/reaper.go`).
 
-1. `zoa approve <id> --region R --target T` → calls ZOA Access API Gateway directly (SigV4, Jump Account role)
-2. ZOA Access Lambda writes `status=approved` to DynamoDB
-3. Per-VPC Lambda reconciler picks it up on next tick
+This separation means a compromised invoker role cannot execute arbitrary TAs against cluster APIs without a boundary task — it can only manage sessions. A boundary task role can reach only its VPC's API Lambda.
 
-This separation means: a compromised laptop credential (Jump Account role) cannot execute TAs — it can only create sessions and approve requests. A compromised ZOA boundary task role can only reach its own VPC's Lambda — it has no path to other clusters.
+Session logging: container stdout → `/ecs/<cluster_id>/zoa-boundary`; ECS Exec transcripts → `.../zoa-boundary/ssm-sessions` (see [boundary session logging](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/design/boundary-session-logging.md) in the ZOA repo).
 
 ### Execution Modes (Sync vs Async)
 
@@ -209,23 +202,39 @@ terraform/modules/zoa-lambda/   → Per-VPC compute (one per target VPC: RC + ea
 
 ### `modules/zoa-lambda/` — Per-VPC Compute
 
-| Resource                    | Details                                                                                                                                                               |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API Lambda                  | Function URL (`AWS_IAM` auth type), invoke mode `RESPONSE_STREAM`, x86_64 container from ECR, VPC-attached to private subnets, 512MB memory.                          |
-| Worker Lambda               | No Function URL. EventBridge-triggered + self-invoke. Same image, VPC, memory.                                                                                        |
-| IAM execution role (shared) | Single role for both Lambdas: DynamoDB read/write, S3 read/write, EKS describe, STS AssumeRole (for TA-scoped roles + uploader), Lambda self-invoke, CloudWatch Logs. |
-| IAM: zoa-aws-read           | Per-TA scoped role for AWS read operations (EKS DescribeCluster, EC2 DescribeInstances/VPCs/Subnets/SecurityGroups). Assumed per-execution via STS.                   |
-| IAM: zoa-aws-write          | Per-TA scoped role for AWS write operations. Grows incrementally as write TAs are added.                                                                              |
-| SQS DLQ                     | Dead letters for Worker async failures. SSE-SQS, 14-day retention. One per Lambda pair.                                                                               |
-| CloudWatch Logs             | Log groups with 365-day retention, KMS-encrypted (customer-managed key, consistent with platform standard). JSON structured logging.                                  |
-| EKS access entry            | Grants Lambda execution role access to target EKS cluster with a Kubernetes group for RBAC binding.                                                                   |
-| Security group              | Egress to EKS API (443) and AWS service endpoints. No inbound rules (Function URL handles ingress).                                                                   |
-| EventBridge Scheduler       | Three schedules: reconciler (1m), GC (5m), and boundary reaper (5m). Always enabled when ZOA Lambda is deployed.                                                       |
+| Resource                    | Details                                                                                                                                                                          |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API Lambda                  | Function URL (`AWS_IAM` auth type), invoke mode `RESPONSE_STREAM`, x86_64 container from ECR, VPC-attached to private subnets, 512MB memory.                                     |
+| Worker Lambda               | No Function URL. EventBridge-triggered + self-invoke. Same image, VPC, memory.                                                                                                   |
+| IAM execution role (shared) | Single role for both Lambdas: DynamoDB read/write, S3 read/write, EKS describe, STS AssumeRole (for TA-scoped roles + uploader), Lambda self-invoke, CloudWatch Logs.            |
+| IAM: zoa-aws-read           | Per-TA scoped role for AWS read operations (EKS DescribeCluster, EC2 DescribeInstances/VPCs/Subnets/SecurityGroups). Assumed per-execution via STS.                              |
+| IAM: zoa-aws-write          | Per-TA scoped role for AWS write operations. Grows incrementally as write TAs are added.                                                                                         |
+| SQS DLQ                     | Dead letters for Worker async failures. SSE-SQS, 14-day retention. One per Lambda pair.                                                                                          |
+| CloudWatch Logs             | Log groups with 365-day retention, KMS-encrypted (customer-managed key, consistent with platform standard). JSON structured logging.                                             |
+| EKS access entry            | Grants Lambda execution role access to target EKS cluster with a Kubernetes group for RBAC binding.                                                                              |
+| Security group              | Egress to EKS API (443) and AWS service endpoints. No inbound rules (Function URL handles ingress).                                                                              |
+| EventBridge Scheduler       | Four schedules on Worker: reconciler (1m), GC (5m), boundary reaper (5m), plus self-invoke for TA execution. Reaper requires `sessions_table_name` and boundary ECS cluster ARN. |
+
+### `modules/zoa-access/` — Session control plane (RC)
+
+| Resource       | Details                                                                                                    |
+| -------------- | ---------------------------------------------------------------------------------------------------------- |
+| Access Lambda  | Same `zoa-lambda` image, `HANDLER_MODE=access`, no VPC. Function URL with `AWS_IAM` auth (no API Gateway). |
+| Invoker role   | Central-trusted role; SREs assume via Central Account to call the Function URL.                            |
+| SSM parameters | Publishes Access Function URL and deployment metadata for CLI autodiscovery.                               |
+
+### `modules/zoa-boundary/` — Investigation containers (RC + MC VPC)
+
+| Resource                      | Details                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| ECS cluster + task definition | Fargate boundary container (`zoa-boundary` image), ECS Exec enabled, `stopTimeout` 30s.                      |
+| CloudWatch Logs               | Container group `/ecs/<cluster_id>/zoa-boundary`; exec transcripts `/ecs/.../ssm-sessions` (single KMS key). |
+| IAM                           | Task role: per-VPC API Function URL, Bedrock (Claude), SSM messages, exec log writes. No standing EKS admin. |
 
 ### RC/MC Config Wiring
 
-- **RC** instantiates both modules: `modules/zoa` (shared resources) + `modules/zoa-lambda` (RC-local Lambda pair). Exports data-access role ARN and ECR URL as outputs for MC consumption.
-- **MC** instantiates `modules/zoa-lambda` only, consuming RC outputs (ECR URL, DynamoDB ARNs/names, S3 bucket, KMS key ARN, data-access role ARN, uploader role ARN).
+- **RC** instantiates `modules/zoa`, `modules/zoa-lambda`, `modules/zoa-access`, and `modules/zoa-boundary` (RC VPC). Exports data-access role ARN and ECR URL as outputs for MC consumption.
+- **MC** instantiates `modules/zoa-lambda` and `modules/zoa-boundary`, consuming RC outputs (ECR URL, DynamoDB, S3, KMS, data-access role, sessions table, Access metadata).
 - **Cross-account access**: MC Lambdas assume `zoa-data-access` role via STS to reach RC's DynamoDB and S3. Both DynamoDB tables and S3 bucket also have resource-based policies scoped by MC OU path — defense in depth (either mechanism alone would suffice).
 
 ## Tunable Parameters
@@ -322,30 +331,9 @@ Graviton/arm64 migration planned for ~20% Lambda cost reduction.
 
 ---
 
-> **Everything above this line is implemented and deployed.** Sections below describe features that are designed and validated but not yet built. As each feature ships, it will be moved into the main body of this document.
+> Sections below describe features not yet implemented.
 
 ## Future Considerations
-
-### ZOA Access Lambda
-
-A dedicated Lambda (no VPC attachment, in the RC account) behind a public API Gateway with a custom domain (`https://zoa-access.{region}.rosa.example.com`):
-
-| Concern                    | Access Lambda                                    | Per-VPC Lambda                                                                                                                                                                 |
-| -------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| VPC-attached               | No                                               | Yes (direct EKS access)                                                                                                                                                        |
-| Cold start                 | ~200ms (no VPC)                                  | Under 100ms to over 1s ([AWS docs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtime-environment.html)); VPC adds < 50ms with Hyperplane. Go is in the fastest tier. |
-| Must work when EKS is down | Yes (session creation bootstraps access)         | Partially (TAs need EKS)                                                                                                                                                       |
-| Permitted callers          | Jump Account roles only (API GW resource policy) | ZOA boundary task roles only (Lambda resource policy)                                                                                                                         |
-| WAF protection             | Yes (IP-based rules, geo-blocking)               | Not needed (callers are ECS tasks in same VPC)                                                                                                                                 |
-
-Responsibilities:
-
-- **Session management**: `ecs:RunTask` to create ZOA boundary containers in target VPCs, inject `ZOA_API_URL`
-- **Approval/rejection**: write `approved`/`rejected` status to DynamoDB (per-VPC reconciler handles activation)
-- **Placement routing**: resolve target cluster → VPC → Function URL from `boundary-targets` DynamoDB table
-- **Cross-account session creation**: `sts:AssumeRole` into MC account to run ECS tasks there
-
-Key design choice: the Access Lambda does NOT create EKS access entries or execute TAs. All target operations go through the per-VPC Lambda. This keeps IAM minimal and the architecture uniform.
 
 ### Break-Glass Access
 
@@ -374,7 +362,7 @@ sequenceDiagram
     Lambda->>DDB: PUT execution (pending)
     Lambda-->>SRE: {id, "pending"}
 
-    Approver->>Access: POST /approve/{id} (SigV4, Jump Account)
+    Approver->>Access: POST /approve/{id} (SigV4, Access Function URL)
     Access->>DDB: UPDATE status → approved
 
     Note over Lambda: Reconciler tick (≤1m)
@@ -393,25 +381,11 @@ sequenceDiagram
 - Notification: SNS → Slack/PagerDuty for approval requests
 - Approver validation: approver != requester, same LDAP group, SigV4 identity verified
 
-### ZOA boundary integration
-
-ZOA CLI runs from a **ZOA boundary** ECS Fargate container — an audited shell that operators join via ECS Exec:
-
-- **Placement**: ZOA Access Lambda creates the container in the target VPC (direct network path to private EKS)
-- **Identity bridge**: ECS task ARN → DynamoDB lookup → SRE identity (all CLI calls attributed to the originating SRE)
-- **No local credentials needed**: Task IAM role provides SigV4 identity automatically
-- **Auditable sessions**: SSM Session Manager records all terminal I/O; `auditd` captures syscalls; both streamed to S3 (WORM)
-- **Time-boxed**: 4h hard deadline (not extendable — new container = fresh audit trail)
-- **Reconnectable**: SRE can disconnect and `join-task` later (session state persists in container)
-- **Network-isolated**: only reaches Lambda Function URLs (via NAT) and EKS API (same VPC). No internet egress for break-glass kubectl.
-- **99.99% availability** (ECS Fargate SLA)
-- **Pre-installed tooling**: `zoa` CLI, `aws` CLI, `kubectl` (for break-glass only)
-
 ## Related Documentation
 
 ### In this repository
 
-- Terraform modules: [`terraform/modules/zoa/`](../../terraform/modules/zoa/) and [`terraform/modules/zoa-lambda/`](../../terraform/modules/zoa-lambda/)
+- Terraform modules: [`terraform/modules/zoa/`](../../terraform/modules/zoa/), [`terraform/modules/zoa-lambda/`](../../terraform/modules/zoa-lambda/), [`terraform/modules/zoa-access/`](../../terraform/modules/zoa-access/), [`terraform/modules/zoa-boundary/`](../../terraform/modules/zoa-boundary/)
 - RC config: [`terraform/config/regional-cluster/`](../../terraform/config/regional-cluster/) (instantiates both modules)
 - MC config: [`terraform/config/management-cluster/`](../../terraform/config/management-cluster/) (instantiates `zoa-lambda` only)
 
@@ -426,4 +400,5 @@ ZOA CLI runs from a **ZOA boundary** ECS Fargate container — an audited shell 
 - [E2E Testing](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/e2e-testing.md) — Functional and monitoring E2E suites, smoke vs full, CI integration
 - [Observability](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/observability.md) — EMF metrics catalog, cost model, Lambda logs, Grafana Explorer
 - [API Reference](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/api-reference.md) — Lambda Function URL HTTP API endpoints
+- [Boundary session logging](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/design/boundary-session-logging.md) — CloudWatch log groups for container vs ECS Exec
 - [Konflux](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/konflux.md) — Container image build pipeline
