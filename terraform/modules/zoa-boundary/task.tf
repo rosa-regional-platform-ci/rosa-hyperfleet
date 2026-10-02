@@ -116,7 +116,7 @@ resource "aws_ecs_task_definition" "boundary" {
           value = "/home/sre"
         },
         {
-          name  = "CLAUDE_CODE_USE_BEDROCK"
+          name  = "CLAUDE_CODE_USE_MANTLE"
           value = "1"
         },
         {
@@ -127,10 +127,16 @@ resource "aws_ecs_task_definition" "boundary" {
           name  = "ZOA_ECS_EXEC_COMMAND"
           value = var.ecs_exec_interactive_command
         },
-        var.claude_bedrock_model_id != "" ? [{
-          name  = "ANTHROPIC_MODEL"
-          value = var.claude_bedrock_model_id
-        }] : [],
+        var.claude_mantle_model_id != "" ? [
+          {
+            name  = "ANTHROPIC_MODEL"
+            value = var.claude_mantle_model_id
+          },
+          {
+            name  = "ANTHROPIC_DEFAULT_HAIKU_MODEL"
+            value = var.claude_mantle_model_id
+          },
+        ] : [],
       ])
 
       logConfiguration = {
@@ -274,7 +280,38 @@ resource "aws_iam_role_policy" "task_lambda" {
   })
 }
 
-# Bedrock — Claude Code uses Amazon Bedrock (Haiku 4.5 only by default).
+# Bedrock Mantle — in-region Claude Code (Haiku 4.5). AWS_REGION on the task pins the Mantle endpoint.
+resource "aws_iam_role_policy" "task_bedrock_mantle" {
+  count = var.claude_mantle_model_id != "" ? 1 : 0
+  name  = "bedrock-mantle-inference"
+  role  = aws_iam_role.task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "BedrockMantleInferenceInRegion"
+        Effect = "Allow"
+        Action = [
+          "bedrock-mantle:CreateInference",
+          "bedrock-mantle:GetProject",
+          "bedrock-mantle:ListProjects",
+          "bedrock-mantle:ListTagsForResource",
+          "bedrock-mantle:Get*",
+          "bedrock-mantle:List*",
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestedRegion" = data.aws_region.current.region
+          }
+        }
+      },
+    ]
+  })
+}
+
+# Classic bedrock-runtime Invoke — optional; disabled by default (empty model/profile lists).
 resource "aws_iam_role_policy" "task_bedrock" {
   count = (length(var.allowed_bedrock_models) > 0 || length(var.allowed_bedrock_inference_profiles) > 0) ? 1 : 0
   name  = "bedrock-invoke"
