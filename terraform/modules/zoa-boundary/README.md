@@ -25,6 +25,18 @@ Boundary tasks set **`ANTHROPIC_MODEL=us.anthropic.claude-sonnet-5`** (same Bedr
 | `AWS_REGION` | Deployment region (from task env) |
 | `ANTHROPIC_MODEL` | `claude_code_bedrock_primary_model` (default `us.anthropic.claude-sonnet-5`) |
 
-Task IAM: `bedrock:InvokeModel`, `InvokeModelWithResponseStream`, and `ListInferenceProfiles` on `inference-profile/*` and `foundation-model/*` (all regions in the partition). Marketplace subscribe via `aws:CalledViaLast = bedrock.amazonaws.com`.
+Task IAM: `bedrock:InvokeModel`, `InvokeModelWithResponseStream`, `ListInferenceProfiles`, and `GetInferenceProfile` (regional inference/application profiles) on the usual Bedrock ARNs. Marketplace subscribe via `aws:CalledViaLast = bedrock.amazonaws.com`.
 
-Anthropic **use case** and **model access** in the AWS account are account-level prerequisites ([Bedrock model access](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html)); this module does not submit those forms.
+### Bedrock model agreements
+
+This module runs on **both RC and MC** Terraform applies — each AWS account gets its own agreements and budget.
+
+When `enable_bedrock_model_agreements` is true, Terraform manages `aws_bedrock_foundation_model_agreement` for each non-empty entry in `bedrock_model_agreements`. Resource identity is **`model_id|offer_id`**: adding a model creates an agreement; **changing an offer ID destroys the old agreement and creates a new one**; removing a model from the map **destroys** its agreement. `ignore_changes = [offer_token]` only avoids churn when AWS rotates tokens for the same offer ID.
+
+**Before production in an account/Region:** confirm PUBLIC offer IDs (CLI/console), set `bedrock_model_agreements` via module inputs (today: defaults in `variables.tf`; planned: per-env `config/`). Agreements already created manually must be **imported** or removed before first apply to avoid conflicts.
+
+This is **not** the Anthropic use-case form; account onboarding may still be required for invoke.
+
+### Bedrock cost budget
+
+When `enable_bedrock_cost_budget` is true, one **account-wide** monthly **Amazon Bedrock** budget emails **ACTUAL** spend at **50%, 80%, and 100%** of `bedrock_monthly_budget_usd` (default **1000** USD) to `bedrock_budget_notification_email` (default `rosa-hyperfleet@redhat.com`). Alerts do not cap usage. Confirm the mailbox is a valid AWS Budgets subscriber in each account after apply.
