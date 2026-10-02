@@ -61,10 +61,10 @@ variable "zoa_lambda_function_arn" {
   type        = string
 }
 
-variable "claude_bedrock_foundation_model_id" {
-  description = "In-region Bedrock foundation model ID for Haiku (used to create a single-region application inference profile). Not passed directly to Claude Code — invoke uses the profile ID."
+variable "claude_bedrock_inference_profile_id" {
+  description = "Bedrock system inference profile ID for Claude Code (ANTHROPIC_MODEL). Haiku 4.5 requires a profile, not a raw foundation-model ID."
   type        = string
-  default     = "anthropic.claude-haiku-4-5-20251001-v1:0"
+  default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 }
 
 variable "ecs_exec_interactive_command" {

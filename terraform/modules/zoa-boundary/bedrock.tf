@@ -1,26 +1,14 @@
 # Classic Amazon Bedrock (InvokeModel / bedrock-runtime) for Claude Code in boundary tasks.
 #
-# Haiku 4.5 does not support on-demand InvokeModel with the foundation-model ID alone; AWS
-# requires an inference profile. We create an *application* inference profile whose source is
-# the in-region foundation model ARN only (not a us./eu. system cross-region profile).
+# Haiku 4.5 cannot be invoked with the foundation-model ID alone, and AWS rejects
+# application inference profiles whose source is only the in-region foundation model
+# ("does not support On Demand inference"). Use a Bedrock system inference profile ID
+# (default: US Haiku 4.5 profile in the deployment region).
 
-locals {
-  claude_haiku_foundation_model_id  = var.claude_bedrock_foundation_model_id
-  claude_haiku_foundation_model_arn = "arn:aws:bedrock:${data.aws_region.current.region}::foundation-model/${local.claude_haiku_foundation_model_id}"
-}
-
-resource "aws_bedrock_inference_profile" "claude_haiku" {
-  name = "${var.cluster_id}-claude-haiku"
-
-  model_source {
-    copy_from = local.claude_haiku_foundation_model_arn
-  }
-
-  tags = merge(local.common_tags, {
-    Name = "${var.cluster_id}-claude-haiku-inference-profile"
-  })
+data "aws_bedrock_inference_profile" "claude_haiku" {
+  inference_profile_id = var.claude_bedrock_inference_profile_id
 }
 
 locals {
-  claude_bedrock_invoke_model_id = aws_bedrock_inference_profile.claude_haiku.id
+  claude_bedrock_invoke_model_id = data.aws_bedrock_inference_profile.claude_haiku.inference_profile_id
 }

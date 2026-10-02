@@ -282,7 +282,7 @@ resource "aws_iam_role_policy" "task_lambda" {
   })
 }
 
-# Classic Bedrock Invoke — Haiku via single-region application inference profile only.
+# Classic Bedrock Invoke — Haiku via configured system inference profile.
 resource "aws_iam_role_policy" "task_bedrock" {
   name = "bedrock-invoke"
   role = aws_iam_role.task.id
@@ -299,8 +299,7 @@ resource "aws_iam_role_policy" "task_bedrock" {
           "bedrock:GetInferenceProfile",
         ]
         Resource = [
-          local.claude_haiku_foundation_model_arn,
-          aws_bedrock_inference_profile.claude_haiku.arn,
+          data.aws_bedrock_inference_profile.claude_haiku.inference_profile_arn,
         ]
       },
       {
