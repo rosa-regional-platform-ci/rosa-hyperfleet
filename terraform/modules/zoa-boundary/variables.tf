@@ -89,8 +89,7 @@ variable "bedrock_model_agreements" {
   description = "Foundation model ID to Bedrock PUBLIC offer ID. Must match offers available in this account/Region at apply time. Empty offer ID skips that model. Changing an offer ID replaces the agreement (see bedrock-model-agreements.tf)."
   type        = map(string)
   default = {
-    "anthropic.claude-sonnet-5"                = "offer-2ykemehpsyf7g"
-    "anthropic.claude-haiku-4-5-20251001-v1:0" = "offer-fudwqbphlos64"
+    "anthropic.claude-sonnet-5" = "offer-2ykemehpsyf7g"
   }
 }
 
