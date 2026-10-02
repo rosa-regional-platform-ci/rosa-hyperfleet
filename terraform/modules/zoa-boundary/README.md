@@ -15,12 +15,14 @@ Baked files live under **`/home/sre`**: `.claude/CLAUDE.md`, `.claude/ZOA_SESSIO
 
 ## Claude Code (classic Amazon Bedrock)
 
+Bedrock is enabled via task env only; Claude Code selects the model (no `ANTHROPIC_MODEL` in Terraform).
+
 | Setting | Value |
 |---------|--------|
 | `CLAUDE_CODE_USE_BEDROCK` | `1` |
 | `CLAUDE_CODE_USE_MANTLE` | `0` |
-| `ANTHROPIC_MODEL` | `claude_bedrock_inference_profile_id` (default `us.anthropic.claude-haiku-4-5-20251001-v1:0`) |
+| `AWS_REGION` | Deployment region (from task env) |
 
-Haiku 4.5 on Bedrock requires a **system inference profile**; application profiles sourced from the in-region foundation model are rejected by AWS. Override `claude_bedrock_inference_profile_id` per region if a different profile is approved.
+Task IAM: `bedrock:InvokeModel`, `InvokeModelWithResponseStream`, and `ListInferenceProfiles` on `inference-profile/*` and `foundation-model/*` (all regions in the partition). Marketplace subscribe via `aws:CalledViaLast = bedrock.amazonaws.com`.
 
-Task IAM: `bedrock:InvokeModel` / `InvokeModelWithResponseStream` on the configured inference profile ARN and that profile’s backing foundation models (geo profile destination regions). Marketplace subscribe via `aws:CalledViaLast = bedrock.amazonaws.com`.
+The AWS account must still complete [Anthropic use case onboarding](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html) before invokes succeed.

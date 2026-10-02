@@ -131,14 +131,6 @@ resource "aws_ecs_task_definition" "boundary" {
           name  = "ZOA_ECS_EXEC_COMMAND"
           value = var.ecs_exec_interactive_command
         },
-        {
-          name  = "ANTHROPIC_MODEL"
-          value = local.claude_bedrock_invoke_model_id
-        },
-        {
-          name  = "ANTHROPIC_DEFAULT_HAIKU_MODEL"
-          value = local.claude_bedrock_invoke_model_id
-        },
       ])
 
       logConfiguration = {
@@ -282,7 +274,7 @@ resource "aws_iam_role_policy" "task_lambda" {
   })
 }
 
-# Classic Bedrock Invoke — Haiku via configured system inference profile.
+# Classic Bedrock Invoke — broad IAM; Claude Code picks the model.
 resource "aws_iam_role_policy" "task_bedrock" {
   name = "bedrock-invoke"
   role = aws_iam_role.task.id
@@ -291,25 +283,17 @@ resource "aws_iam_role_policy" "task_bedrock" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "BedrockInvokeModelInRegion"
+        Sid    = "BedrockInvokeModel"
         Effect = "Allow"
         Action = [
           "bedrock:InvokeModel",
           "bedrock:InvokeModelWithResponseStream",
-          "bedrock:GetInferenceProfile",
-        ]
-        Resource = concat(
-          [data.aws_bedrock_inference_profile.claude_haiku.inference_profile_arn],
-          local.claude_bedrock_foundation_model_arns,
-        )
-      },
-      {
-        Sid    = "BedrockListInferenceProfiles"
-        Effect = "Allow"
-        Action = [
           "bedrock:ListInferenceProfiles",
         ]
-        Resource = "*"
+        Resource = [
+          "arn:${data.aws_partition.current.partition}:bedrock:*:*:inference-profile/*",
+          "arn:${data.aws_partition.current.partition}:bedrock:*:*:foundation-model/*",
+        ]
       },
       {
         Sid    = "AllowMarketplaceSubscriptionViaBedrock"

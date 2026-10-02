@@ -61,12 +61,6 @@ variable "zoa_lambda_function_arn" {
   type        = string
 }
 
-variable "claude_bedrock_inference_profile_id" {
-  description = "Bedrock system inference profile ID for Claude Code (ANTHROPIC_MODEL). Haiku 4.5 requires a profile, not a raw foundation-model ID."
-  type        = string
-  default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
-}
-
 variable "ecs_exec_interactive_command" {
   description = "Shell command passed to ecs:ExecuteCommand for boundary sessions. ECS Exec always starts as root; this command drops to the container user (see AWS ECS Exec docs). Returned by ZOA Access session/join API — clients must not hardcode a different command."
   type        = string
