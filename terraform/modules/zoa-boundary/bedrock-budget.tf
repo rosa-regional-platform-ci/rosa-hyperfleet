@@ -1,5 +1,14 @@
 # Monthly Bedrock cost alerts for this AWS account (all Bedrock callers, not only boundary).
 # Notifications do not cap or stop inference.
+# Subscriber uses plus-addressing (base+account_id@domain) so RC vs MC alerts are distinguishable.
+
+locals {
+  bedrock_budget_subscriber_email = replace(
+    var.bedrock_budget_notification_email,
+    "@",
+    "+${data.aws_caller_identity.current.account_id}@",
+  )
+}
 
 resource "aws_budgets_budget" "bedrock" {
   count = var.enable_bedrock_cost_budget ? 1 : 0
@@ -23,7 +32,7 @@ resource "aws_budgets_budget" "bedrock" {
       threshold                  = notification.value
       threshold_type             = "PERCENTAGE"
       notification_type          = "ACTUAL"
-      subscriber_email_addresses = [var.bedrock_budget_notification_email]
+      subscriber_email_addresses = [local.bedrock_budget_subscriber_email]
     }
   }
 

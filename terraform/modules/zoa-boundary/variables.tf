@@ -111,7 +111,7 @@ variable "bedrock_monthly_budget_usd" {
 }
 
 variable "bedrock_budget_notification_email" {
-  description = "Email recipient for Bedrock budget ACTUAL spend notifications."
+  description = "Base email for Bedrock budget ACTUAL spend notifications. Applied as plus-addressing local+account_id@domain per AWS account (e.g. rosa-hyperfleet+855246887846@redhat.com)."
   type        = string
   default     = "rosa-hyperfleet@redhat.com"
 

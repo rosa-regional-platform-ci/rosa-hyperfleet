@@ -39,4 +39,4 @@ This is **not** the Anthropic use-case form; account onboarding may still be req
 
 ### Bedrock cost budget
 
-When `enable_bedrock_cost_budget` is true, one **account-wide** monthly **Amazon Bedrock** budget emails **ACTUAL** spend at **50%, 80%, and 100%** of `bedrock_monthly_budget_usd` (default **1000** USD) to `bedrock_budget_notification_email` (default `rosa-hyperfleet@redhat.com`). Alerts do not cap usage. Confirm the mailbox is a valid AWS Budgets subscriber in each account after apply.
+When `enable_bedrock_cost_budget` is true, one **account-wide** monthly **Amazon Bedrock** budget emails **ACTUAL** spend at **50%, 80%, and 100%** of `bedrock_monthly_budget_usd` (default **1000** USD). The subscriber is **`bedrock_budget_notification_email` with `+<aws_account_id>` before `@`** (default base `rosa-hyperfleet@redhat.com` → `rosa-hyperfleet+123456789012@redhat.com` per account). Alerts do not cap usage. Confirm plus addresses are accepted by your mail system; AWS Budgets may require confirming each variant the first time it is used.
