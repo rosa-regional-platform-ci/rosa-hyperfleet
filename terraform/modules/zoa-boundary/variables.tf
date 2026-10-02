@@ -62,21 +62,21 @@ variable "zoa_lambda_function_arn" {
 }
 
 variable "claude_bedrock_model_id" {
-  description = "Bedrock on-demand foundation model ID in the cluster region for Claude Code (ANTHROPIC_MODEL). Use foundation-model IDs, not cross-region inference profiles, when restricting IAM to the deployment region."
+  description = "Bedrock model ID for Claude Code (ANTHROPIC_MODEL). Haiku 4.5 requires a geo inference profile ID (e.g. us.anthropic.*), not a foundation-model ID."
   type        = string
-  default     = "anthropic.claude-haiku-4-5-20251001-v1:0"
+  default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 }
 
 variable "allowed_bedrock_models" {
-  description = "Foundation-model ID patterns (Bedrock IAM) allowed for boundary tasks. Empty disables Bedrock IAM."
+  description = "Foundation-model ID patterns (Bedrock IAM) allowed for boundary tasks. Optional when using inference profiles only."
   type        = list(string)
-  default     = ["anthropic.claude-haiku-4-5-*"]
+  default     = []
 }
 
 variable "allowed_bedrock_inference_profiles" {
-  description = "Inference profile ID suffix patterns (after inference-profile/) for Bedrock IAM. Leave empty when using on-demand foundation models in the cluster region only."
+  description = "Inference profile ID suffix patterns (after inference-profile/) for Bedrock IAM."
   type        = list(string)
-  default     = []
+  default     = ["us.anthropic.claude-haiku-4-5-*"]
 }
 
 variable "ecs_exec_interactive_command" {

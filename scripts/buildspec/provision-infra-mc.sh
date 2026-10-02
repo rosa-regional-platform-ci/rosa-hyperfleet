@@ -72,11 +72,15 @@ else
         TF_VAR_oidc_bucket_arn=$(AWS_ACCESS_KEY_ID=$(echo "$_rc_creds" | awk '{print $1}') AWS_SECRET_ACCESS_KEY=$(echo "$_rc_creds" | awk '{print $2}') AWS_SESSION_TOKEN=$(echo "$_rc_creds" | awk '{print $3}') terraform -chdir="$_RC_TF_DIR" output -raw oidc_bucket_arn 2>/dev/null || true)
         TF_VAR_oidc_bucket_region=$(AWS_ACCESS_KEY_ID=$(echo "$_rc_creds" | awk '{print $1}') AWS_SECRET_ACCESS_KEY=$(echo "$_rc_creds" | awk '{print $2}') AWS_SESSION_TOKEN=$(echo "$_rc_creds" | awk '{print $3}') terraform -chdir="$_RC_TF_DIR" output -raw oidc_bucket_region 2>/dev/null || true)
         TF_VAR_rhobs_api_url=$(AWS_ACCESS_KEY_ID=$(echo "$_rc_creds" | awk '{print $1}') AWS_SECRET_ACCESS_KEY=$(echo "$_rc_creds" | awk '{print $2}') AWS_SESSION_TOKEN=$(echo "$_rc_creds" | awk '{print $3}') terraform -chdir="$_RC_TF_DIR" output -raw rhobs_api_url 2>/dev/null || true)
+        TF_VAR_zoa_kms_key_arn=$(AWS_ACCESS_KEY_ID=$(echo "$_rc_creds" | awk '{print $1}') AWS_SECRET_ACCESS_KEY=$(echo "$_rc_creds" | awk '{print $2}') AWS_SESSION_TOKEN=$(echo "$_rc_creds" | awk '{print $3}') terraform -chdir="$_RC_TF_DIR" output -raw zoa_kms_key_arn 2>/dev/null | grep -E '^arn:' || true)
+        TF_VAR_zoa_access_lambda_role_arn=$(AWS_ACCESS_KEY_ID=$(echo "$_rc_creds" | awk '{print $1}') AWS_SECRET_ACCESS_KEY=$(echo "$_rc_creds" | awk '{print $2}') AWS_SESSION_TOKEN=$(echo "$_rc_creds" | awk '{print $3}') terraform -chdir="$_RC_TF_DIR" output -raw zoa_access_lambda_role_arn 2>/dev/null | grep -E '^arn:' || true)
         if [ -n "${TF_VAR_oidc_cloudfront_domain}" ] && \
            [ -n "${TF_VAR_oidc_bucket_name}" ] && \
            [ -n "${TF_VAR_oidc_bucket_arn}" ] && \
            [ -n "${TF_VAR_oidc_bucket_region}" ] && \
-           [ -n "${TF_VAR_rhobs_api_url}" ]; then
+           [ -n "${TF_VAR_rhobs_api_url}" ] && \
+           [ -n "${TF_VAR_zoa_kms_key_arn}" ] && \
+           [ -n "${TF_VAR_zoa_access_lambda_role_arn}" ]; then
             break
         fi
         echo "RC outputs not ready (attempt ${_OIDC_RETRY_COUNT}/${_OIDC_MAX_RETRIES}), retrying in ${_OIDC_RETRY_DELAY}s..."
@@ -86,8 +90,10 @@ else
        [ -z "${TF_VAR_oidc_bucket_name}" ] || \
        [ -z "${TF_VAR_oidc_bucket_arn}" ] || \
        [ -z "${TF_VAR_oidc_bucket_region}" ] || \
-       [ -z "${TF_VAR_rhobs_api_url}" ]; then
-        echo "ERROR: RC outputs missing after $((_OIDC_MAX_RETRIES * _OIDC_RETRY_DELAY / 60))+ minutes" >&2
+       [ -z "${TF_VAR_rhobs_api_url}" ] || \
+       [ -z "${TF_VAR_zoa_kms_key_arn}" ] || \
+       [ -z "${TF_VAR_zoa_access_lambda_role_arn}" ]; then
+        echo "ERROR: RC outputs missing after $((_OIDC_MAX_RETRIES * _OIDC_RETRY_DELAY / 60))+ minutes (need OIDC, rhobs_api_url, zoa_kms_key_arn, zoa_access_lambda_role_arn)" >&2
         exit 1
     fi
     export TF_VAR_oidc_cloudfront_domain TF_VAR_oidc_bucket_name TF_VAR_oidc_bucket_arn TF_VAR_oidc_bucket_region TF_VAR_rhobs_api_url
@@ -96,8 +102,8 @@ else
     # capturing terraform warnings as the value (non-ASCII chars break IAM policies)
     export TF_VAR_zoa_outputs_bucket_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_bucket_arn 2>/dev/null | grep -E '^arn:' || echo "")
 
-    # ZOA KMS key ARN (optional — for S3 SSE-KMS cross-account access)
-    export TF_VAR_zoa_kms_key_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_kms_key_arn 2>/dev/null | grep -E '^arn:' || echo "")
+    export TF_VAR_zoa_kms_key_arn
+    export TF_VAR_zoa_access_lambda_role_arn
 
     # ZOA Lambda data-layer outputs (DynamoDB tables + uploader role in RC account)
     export TF_VAR_zoa_table_name=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_table_name 2>/dev/null || echo "")
@@ -107,7 +113,6 @@ else
     export TF_VAR_zoa_sessions_table_name=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_sessions_table_name 2>/dev/null || echo "")
     export TF_VAR_zoa_uploader_role_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_uploader_role_arn 2>/dev/null | grep -E '^arn:' || echo "")
     export TF_VAR_zoa_data_access_role_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_data_access_role_arn 2>/dev/null | grep -E '^arn:' || echo "")
-    export TF_VAR_zoa_access_lambda_role_arn=$(cd "$_RC_TF_DIR" && terraform output -raw zoa_access_lambda_role_arn 2>/dev/null | grep -E '^arn:' || echo "")
 fi
 
 # ── Phase 1b: ZOA Lambda image reference ──────────────────────────────────────
