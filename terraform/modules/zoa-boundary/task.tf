@@ -120,6 +120,10 @@ resource "aws_ecs_task_definition" "boundary" {
           value = "1"
         },
         {
+          name  = "CLAUDE_CODE_USE_BEDROCK"
+          value = "0"
+        },
+        {
           name  = "DISABLE_AUTOUPDATER"
           value = "1"
         },
