@@ -90,6 +90,15 @@ platformApi:
     scrapeTimeout: 10s
     labels: {}
 
+  # Authorization is mandatory. Caller grants belong in environment overrides.
+  authz:
+    resolver: config
+    config: |
+      formatVersion: 1
+      registeredAccounts: []
+      policies: []
+      attachments: []
+
   # Rate Limiting configuration
   rateLimit:
     enabled: true
