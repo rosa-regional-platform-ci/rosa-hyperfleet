@@ -13,25 +13,16 @@ eksNodePool:
     family: AL2023
     id: ami-08534dafc055ff299
   rootVolumeSize: 50Gi
-baseDomain: us-east-1.dev0.rosa.devshift.net
+baseDomain: us-east-1-eph-b63c41.ci00.rosa.devshift.net
 platformApi:
   authz:
     resolver: config
-    config: 'formatVersion: 1
-
-
-      registeredAccounts: []
-
-      policies: []
-
-      attachments: []
-
-      '
+    config: "formatVersion: 1\n\nregisteredAccounts: [\"720644165472\", \"313828097858\"]\npolicies:\n  - id: ci-read-clusters-720644165472\n    ownerAccountID: \"720644165472\"\n    content: |\n      permit(principal, action in HyperFleet::Action::\"ReadOnly\", resource)\n      when { context.accountId == \"720644165472\" && context.region == \"us-east-1\" };\n  - id: ci-read-clusters-313828097858\n    ownerAccountID: \"313828097858\"\n    content: |\n      permit(principal, action in HyperFleet::Action::\"ReadOnly\", resource)\n      when { context.accountId == \"313828097858\" && context.region == \"us-east-1\" };\nattachments:\n  - id: ci-readers-720644165472\n    policyID: ci-read-clusters-720644165472\n    principalARN: arn:aws:iam::720644165472:role/OrganizationAccountAccessRole\n    bindingMode: role-membership\n    scope: regional\n    region: us-east-1\n  - id: ci-readers-313828097858\n    policyID: ci-read-clusters-313828097858\n    principalARN: arn:aws:iam::313828097858:role/OrganizationAccountAccessRole\n    bindingMode: role-membership\n    scope: regional\n    region: us-east-1\n"
   app:
     args:
       defaultClusterExpiration: ''
 hyperfleet:
-  oidcS3Bucket: hypershift--regional-oidc-ssm:///infra/ephemeral/us-east-1/account_id
+  oidcS3Bucket: hypershift-eph-b63c41-regional-oidc-720644165472
 pagerduty:
   enabled: false
 grafana:
