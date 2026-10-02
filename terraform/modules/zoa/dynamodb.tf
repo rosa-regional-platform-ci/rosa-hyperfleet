@@ -355,7 +355,7 @@ resource "aws_dynamodb_table" "boundary_sessions" {
     kms_key_arn = aws_kms_key.zoa.arn
   }
 
-  tags = merge(local.common_tags, { Name = local.sessions_table_name })
+  tags = merge(local.common_tags, { Name = local.sessions_table_name, Component = "zoa" })
 }
 
 # =============================================================================

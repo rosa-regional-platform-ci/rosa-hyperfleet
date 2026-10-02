@@ -61,10 +61,10 @@ variable "zoa_lambda_function_arn" {
   type        = string
 }
 
-variable "claude_mantle_model_id" {
-  description = "Bedrock Mantle model ID for Claude Code (in-region via task AWS_REGION). Default Haiku 4.5 only."
+variable "claude_bedrock_foundation_model_id" {
+  description = "In-region Bedrock foundation model ID for Haiku (used to create a single-region application inference profile). Not passed directly to Claude Code — invoke uses the profile ID."
   type        = string
-  default     = "anthropic.claude-haiku-4-5"
+  default     = "anthropic.claude-haiku-4-5-20251001-v1:0"
 }
 
 variable "ecs_exec_interactive_command" {

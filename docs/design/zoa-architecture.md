@@ -237,6 +237,12 @@ terraform/modules/zoa-lambda/   → Per-VPC compute (one per target VPC: RC + ea
 - **MC** instantiates `modules/zoa-lambda` and `modules/zoa-boundary`, consuming RC outputs (ECR URL, DynamoDB, S3, KMS, data-access role, sessions table, Access metadata).
 - **Cross-account access**: MC Lambdas assume `zoa-data-access` role via STS to reach RC's DynamoDB and S3. Both DynamoDB tables and S3 bucket also have resource-based policies scoped by MC OU path — defense in depth (either mechanism alone would suffice).
 
+### AWS cost allocation tags (ZOA)
+
+All ZOA Terraform modules set **`Component=zoa`** and **`function=zoa`** on taggable resources (in addition to provider **`default_tags`**: `app-code`, `service-phase`, `cost-center`, `environment`). Modules: `zoa`, `zoa-lambda`, `zoa-access`, `zoa-boundary`. Central-account SSM deployment discovery uses the **`aws.central`** provider with the same org **`default_tags`**.
+
+Access Lambda sets **`Component`** and **`function`** on boundary **ECS tasks** at `RunTask` (with session attribution tags). Activate these keys as cost allocation tags in AWS Billing for per-component reports.
+
 ## Tunable Parameters
 
 All configuration is via Terraform variables that map to Lambda environment variables — no code changes or redeployment required beyond `terraform apply`:

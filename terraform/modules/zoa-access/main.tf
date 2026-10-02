@@ -27,7 +27,9 @@ locals {
 
   common_tags = merge(var.tags, {
     Component = "zoa"
+    function  = "zoa"
     ManagedBy = "terraform"
+    module    = "zoa-access"
     Region    = var.regional_id
   })
 }

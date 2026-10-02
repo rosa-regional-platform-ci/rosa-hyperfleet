@@ -53,7 +53,9 @@ locals {
 
   common_tags = {
     Component = "zoa"
+    function  = "zoa"
     ManagedBy = "terraform"
+    module    = "zoa-lambda"
     Cluster   = var.cluster_id
   }
 }

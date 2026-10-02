@@ -117,11 +117,11 @@ resource "aws_ecs_task_definition" "boundary" {
         },
         {
           name  = "CLAUDE_CODE_USE_MANTLE"
-          value = "1"
+          value = "0"
         },
         {
           name  = "CLAUDE_CODE_USE_BEDROCK"
-          value = "0"
+          value = "1"
         },
         {
           name  = "DISABLE_AUTOUPDATER"
@@ -133,11 +133,11 @@ resource "aws_ecs_task_definition" "boundary" {
         },
         {
           name  = "ANTHROPIC_MODEL"
-          value = var.claude_mantle_model_id
+          value = local.claude_bedrock_invoke_model_id
         },
         {
           name  = "ANTHROPIC_DEFAULT_HAIKU_MODEL"
-          value = var.claude_mantle_model_id
+          value = local.claude_bedrock_invoke_model_id
         },
       ])
 
@@ -282,29 +282,46 @@ resource "aws_iam_role_policy" "task_lambda" {
   })
 }
 
-# Bedrock Mantle — in-region Claude Code (Haiku 4.5). AWS_REGION on the task pins the Mantle endpoint.
-resource "aws_iam_role_policy" "task_bedrock_mantle" {
-  name = "bedrock-mantle-inference"
+# Classic Bedrock Invoke — Haiku via single-region application inference profile only.
+resource "aws_iam_role_policy" "task_bedrock" {
+  name = "bedrock-invoke"
   role = aws_iam_role.task.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "BedrockMantleInferenceInRegion"
+        Sid    = "BedrockInvokeModelInRegion"
         Effect = "Allow"
         Action = [
-          "bedrock-mantle:CreateInference",
-          "bedrock-mantle:GetProject",
-          "bedrock-mantle:ListProjects",
-          "bedrock-mantle:ListTagsForResource",
-          "bedrock-mantle:Get*",
-          "bedrock-mantle:List*",
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+          "bedrock:GetInferenceProfile",
+        ]
+        Resource = [
+          local.claude_haiku_foundation_model_arn,
+          aws_bedrock_inference_profile.claude_haiku.arn,
+        ]
+      },
+      {
+        Sid    = "BedrockListInferenceProfiles"
+        Effect = "Allow"
+        Action = [
+          "bedrock:ListInferenceProfiles",
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowMarketplaceSubscriptionViaBedrock"
+        Effect = "Allow"
+        Action = [
+          "aws-marketplace:ViewSubscriptions",
+          "aws-marketplace:Subscribe",
         ]
         Resource = "*"
         Condition = {
           StringEquals = {
-            "aws:RequestedRegion" = data.aws_region.current.region
+            "aws:CalledViaLast" = "bedrock.amazonaws.com"
           }
         }
       },
