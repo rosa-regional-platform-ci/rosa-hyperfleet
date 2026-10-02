@@ -198,13 +198,28 @@ resource "aws_kms_key_policy" "zoa" {
         }
       },
       {
-        Sid    = "AllowCrossAccountMCCloudWatchLogsKMSAssociate"
+        Sid    = "AllowCrossAccountMCCloudWatchLogsKMSDescribe"
         Effect = "Allow"
         Principal = {
           AWS = "*"
         }
         Action = [
           "kms:DescribeKey",
+        ]
+        Resource = "*"
+        Condition = {
+          "ForAnyValue:StringLike" = {
+            "aws:PrincipalOrgPaths" = "${var.mc_ou_path}*"
+          }
+        }
+      },
+      {
+        Sid    = "AllowCrossAccountMCCloudWatchLogsKMSCreateGrant"
+        Effect = "Allow"
+        Principal = {
+          AWS = "*"
+        }
+        Action = [
           "kms:CreateGrant",
         ]
         Resource = "*"
