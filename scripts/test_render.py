@@ -2476,19 +2476,43 @@ class TestAuthzDelivery:
         ):
             assert contract in doc, f"Missing authorization operating contract: {contract}"
 
-    @pytest.mark.parametrize("env,ci", [
-        ("integration", False), ("stage", False),
-        ("ephemeral", False), ("ephemeral", True),
+    @pytest.mark.parametrize("env,ci,eph_prefix", [
+        ("integration", False, ""), ("stage", False, ""),
+        ("ephemeral", False, ""), ("ephemeral", False, "authz-test"),
+        ("ephemeral", True, ""),
     ])
-    def test_safe_source_defaults(self, tmp_path, monkeypatch, env, ci):
+    def test_safe_source_defaults(self, tmp_path, monkeypatch, env, ci, eph_prefix):
         monkeypatch.setenv("BUILD_ID", "test-ci" if ci else "")
-        values = _authz_values(tmp_path, env, eph_prefix="authz-test" if ci else "")
+        values = _authz_values(tmp_path, env, eph_prefix=eph_prefix)
         authz = values["platformApi"]["authz"]
         assert set(authz) == {"resolver", "config"}
         assert authz["resolver"] == "config"
         assert yaml.safe_load(authz["config"]) == {
             "formatVersion": 1, "registeredAccounts": [], "policies": [], "attachments": [],
         }
+
+    def test_ci_role_grants(self, tmp_path, monkeypatch):
+        # Only actual CI provisioning receives these feature-branch role grants.
+        monkeypatch.setenv("BUILD_ID", "test-ci")
+        values = _authz_values(tmp_path, "ephemeral", eph_prefix="authz-test")
+        resources, _ = _helm_platform(tmp_path, values)
+        bundle = yaml.safe_load(_resource(resources, "ConfigMap", "authz-config")["data"]["config.yaml"])
+        assert bundle["formatVersion"] == 1
+        assert bundle["registeredAccounts"] == ["720644165472", "313828097858"]
+        assert len(bundle["policies"]) == len(bundle["attachments"]) == 2
+        for account, policy, attachment in zip(
+            bundle["registeredAccounts"], bundle["policies"], bundle["attachments"], strict=True,
+        ):
+            assert policy == {
+                "id": f"ci-read-clusters-{account}", "ownerAccountID": account,
+                "content": 'permit(principal, action in HyperFleet::Action::"ReadOnly", resource)\n'
+                           f'when {{ context.accountId == "{account}" && context.region == "us-east-1" }};\n',
+            }
+            assert attachment == {
+                "id": f"ci-readers-{account}", "policyID": policy["id"],
+                "principalARN": f"arn:aws:iam::{account}:role/OrganizationAccountAccessRole",
+                "bindingMode": "role-membership", "scope": "regional", "region": "us-east-1",
+            }
 
     @pytest.mark.parametrize("binding,scope", [
         ("role-membership", "regional"), ("exact-principal", "global"),

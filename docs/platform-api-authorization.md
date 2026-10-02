@@ -1,11 +1,11 @@
 # Configure Platform API authorization
 
-This chart delivers a mandatory startup authorization bundle. Source and chart
+This chart delivers a mandatory startup authorization bundle. Global and chart
 values deny protected reads by default. Enrollment alone grants no action.
 
-This change does not update the API image pin. Before using the bundle, verify
-that the chosen API image implements the configuration resolver and the inputs
-below. Rendering is not a server-startup or shared-deployment proof.
+The feature branch pins the API image built from commit
+`e6610c5ca12c0bfd776452055d82d59d0b5e64bc` by digest. Rendering is not a
+server-startup or shared-deployment proof.
 
 ## Deployment identity trust gap
 
@@ -132,12 +132,21 @@ The existing ephemeral provider deep-merges `.ephemeral-env/defaults.yaml` into
 region files. The example includes `us-east-1.yaml` for that path. Preparing
 these files does not provision or deploy anything.
 
-`config/ephemeral/defaults.yaml` serves both dev0 and ci00. Its committed authz
-values remain empty. Do not put the dev account IDs into that shared template.
-CI profile names `rrp-rc` and `rrp-customer` are not evidence of caller ARNs.
-For CI, verify the actual caller records and place an explicit bundle in its
-existing environment override path. Until then, reads remain denied. Injected
-infrastructure account IDs do not automatically become enrolled callers.
+`config/ephemeral/defaults.yaml` serves both dev0 and ci00. On this feature branch,
+its bundle grants regional `ReadOnly` access to the verified local
+`OrganizationAccountAccessRole` roles in RC `720644165472` and customer
+`313828097858`. These accounts match the internal repository's CI onboarding
+records. The grants render only when `ci` is true (both `EPH_PREFIX` and `BUILD_ID`
+are set during ephemeral CI provisioning). Dev rendering and ordinary CI lint
+retain empty enrollment and grants. Integration and stage remain empty.
+
+These are verified local roles, not a claim about Prow's Vault credential chain.
+The E2E runner logs the actual regional caller and, when customer tests run, the
+customer caller's account and ARN. If Prow uses different principals, requests
+fail closed; update explicit attachments only after inspecting that evidence.
+Profile names alone are not caller proof. Injected infrastructure account IDs do
+not automatically become enrolled callers. Review these feature-branch grants
+before merging or using another account pool.
 
 ## Render and inspect
 
