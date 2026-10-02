@@ -73,6 +73,12 @@ variable "enable_bedrock_logging" {
   default     = false
 }
 
+variable "claude_code_bedrock_primary_model" {
+  description = "Claude Code primary model (ANTHROPIC_MODEL). Default matches /model → Sonnet on Bedrock in boundary (us.anthropic.claude-sonnet-5), not picker Default (Sonnet 4.5)."
+  type        = string
+  default     = "us.anthropic.claude-sonnet-5"
+}
+
 variable "breakglass_role_arns" {
   description = "IAM role ARNs the boundary task role may assume for break-glass access. Empty by default — populated by the break-glass epic."
   type        = list(string)

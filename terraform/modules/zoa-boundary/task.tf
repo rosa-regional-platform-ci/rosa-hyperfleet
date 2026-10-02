@@ -23,73 +23,6 @@ resource "aws_ecs_task_definition" "boundary" {
       stopTimeout = 30
       user        = "1000"
 
-      entryPoint = ["/bin/bash", "-c"]
-      command = [
-        <<-EOF
-          set -euo pipefail
-          export PATH="/usr/local/bin:/usr/local/aws-cli/v2/current/bin:/usr/bin:/bin"
-
-          echo "=== ZOA Boundary Session ==="
-          echo "Started at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "Cluster:    $ZOA_TARGET"
-          echo "Deployment: $ZOA_DEPLOYMENT"
-          echo "User:       $(id -un) (uid=$(id -u))"
-          echo ""
-
-          mkdir -p /home/sre/.claude
-          {
-            echo "# Active ZOA Boundary session"
-            echo ""
-            echo "| Field | Value |"
-            echo "|-------|-------|"
-            echo "| Deployment | $ZOA_DEPLOYMENT |"
-            echo "| Target | $ZOA_TARGET |"
-            echo "| AWS region | $AWS_REGION |"
-            echo "| ZOA API | $ZOA_API_URL |"
-            echo ""
-            echo "See CLAUDE.md for architecture and allowed tools."
-          } > /home/sre/.claude/ZOA_SESSION.md
-
-          # ECS Exec transcript logging requires script + cat in the image (AWS ECS Exec docs).
-          for bin in script cat; do
-            if ! command -v "$bin" &>/dev/null; then
-              echo "FATAL: missing $bin — ECS Exec cannot upload session transcripts to CloudWatch"
-              exit 1
-            fi
-          done
-
-          echo "Available tools:"
-          for tool in zoa kubectl jq claude script; do
-            if command -v "$tool" &>/dev/null; then
-              echo "  - $tool"
-            else
-              echo "  - $tool (not found)"
-            fi
-          done
-          if /usr/local/bin/aws --version &>/dev/null; then
-            echo "  - aws"
-          else
-            echo "  - aws (not found at /usr/local/bin/aws)"
-          fi
-          echo ""
-
-          export PS1="[\u@zoa:$ZOA_DEPLOYMENT/$ZOA_TARGET] \w \$ "
-
-          echo "=== Boundary ready for connections ==="
-          echo "Execute TAs with: zoa run <action> [args] --jira TICKET"
-          echo "List actions:     zoa actions"
-          echo ""
-
-          echo "Boundary is ready. Waiting for ECS Exec connections..."
-          echo "Container will stay running until the task is stopped."
-          echo ""
-
-          while true; do
-            sleep 3600
-          done
-        EOF
-      ]
-
       environment = flatten([
         {
           name  = "ZOA_API_URL"
@@ -116,10 +49,6 @@ resource "aws_ecs_task_definition" "boundary" {
           value = "/home/sre"
         },
         {
-          name  = "CLAUDE_CODE_USE_MANTLE"
-          value = "0"
-        },
-        {
           name  = "CLAUDE_CODE_USE_BEDROCK"
           value = "1"
         },
@@ -130,6 +59,10 @@ resource "aws_ecs_task_definition" "boundary" {
         {
           name  = "ZOA_ECS_EXEC_COMMAND"
           value = var.ecs_exec_interactive_command
+        },
+        {
+          name  = "ANTHROPIC_MODEL"
+          value = var.claude_code_bedrock_primary_model
         },
       ])
 
