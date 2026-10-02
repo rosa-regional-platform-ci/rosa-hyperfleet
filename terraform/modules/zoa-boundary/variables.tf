@@ -62,21 +62,9 @@ variable "zoa_lambda_function_arn" {
 }
 
 variable "claude_mantle_model_id" {
-  description = "Bedrock Mantle model ID for Claude Code (in-region via AWS_REGION). Haiku 4.5: anthropic.claude-haiku-4-5. Do not use us./eu./global. inference profile IDs if data must stay in the deployment region."
+  description = "Bedrock Mantle model ID for Claude Code (in-region via task AWS_REGION). Default Haiku 4.5 only."
   type        = string
   default     = "anthropic.claude-haiku-4-5"
-}
-
-variable "allowed_bedrock_models" {
-  description = "Reserved for classic bedrock-runtime Invoke (foundation-model). Empty when using Mantle-only Claude (default)."
-  type        = list(string)
-  default     = []
-}
-
-variable "allowed_bedrock_inference_profiles" {
-  description = "Reserved for geo/global inference profiles (us.*, eu.*, global.*). Empty by default — geo profiles route across regions and are not used for HyperFleet data sovereignty."
-  type        = list(string)
-  default     = []
 }
 
 variable "ecs_exec_interactive_command" {

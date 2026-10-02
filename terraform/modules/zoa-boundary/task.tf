@@ -131,16 +131,14 @@ resource "aws_ecs_task_definition" "boundary" {
           name  = "ZOA_ECS_EXEC_COMMAND"
           value = var.ecs_exec_interactive_command
         },
-        var.claude_mantle_model_id != "" ? [
-          {
-            name  = "ANTHROPIC_MODEL"
-            value = var.claude_mantle_model_id
-          },
-          {
-            name  = "ANTHROPIC_DEFAULT_HAIKU_MODEL"
-            value = var.claude_mantle_model_id
-          },
-        ] : [],
+        {
+          name  = "ANTHROPIC_MODEL"
+          value = var.claude_mantle_model_id
+        },
+        {
+          name  = "ANTHROPIC_DEFAULT_HAIKU_MODEL"
+          value = var.claude_mantle_model_id
+        },
       ])
 
       logConfiguration = {
@@ -286,9 +284,8 @@ resource "aws_iam_role_policy" "task_lambda" {
 
 # Bedrock Mantle — in-region Claude Code (Haiku 4.5). AWS_REGION on the task pins the Mantle endpoint.
 resource "aws_iam_role_policy" "task_bedrock_mantle" {
-  count = var.claude_mantle_model_id != "" ? 1 : 0
-  name  = "bedrock-mantle-inference"
-  role  = aws_iam_role.task.id
+  name = "bedrock-mantle-inference"
+  role = aws_iam_role.task.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -310,45 +307,6 @@ resource "aws_iam_role_policy" "task_bedrock_mantle" {
             "aws:RequestedRegion" = data.aws_region.current.region
           }
         }
-      },
-    ]
-  })
-}
-
-# Classic bedrock-runtime Invoke — optional; disabled by default (empty model/profile lists).
-resource "aws_iam_role_policy" "task_bedrock" {
-  count = (length(var.allowed_bedrock_models) > 0 || length(var.allowed_bedrock_inference_profiles) > 0) ? 1 : 0
-  name  = "bedrock-invoke"
-  role  = aws_iam_role.task.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "BedrockInvokeModel"
-        Effect = "Allow"
-        Action = [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream",
-        ]
-        Resource = concat(
-          [
-            for model in var.allowed_bedrock_models :
-            "arn:aws:bedrock:${data.aws_region.current.region}::foundation-model/${model}"
-          ],
-          [
-            for profile in var.allowed_bedrock_inference_profiles :
-            "arn:aws:bedrock:${data.aws_region.current.region}:${local.account_id}:inference-profile/${profile}"
-          ],
-        )
-      },
-      {
-        Sid    = "BedrockListInferenceProfiles"
-        Effect = "Allow"
-        Action = [
-          "bedrock:ListInferenceProfiles",
-        ]
-        Resource = "*"
       },
     ]
   })

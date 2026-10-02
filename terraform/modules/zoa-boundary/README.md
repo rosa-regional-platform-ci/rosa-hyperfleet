@@ -21,7 +21,20 @@ See [rosa-hyperfleet-zoa `docs/design/boundary-session-logging.md`](https://gith
 
 **ECS Exec user:** AWS runs `ecs:ExecuteCommand` as **root** regardless of the task definition `user` field ([ECS Exec docs](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-exec.html)). The task runs its main process as UID **1000** (`sre`); interactive sessions use **`ecs_exec_interactive_command`** (default `runuser -u sre -- /bin/bash -l`), set in Terraform on the boundary task (`ZOA_ECS_EXEC_COMMAND`) and returned by **ZOA Access** `session/join` as `exec_command`. Clients must pass that command to ExecuteCommand — do not hardcode a different shell in the CLI alone.
 
-Baked files live under **`/home/sre`** (use `ls -la`): `.claude/CLAUDE.md`, `.claude/ZOA_SESSION.md` (stub in image; entrypoint overwrites session table at task start).
+Baked files live under **`/home/sre`** (use `ls -la`): `.claude/CLAUDE.md`, `.claude/ZOA_SESSION.md` (stub in image; task startup script overwrites session table).
+
+## Claude Code (Bedrock Mantle, in-region)
+
+Terraform sets on the ECS task (override image defaults):
+
+| Env var | Value |
+| -------- | ----- |
+| `AWS_REGION` | Deployment region (pins Mantle endpoint) |
+| `CLAUDE_CODE_USE_MANTLE` | `1` |
+| `CLAUDE_CODE_USE_BEDROCK` | `0` |
+| `ANTHROPIC_MODEL` / `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude_mantle_model_id` (default `anthropic.claude-haiku-4-5`) |
+
+Task IAM: `bedrock-mantle:*` scoped with `aws:RequestedRegion` = deployment region. No classic `bedrock:InvokeModel` or geo inference profiles.
 
 ## Outputs
 

@@ -27,11 +27,6 @@ output "lambda_function_name" {
   value       = aws_lambda_function.access.function_name
 }
 
-output "exec_scoped_role_arn" {
-  description = "IAM role ARN vended on session join for RC boundary ECS Exec"
-  value       = var.exec_scoped_role_arn
-}
-
 output "ssm_parameter_arn" {
   description = "ARN of the SSM deployment discovery parameter"
   value       = aws_ssm_parameter.deployment.arn
