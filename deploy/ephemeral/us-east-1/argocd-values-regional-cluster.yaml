@@ -19,11 +19,14 @@ platformApi:
     resolver: config
     config: 'formatVersion: 1
 
+
       registeredAccounts: []
 
       policies: []
 
-      attachments: []'
+      attachments: []
+
+      '
   app:
     args:
       defaultClusterExpiration: ''
