@@ -70,6 +70,11 @@ output "run_task_command" {
   EOT
 }
 
+output "ecs_exec_interactive_command" {
+  description = "Interactive shell command for ecs:ExecuteCommand (also ZOA_ECS_EXEC_COMMAND on the task and Access Lambda env)"
+  value       = var.ecs_exec_interactive_command
+}
+
 output "exec_command_template" {
   description = "AWS CLI command template to connect to a running boundary task (replace <TASK_ID>)"
   value       = <<-EOT
@@ -78,6 +83,6 @@ output "exec_command_template" {
       --task <TASK_ID> \
       --container ${local.container_name} \
       --interactive \
-      --command '/bin/bash'
+      --command '${var.ecs_exec_interactive_command}'
   EOT
 }

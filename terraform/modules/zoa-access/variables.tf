@@ -75,6 +75,12 @@ variable "boundary_ecs_cluster_arn" {
   type        = string
 }
 
+variable "boundary_ecs_exec_command" {
+  description = "Interactive ecs:ExecuteCommand shell for boundary join (must match zoa-boundary module ecs_exec_interactive_command / task env ZOA_ECS_EXEC_COMMAND)."
+  type        = string
+  default     = "runuser -u sre -- /bin/bash -l"
+}
+
 variable "tags" {
   description = "Additional tags to apply to all resources."
   type        = map(string)

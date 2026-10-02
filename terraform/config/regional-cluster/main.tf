@@ -528,6 +528,7 @@ module "zoa_access" {
   kms_key_arn              = module.zoa.kms_key_arn
   deployment_name          = var.deployment_name
   boundary_ecs_cluster_arn = module.zoa_boundary.ecs_cluster_arn
+  boundary_ecs_exec_command = module.zoa_boundary.ecs_exec_interactive_command
 }
 
 # =============================================================================

@@ -69,6 +69,7 @@ resource "aws_lambda_function" "access" {
       AUDIT_TABLE        = var.audit_table_name
       KMS_KEY_ARN        = var.kms_key_arn
       DEPLOYMENT_NAME    = var.deployment_name
+      ZOA_ECS_EXEC_COMMAND = var.boundary_ecs_exec_command
     }
   }
 

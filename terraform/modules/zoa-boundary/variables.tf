@@ -62,9 +62,9 @@ variable "zoa_lambda_function_arn" {
 }
 
 variable "claude_bedrock_model_id" {
-  description = "Bedrock model or inference profile ID for Claude Code (ANTHROPIC_MODEL on the boundary task). Infra-owned default: Haiku 4.5."
+  description = "Bedrock on-demand foundation model ID in the cluster region for Claude Code (ANTHROPIC_MODEL). Use foundation-model IDs, not cross-region inference profiles, when restricting IAM to the deployment region."
   type        = string
-  default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+  default     = "anthropic.claude-haiku-4-5-20251001-v1:0"
 }
 
 variable "allowed_bedrock_models" {
@@ -74,9 +74,15 @@ variable "allowed_bedrock_models" {
 }
 
 variable "allowed_bedrock_inference_profiles" {
-  description = "Inference profile ID suffix patterns (after inference-profile/) for Bedrock IAM. Scoped to this account and region."
+  description = "Inference profile ID suffix patterns (after inference-profile/) for Bedrock IAM. Leave empty when using on-demand foundation models in the cluster region only."
   type        = list(string)
-  default     = ["us.anthropic.claude-haiku-4-5-*"]
+  default     = []
+}
+
+variable "ecs_exec_interactive_command" {
+  description = "Shell command passed to ecs:ExecuteCommand for boundary sessions. ECS Exec always starts as root; this command drops to the container user (see AWS ECS Exec docs). Returned by ZOA Access session/join API — clients must not hardcode a different command."
+  type        = string
+  default     = "runuser -u sre -- /bin/bash -l"
 }
 
 variable "enable_bedrock_logging" {

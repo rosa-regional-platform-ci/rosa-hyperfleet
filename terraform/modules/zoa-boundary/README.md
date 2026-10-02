@@ -19,6 +19,10 @@ Requirements: `util-linux` (`script`) in the boundary image, `initProcessEnabled
 
 See [rosa-hyperfleet-zoa `docs/design/boundary-session-logging.md`](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/design/boundary-session-logging.md).
 
+**ECS Exec user:** AWS runs `ecs:ExecuteCommand` as **root** regardless of the task definition `user` field ([ECS Exec docs](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-exec.html)). The task runs its main process as UID **1000** (`sre`); interactive sessions use **`ecs_exec_interactive_command`** (default `runuser -u sre -- /bin/bash -l`), set in Terraform on the boundary task (`ZOA_ECS_EXEC_COMMAND`) and returned by **ZOA Access** `session/join` as `exec_command`. Clients must pass that command to ExecuteCommand — do not hardcode a different shell in the CLI alone.
+
+Baked files live under **`/home/sre`** (use `ls -la`): `.claude/CLAUDE.md`, `.claude/ZOA_SESSION.md` (stub in image; entrypoint overwrites session table at task start).
+
 ## Outputs
 
 | Output | Description |

@@ -27,7 +27,7 @@ resource "aws_ecs_task_definition" "boundary" {
       command = [
         <<-EOF
           set -euo pipefail
-          export PATH="/usr/local/bin:/usr/local/aws-cli/v2/current/bin:$${PATH:-/usr/bin:/bin}"
+          export PATH="/usr/local/bin:/usr/local/aws-cli/v2/current/bin:/usr/bin:/bin"
 
           echo "=== ZOA Boundary Session ==="
           echo "Started at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
@@ -59,13 +59,18 @@ resource "aws_ecs_task_definition" "boundary" {
           done
 
           echo "Available tools:"
-          for tool in zoa aws kubectl jq claude script; do
+          for tool in zoa kubectl jq claude script; do
             if command -v "$tool" &>/dev/null; then
               echo "  - $tool"
             else
               echo "  - $tool (not found)"
             fi
           done
+          if /usr/local/bin/aws --version &>/dev/null; then
+            echo "  - aws"
+          else
+            echo "  - aws (not found at /usr/local/bin/aws)"
+          fi
           echo ""
 
           export PS1="[\u@zoa:$ZOA_DEPLOYMENT/$ZOA_TARGET] \w \$ "
@@ -117,6 +122,10 @@ resource "aws_ecs_task_definition" "boundary" {
         {
           name  = "DISABLE_AUTOUPDATER"
           value = "1"
+        },
+        {
+          name  = "ZOA_ECS_EXEC_COMMAND"
+          value = var.ecs_exec_interactive_command
         },
         var.claude_bedrock_model_id != "" ? [{
           name  = "ANTHROPIC_MODEL"
