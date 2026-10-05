@@ -92,10 +92,21 @@ variable "exec_scoped_role_arn" {
   type        = string
 }
 
+variable "create_lambda_execution_role" {
+  description = "When false, attach policies to lambda_execution_role_arn (role created outside this module, e.g. RC bootstrap before zoa_boundary)."
+  type        = bool
+  default     = true
+}
+
 variable "lambda_execution_role_arn" {
-  description = "Optional existing IAM role ARN for the Access Lambda. When set, the module does not create aws_iam_role.lambda (RC stack creates the role before zoa_boundary)."
+  description = "Existing Access Lambda execution role ARN when create_lambda_execution_role is false."
   type        = string
   default     = null
+
+  validation {
+    condition     = var.create_lambda_execution_role || var.lambda_execution_role_arn != null
+    error_message = "lambda_execution_role_arn must be set when create_lambda_execution_role is false."
+  }
 }
 
 variable "tags" {

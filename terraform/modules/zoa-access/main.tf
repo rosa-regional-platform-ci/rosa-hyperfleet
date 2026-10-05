@@ -33,7 +33,6 @@ locals {
     Region    = var.regional_id
   })
 
-  use_external_lambda_role = var.lambda_execution_role_arn != null && var.lambda_execution_role_arn != ""
 }
 
 # =============================================================================
@@ -54,15 +53,10 @@ resource "aws_cloudwatch_log_group" "access" {
 # Lambda Function — HANDLER_MODE=access (no VPC)
 # =============================================================================
 
-data "aws_iam_role" "lambda_execution" {
-  count = local.use_external_lambda_role ? 1 : 0
-  name  = "${local.function_name}-lambda"
-}
-
 locals {
-  lambda_role_arn  = local.use_external_lambda_role ? data.aws_iam_role.lambda_execution[0].arn : aws_iam_role.lambda[0].arn
-  lambda_role_id   = local.use_external_lambda_role ? data.aws_iam_role.lambda_execution[0].id : aws_iam_role.lambda[0].id
-  lambda_role_name = local.use_external_lambda_role ? data.aws_iam_role.lambda_execution[0].name : aws_iam_role.lambda[0].name
+  lambda_role_name = "${local.function_name}-lambda"
+  lambda_role_arn  = var.create_lambda_execution_role ? aws_iam_role.lambda[0].arn : var.lambda_execution_role_arn
+  lambda_role_id   = var.create_lambda_execution_role ? aws_iam_role.lambda[0].id : local.lambda_role_name
 }
 
 resource "aws_lambda_function" "access" {
@@ -200,9 +194,9 @@ resource "aws_iam_role_policy" "invoker_function_url" {
 # =============================================================================
 
 resource "aws_iam_role" "lambda" {
-  count = local.use_external_lambda_role ? 0 : 1
+  count = var.create_lambda_execution_role ? 1 : 0
 
-  name        = "${local.function_name}-lambda"
+  name        = local.lambda_role_name
   description = "Execution role for ZOA Access Lambda in ${var.regional_id}"
 
   assume_role_policy = jsonencode({

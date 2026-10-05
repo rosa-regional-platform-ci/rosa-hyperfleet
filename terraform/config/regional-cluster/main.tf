@@ -577,7 +577,8 @@ module "zoa_access" {
   boundary_ecs_cluster_arn    = module.zoa_boundary.ecs_cluster_arn
   boundary_ecs_exec_command   = module.zoa_boundary.ecs_exec_interactive_command
   exec_scoped_role_arn        = module.zoa_boundary.exec_scoped_role_arn
-  lambda_execution_role_arn   = aws_iam_role.zoa_access_lambda.arn
+  create_lambda_execution_role = false
+  lambda_execution_role_arn    = aws_iam_role.zoa_access_lambda.arn
 }
 
 # =============================================================================
