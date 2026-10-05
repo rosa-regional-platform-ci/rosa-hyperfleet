@@ -13,13 +13,13 @@ eksNodePool:
     family: AL2023
     id: ami-0bfaadce939859f01
   rootVolumeSize: 50Gi
-baseDomain: us-east-1.dev0.rosa.devshift.net
+baseDomain: us-east-1-eph-5123f97c.dev0.rosa.devshift.net
 platformApi:
   app:
     args:
       defaultClusterExpiration: ''
 hyperfleet:
-  oidcS3Bucket: hypershift--regional-oidc-ssm:///infra/ephemeral/us-east-1/account_id
+  oidcS3Bucket: hypershift-eph-5123f97c-regional-oidc-599476212575
 pagerduty:
   enabled: false
 grafana:
