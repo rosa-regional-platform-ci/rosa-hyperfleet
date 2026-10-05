@@ -2492,16 +2492,22 @@ class TestAuthzDelivery:
         }
 
     def test_ci_role_grants(self, tmp_path, monkeypatch):
-        # Only actual CI provisioning receives these feature-branch role grants.
+        # Only actual CI provisioning receives these feature-branch caller grants.
         monkeypatch.setenv("BUILD_ID", "test-ci")
         values = _authz_values(tmp_path, "ephemeral", eph_prefix="authz-test")
         resources, _ = _helm_platform(tmp_path, values)
         bundle = yaml.safe_load(_resource(resources, "ConfigMap", "authz-config")["data"]["config.yaml"])
         assert bundle["formatVersion"] == 1
         assert bundle["registeredAccounts"] == ["720644165472", "313828097858"]
-        assert len(bundle["policies"]) == len(bundle["attachments"]) == 2
+        assert len(bundle["policies"]) == 2
+        assert len(bundle["attachments"]) == 3
+        assert bundle["attachments"][-1] == {
+            "id": "ci-e2e-720644165472", "policyID": "ci-read-clusters-720644165472",
+            "principalARN": "arn:aws:iam::720644165472:user/e2e",
+            "bindingMode": "exact-principal", "scope": "regional", "region": "us-east-1",
+        }
         for account, policy, attachment in zip(
-            bundle["registeredAccounts"], bundle["policies"], bundle["attachments"], strict=True,
+            bundle["registeredAccounts"], bundle["policies"], bundle["attachments"][:2], strict=True,
         ):
             assert policy == {
                 "id": f"ci-read-clusters-{account}", "ownerAccountID": account,
