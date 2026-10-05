@@ -515,6 +515,40 @@ module "zoa_lambda" {
 }
 
 # =============================================================================
+# Bedrock account primitives (agreements, budget; optional logging)
+# =============================================================================
+# Per-account resources; skip-if-exists for shared pool accounts. Not wired to ZOA.
+# Future: call module.bedrock from dedicated per-account Terraform only.
+
+module "bedrock" {
+  source = "../../modules/bedrock"
+}
+
+# =============================================================================
+# ZOA Boundary (ECS Fargate tasks — RC VPC)
+# =============================================================================
+
+module "zoa_boundary" {
+  source = "../../modules/zoa-boundary"
+
+  depends_on = [module.zoa, aws_iam_role.zoa_access_lambda]
+
+  cluster_id                = var.regional_id
+  cluster_name              = module.regional_cluster.cluster_name
+  cluster_security_group_id = module.regional_cluster.cluster_security_group_id
+  vpc_id                    = module.regional_cluster.vpc_id
+  private_subnet_ids        = module.regional_cluster.private_subnet_ids
+  deployment_name           = var.deployment_name
+
+  boundary_image          = var.zoa_boundary_image
+  zoa_function_url        = module.zoa_lambda.api_function_url
+  zoa_lambda_function_arn = module.zoa_lambda.api_function_arn
+  kms_key_arn             = module.zoa.kms_key_arn
+
+  access_lambda_role_arn = aws_iam_role.zoa_access_lambda.arn
+}
+
+# =============================================================================
 # ZOA Access Lambda (Boundary session management — RC only)
 # =============================================================================
 
@@ -535,38 +569,15 @@ module "zoa_access" {
   trusted_assumer_role_names = var.zoa_access_trusted_assumer_role_names
   mc_account_ids             = local.mc_account_ids
 
-  sessions_table_name       = module.zoa.sessions_table_name
-  audit_table_name          = module.zoa.audit_table_name
-  targets_ssm_prefix        = "/zoa/targets/${var.deployment_name}"
-  kms_key_arn               = module.zoa.kms_key_arn
-  deployment_name           = var.deployment_name
-  boundary_ecs_cluster_arn  = module.zoa_boundary.ecs_cluster_arn
-  boundary_ecs_exec_command = module.zoa_boundary.ecs_exec_interactive_command
-  exec_scoped_role_arn      = module.zoa_boundary.exec_scoped_role_arn
-}
-
-# =============================================================================
-# ZOA Boundary (ECS Fargate tasks — RC VPC)
-# =============================================================================
-
-module "zoa_boundary" {
-  source = "../../modules/zoa-boundary"
-
-  depends_on = [module.zoa]
-
-  cluster_id                = var.regional_id
-  cluster_name              = module.regional_cluster.cluster_name
-  cluster_security_group_id = module.regional_cluster.cluster_security_group_id
-  vpc_id                    = module.regional_cluster.vpc_id
-  private_subnet_ids        = module.regional_cluster.private_subnet_ids
-  deployment_name           = var.deployment_name
-
-  boundary_image          = var.zoa_boundary_image
-  zoa_function_url        = module.zoa_lambda.api_function_url
-  zoa_lambda_function_arn = module.zoa_lambda.api_function_arn
-  kms_key_arn             = module.zoa.kms_key_arn
-
-  access_lambda_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.regional_id}-zoa-access-lambda"
+  sessions_table_name         = module.zoa.sessions_table_name
+  audit_table_name            = module.zoa.audit_table_name
+  targets_ssm_prefix          = "/zoa/targets/${var.deployment_name}"
+  kms_key_arn                 = module.zoa.kms_key_arn
+  deployment_name             = var.deployment_name
+  boundary_ecs_cluster_arn    = module.zoa_boundary.ecs_cluster_arn
+  boundary_ecs_exec_command   = module.zoa_boundary.ecs_exec_interactive_command
+  exec_scoped_role_arn        = module.zoa_boundary.exec_scoped_role_arn
+  lambda_execution_role_arn   = aws_iam_role.zoa_access_lambda.arn
 }
 
 # =============================================================================

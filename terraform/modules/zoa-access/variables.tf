@@ -92,6 +92,12 @@ variable "exec_scoped_role_arn" {
   type        = string
 }
 
+variable "lambda_execution_role_arn" {
+  description = "Optional existing IAM role ARN for the Access Lambda. When set, the module does not create aws_iam_role.lambda (RC stack creates the role before zoa_boundary)."
+  type        = string
+  default     = null
+}
+
 variable "tags" {
   description = "Additional tags to apply to all resources."
   type        = map(string)

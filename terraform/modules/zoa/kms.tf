@@ -152,8 +152,6 @@ resource "aws_kms_key_policy" "zoa" {
               "arn:aws:logs:${data.aws_region.current.name}:*:log-group:/ecs/*/zoa-boundary:*",
               "arn:aws:logs:${data.aws_region.current.name}:*:log-group:/ecs/*/zoa-boundary/ssm-sessions",
               "arn:aws:logs:${data.aws_region.current.name}:*:log-group:/ecs/*/zoa-boundary/ssm-sessions:*",
-              "arn:aws:logs:${data.aws_region.current.name}:*:log-group:/aws/bedrock/model-invocations",
-              "arn:aws:logs:${data.aws_region.current.name}:*:log-group:/aws/bedrock/model-invocations:*",
             ]
           }
         }

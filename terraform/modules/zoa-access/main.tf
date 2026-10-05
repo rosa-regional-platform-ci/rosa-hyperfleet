@@ -32,6 +32,8 @@ locals {
     module    = "zoa-access"
     Region    = var.regional_id
   })
+
+  use_external_lambda_role = var.lambda_execution_role_arn != null && var.lambda_execution_role_arn != ""
 }
 
 # =============================================================================
@@ -52,10 +54,21 @@ resource "aws_cloudwatch_log_group" "access" {
 # Lambda Function — HANDLER_MODE=access (no VPC)
 # =============================================================================
 
+data "aws_iam_role" "lambda_execution" {
+  count = local.use_external_lambda_role ? 1 : 0
+  name  = "${local.function_name}-lambda"
+}
+
+locals {
+  lambda_role_arn  = local.use_external_lambda_role ? data.aws_iam_role.lambda_execution[0].arn : aws_iam_role.lambda[0].arn
+  lambda_role_id   = local.use_external_lambda_role ? data.aws_iam_role.lambda_execution[0].id : aws_iam_role.lambda[0].id
+  lambda_role_name = local.use_external_lambda_role ? data.aws_iam_role.lambda_execution[0].name : aws_iam_role.lambda[0].name
+}
+
 resource "aws_lambda_function" "access" {
   function_name = local.function_name
   description   = "ZOA Access Lambda for ${var.regional_id} - session lifecycle, target discovery"
-  role          = aws_iam_role.lambda.arn
+  role          = local.lambda_role_arn
   package_type  = "Image"
   image_uri     = var.image_uri
   # Must match zoa-lambda (x86_64) and quay.io/rrp-dev-ci/zoa-lambda image builds (linux/amd64).
@@ -187,6 +200,8 @@ resource "aws_iam_role_policy" "invoker_function_url" {
 # =============================================================================
 
 resource "aws_iam_role" "lambda" {
+  count = local.use_external_lambda_role ? 0 : 1
+
   name        = "${local.function_name}-lambda"
   description = "Execution role for ZOA Access Lambda in ${var.regional_id}"
 
@@ -207,14 +222,14 @@ resource "aws_iam_role" "lambda" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role       = aws_iam_role.lambda.name
+  role       = local.lambda_role_name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 # DynamoDB: Read/Write sessions, Read targets, Write audit
 resource "aws_iam_role_policy" "lambda_dynamodb" {
   name = "${local.function_name}-dynamodb"
-  role = aws_iam_role.lambda.id
+  role = local.lambda_role_id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -252,7 +267,7 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
 # ECS: RunTask, StopTask, DescribeTasks for boundary session management
 resource "aws_iam_role_policy" "lambda_ecs" {
   name = "${local.function_name}-ecs"
-  role = aws_iam_role.lambda.id
+  role = local.lambda_role_id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -305,7 +320,7 @@ resource "aws_iam_role_policy" "lambda_ecs" {
 # STS: cross-account boundary ECS + exec credential vending (MC targets)
 resource "aws_iam_role_policy" "lambda_sts" {
   name = "${local.function_name}-sts"
-  role = aws_iam_role.lambda.id
+  role = local.lambda_role_id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -335,7 +350,7 @@ resource "aws_iam_role_policy" "lambda_sts" {
 # SSM: Deployment discovery (Central Account) and target registration (RC Account)
 resource "aws_iam_role_policy" "lambda_ssm" {
   name = "${local.function_name}-ssm"
-  role = aws_iam_role.lambda.id
+  role = local.lambda_role_id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -365,7 +380,7 @@ resource "aws_iam_role_policy" "lambda_ssm" {
 # KMS: Encrypt/decrypt with the ZOA KMS key
 resource "aws_iam_role_policy" "lambda_kms" {
   name = "${local.function_name}-kms"
-  role = aws_iam_role.lambda.id
+  role = local.lambda_role_id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -383,7 +398,7 @@ resource "aws_iam_role_policy" "lambda_kms" {
 # ECR: Pull Lambda container image
 resource "aws_iam_role_policy" "lambda_ecr" {
   name = "${local.function_name}-ecr"
-  role = aws_iam_role.lambda.id
+  role = local.lambda_role_id
 
   policy = jsonencode({
     Version = "2012-10-17"

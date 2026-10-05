@@ -9,7 +9,7 @@ output "function_url" {
 
 output "lambda_role_arn" {
   description = "ARN of the ZOA Access Lambda execution role"
-  value       = aws_iam_role.lambda.arn
+  value       = local.lambda_role_arn
 }
 
 output "invoker_role_arn" {

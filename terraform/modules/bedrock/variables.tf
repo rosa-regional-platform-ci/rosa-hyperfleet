@@ -1,0 +1,77 @@
+variable "enable_bedrock_model_agreements" {
+  description = "Create aws_bedrock_foundation_model_agreement for each non-empty entry in model_agreements when not already AVAILABLE in this account/Region."
+  type        = bool
+  default     = true
+}
+
+variable "model_agreements" {
+  description = "Foundation model ID to Bedrock PUBLIC offer ID. Empty offer ID skips that model."
+  type        = map(string)
+  default = {
+    "anthropic.claude-sonnet-5" = "offer-2ykemehpsyf7g"
+  }
+}
+
+variable "enable_cost_budget" {
+  description = "Create an account-wide monthly Amazon Bedrock cost budget when budget_name does not already exist."
+  type        = bool
+  default     = true
+}
+
+variable "budget_name" {
+  description = "AWS Budgets name for Bedrock service spend (fixed per account, not per cluster)."
+  type        = string
+  default     = "bedrock-monthly"
+}
+
+variable "monthly_budget_usd" {
+  description = "Monthly Bedrock spend limit (USD) for budget alerts only."
+  type        = number
+  default     = 1000
+
+  validation {
+    condition     = var.monthly_budget_usd >= 1
+    error_message = "monthly_budget_usd must be at least 1."
+  }
+}
+
+variable "budget_notification_email" {
+  description = "Base email for budget ACTUAL spend notifications (plus-addressed with account ID)."
+  type        = string
+  default     = "rosa-hyperfleet@redhat.com"
+
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.budget_notification_email))
+    error_message = "budget_notification_email must be a valid email address."
+  }
+}
+
+variable "enable_invocation_logging" {
+  description = "Enable Bedrock model invocation logging to CloudWatch (metadata only; no prompt/response payload)."
+  type        = bool
+  default     = false
+}
+
+variable "invocation_log_group_name" {
+  description = "CloudWatch log group for account-wide Bedrock invocation metadata."
+  type        = string
+  default     = "/aws/bedrock/model-invocations"
+}
+
+variable "invocation_logging_role_name" {
+  description = "IAM role name that the Bedrock service assumes to write invocation logs."
+  type        = string
+  default     = "bedrock-invocation-logging"
+}
+
+variable "invocation_log_retention_days" {
+  description = "CloudWatch retention for invocation logs. US regions use at least 365 days for compliance."
+  type        = number
+  default     = 365
+}
+
+variable "tags" {
+  description = "Additional tags applied to Bedrock module resources."
+  type        = map(string)
+  default     = {}
+}
