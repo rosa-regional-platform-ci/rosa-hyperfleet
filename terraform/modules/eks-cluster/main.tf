@@ -309,10 +309,7 @@ resource "aws_eks_node_group" "karpenter_bootstrap" {
     "karpenter.sh/discovery" = aws_eks_cluster.main.name
   })
 
-  depends_on = [
-    aws_iam_role_policy_attachment.karpenter_node_managed,
-    aws_eks_addon.vpc_cni,
-  ]
+  depends_on = [aws_iam_role_policy_attachment.karpenter_node_managed]
 }
 
 # -----------------------------------------------------------------------------
@@ -322,12 +319,6 @@ resource "aws_eks_node_group" "karpenter_bootstrap" {
 # Auto Mode clusters receive VPC CNI and kube-proxy from the managed control
 # plane; Karpenter clusters must declare them explicitly.
 # -----------------------------------------------------------------------------
-
-resource "aws_eks_addon" "vpc_cni" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "vpc-cni"
-  tags         = local.common_tags
-}
 
 resource "aws_eks_addon" "kube_proxy" {
   cluster_name = aws_eks_cluster.main.name

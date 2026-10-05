@@ -1,4 +1,5 @@
-# ECS Fargate infrastructure for bootstrapping ArgoCD on private EKS clusters.
+# ECS Fargate infrastructure for bootstrapping the VPC CNI and ArgoCD on
+# private EKS clusters.
 # See docs/design/fully-private-eks-bootstrap.md for architecture.
 
 locals {
@@ -83,7 +84,8 @@ resource "aws_cloudwatch_log_group" "bootstrap" {
   })
 }
 
-# Idempotent task: installs/updates ArgoCD, the cluster secret, and root Application.
+# Idempotent task: installs/updates the VPC CNI and ArgoCD, the cluster secret,
+# and the root Application.
 resource "aws_ecs_task_definition" "bootstrap" {
   family                   = "${var.cluster_id}-bootstrap"
   network_mode             = "awsvpc"
@@ -114,10 +116,61 @@ resource "aws_ecs_task_definition" "bootstrap" {
           git clone --depth 1 -b "$REPOSITORY_BRANCH" "$REPOSITORY_URL" "$REPO_DIR"
           echo "✓ Repository cloned"
 
-          # Configure kubectl for EKS
-          aws eks update-kubeconfig --name $CLUSTER_NAME
+           # Configure kubectl for EKS
+           aws eks update-kubeconfig --name $CLUSTER_NAME
 
-          # Wait for essential addons on the bootstrap node group before
+           # Install the VPC CNI before ArgoCD. A fresh cluster no longer has
+           # the EKS-managed vpc-cni addon, and ArgoCD requires pod networking.
+           echo "Installing self-managed AWS VPC CNI..."
+           VPC_CNI_IMAGE_REGISTRY=$(aws ssm get-parameter \
+             --name /argocd/vpc-cni/image-registry \
+             --query 'Parameter.Value' \
+             --output text \
+             --region "$AWS_REGION")
+           VPC_CNI_IMAGE_REGISTRY="$${VPC_CNI_IMAGE_REGISTRY%/}"
+           if [[ "$VPC_CNI_IMAGE_REGISTRY" == "None" || ! "$VPC_CNI_IMAGE_REGISTRY" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
+             echo "ERROR: /argocd/vpc-cni/image-registry must contain only a registry hostname" >&2
+             exit 1
+           fi
+
+           CLUSTER_ENDPOINT=$(aws eks describe-cluster \
+             --name "$CLUSTER_NAME" \
+             --region "$AWS_REGION" \
+             --query 'cluster.endpoint' \
+             --output text)
+
+           helm repo add aws-eks https://aws.github.io/eks-charts
+           helm dependency build "$REPO_DIR/argocd/config/shared/kube-system"
+
+           VPC_CNI_VALUES=/tmp/vpc-cni-bootstrap-values.yaml
+           cat > "$VPC_CNI_VALUES" <<-VPC_CNI_VALUES_EOF
+           aws-vpc-cni:
+             image:
+               overrideRepository: $${VPC_CNI_IMAGE_REGISTRY}/amazon-k8s-cni
+             init:
+               image:
+                 overrideRepository: $${VPC_CNI_IMAGE_REGISTRY}/amazon-k8s-cni-init
+             nodeAgent:
+               image:
+                 overrideRepository: $${VPC_CNI_IMAGE_REGISTRY}/amazon/aws-network-policy-agent
+             extraEnv:
+               - name: CLUSTER_ENDPOINT
+                 value: $${CLUSTER_ENDPOINT}
+               - name: CLUSTER_NAME
+                 value: $${CLUSTER_NAME}
+               - name: VPC_ID
+                 value: $${VPC_ID}
+        VPC_CNI_VALUES_EOF
+
+           helm template kube-system \
+             "$REPO_DIR/argocd/config/shared/kube-system" \
+             --namespace kube-system \
+             -f "$VPC_CNI_VALUES" \
+             | kubectl apply --server-side -f -
+           kubectl rollout status daemonset/aws-node -n kube-system --timeout=10m
+           echo "✓ Self-managed AWS VPC CNI is ready"
+
+           # Wait for essential addons on the bootstrap node group before
           # installing ArgoCD. Pod Identity agent must be active so that
           # workloads deployed by ArgoCD (LBC, EBS CSI) can authenticate.
           for ADDON in coredns metrics-server eks-pod-identity-agent; do
@@ -213,6 +266,8 @@ resource "aws_ecs_task_definition" "bootstrap" {
               sre_domain: "$SRE_DOMAIN"
               redis_endpoint: "$REDIS_ENDPOINT"
               vpc_id: "$VPC_ID"
+              vpc_cni_image_registry: "$VPC_CNI_IMAGE_REGISTRY"
+              cluster_endpoint: "$CLUSTER_ENDPOINT"
           type: Opaque
           stringData:
             name: in-cluster
@@ -258,6 +313,10 @@ resource "aws_ecs_task_definition" "bootstrap" {
       essential = true
 
       environment = [
+        {
+          name  = "AWS_REGION"
+          value = data.aws_region.current.region
+        },
         {
           name  = "AWS_DEFAULT_REGION"
           value = data.aws_region.current.region

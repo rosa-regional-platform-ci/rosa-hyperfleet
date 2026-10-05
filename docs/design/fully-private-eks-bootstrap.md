@@ -59,7 +59,7 @@ The rosa-hyperfleet requires a mechanism to provision and configure secure and p
 ```mermaid
 graph LR
     TF[1. Terraform Apply<br/>Cluster Provision]
-    ECS[2. ECS Bootstrap Task<br/>Day-2 ArgoCD Install]
+    ECS[2. ECS Bootstrap Task<br/>VPC CNI then ArgoCD]
     Git[Git Repository<br/>Cluster Configuration]
 
     subgraph "Private EKS Cluster"
@@ -69,7 +69,7 @@ graph LR
 
     TF -->|Provisions| ArgoCD
     TF -.->|Enables| ECS
-    ECS -.->|One-time Install| ArgoCD
+    ECS -.->|Installs CNI, then ArgoCD| ArgoCD
     Git -->|3. Pulls Configuration| ArgoCD
     ArgoCD -->|Configures & Manages| Workloads
 
@@ -89,7 +89,8 @@ Creates fully private EKS cluster with:
 - Private VPC with controlled NAT gateway egress
 - Managed node groups in private subnets
 - Pod Identity for workload authentication
-- Managed addons (CoreDNS, VPC-CNI, EBS-CSI)
+- Managed addons (CoreDNS, kube-proxy, EBS-CSI, Pod Identity)
+- Self-managed AWS VPC CNI installed by ECS bootstrap before ArgoCD
 
 ### Security and Scalability Enhancements
 
@@ -108,11 +109,27 @@ Creates fully private EKS cluster with:
 
 ### Bootstrap System
 
-ECS Fargate-based ArgoCD installation:
+ECS Fargate-based network and ArgoCD installation:
 
 - Dedicated ECS infrastructure for secure cluster operations
 - Tasks run in private subnets with controlled EKS API access
 - Tasks are logged in CloudWatch for observability/auditing
+- The task reads `/argocd/vpc-cni/image-registry` from SSM Parameter Store
+- The task renders and applies the VPC CNI before installing ArgoCD
+
+The parameter contains only the registry hostname. It must be present in the
+target account and region before bootstrap runs. The bootstrap node role pulls
+the images from ECR using IAM; no Kubernetes image pull secret is required.
+
+Create it as a plain SSM `String` before provisioning the cluster:
+
+```bash
+aws ssm put-parameter \
+  --name /argocd/vpc-cni/image-registry \
+  --type String \
+  --value '<registry-hostname>' \
+  --region '<cluster-region>'
+```
 
 ### GitOps Handover
 

@@ -1,0 +1,9 @@
+apiVersion: v2
+name: kube-system
+description: Core system components installed before Argo CD becomes available
+type: application
+version: 1.0.0
+dependencies:
+  - name: aws-vpc-cni
+    version: 1.22.4
+    repository: https://aws.github.io/eks-charts
