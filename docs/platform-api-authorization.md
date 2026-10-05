@@ -141,8 +141,11 @@ are set during ephemeral CI provisioning). Dev rendering and ordinary CI lint
 retain empty enrollment and grants. Integration and stage remain empty.
 
 These are verified local roles, not a claim about Prow's Vault credential chain.
-The E2E runner logs the actual regional caller and, when customer tests run, the
-customer caller's account and ARN. If Prow uses different principals, requests
+The bundle also attaches the regional read policy to
+`arn:aws:iam::720644165472:user/e2e` with `exact-principal` binding, matching the
+caller observed in Prow run `2106095188232376320`. The customer caller remains
+unconfirmed. The E2E runner logs the actual regional caller and, when customer
+tests run, the customer caller's account and ARN. If Prow uses different principals, requests
 fail closed; update explicit attachments only after inspecting that evidence.
 Profile names alone are not caller proof. Injected infrastructure account IDs do
 not automatically become enrolled callers. Review these feature-branch grants
