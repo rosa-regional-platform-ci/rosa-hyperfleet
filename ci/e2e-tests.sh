@@ -128,6 +128,10 @@ E2E_SKIP_ROSA_CLI="${E2E_SKIP_ROSA_CLI:-true}"  # Set to "true" to skip
 E2E_SKIP_ZOA="${E2E_SKIP_ZOA:-false}"  # Set to "true" to skip
 ZOA_REF="${ZOA_REF:-main}"
 ZOA_REPO="${ZOA_REPO:-https://github.com/openshift-online/rosa-hyperfleet-zoa.git}"
+# OCP release payload (full pullspec) for HCP creation. Empty lets the e2e /
+# operator pick their default; CI sets this to pair the cluster's OCP version
+# with the CPO/HO build under test. Consumed by the api repo's test-e2e-cli.
+export OCP_IMAGE="${OCP_IMAGE:-}"
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "${WORK_DIR}"' EXIT
 # ---------------------------------------------------------------------------

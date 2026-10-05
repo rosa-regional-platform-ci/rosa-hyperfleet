@@ -40,6 +40,9 @@ ephemeral-logs*
 # Local ephemeral environment overrides
 .ephemeral-env/
 
+# Ephemeral environment artifacts (CodeBuild logs)
+.ephemeral-artifacts/
+
 # Local tool binaries (downloaded by Makefile)
 /bin/
 
