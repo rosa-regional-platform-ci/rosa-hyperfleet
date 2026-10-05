@@ -226,25 +226,72 @@ variable "targets_ssm_prefix" {
 }
 
 variable "vpc_id" {
-  description = "VPC ID where this Lambda is deployed. Written to SSM target metadata for informational / session tracking purposes."
+  description = "VPC ID for boundary ECS and SSM target metadata."
   type        = string
   default     = ""
+
+  validation {
+    condition     = var.vpc_id != ""
+    error_message = "vpc_id is required (boundary ECS and SSM target registration)."
+  }
 }
 
-variable "boundary_security_group_id" {
-  description = "Security group ID for ZOA Boundary ECS tasks. Written to SSM target for Access Lambda to use in RunTask."
+variable "boundary_image" {
+  description = "Container image for the ZOA boundary ECS task (Konflux/Quay)."
   type        = string
-  default     = ""
+
+  validation {
+    condition     = var.boundary_image != ""
+    error_message = "boundary_image must be set; HyperFleet always deploys the full ZOA stack."
+  }
 }
 
-variable "boundary_ecs_cluster_arn" {
-  description = "ARN of the ZOA Boundary ECS cluster. Written to SSM target for Access Lambda to use in RunTask."
+variable "access_lambda_role_arn" {
+  description = "ARN of the RC ZOA Access Lambda execution role for boundary trust policies. Required when deployment_target is mc; ignored on rc (role is created in this module)."
   type        = string
   default     = ""
+
+  validation {
+    condition = (
+      var.deployment_target == "rc" ||
+      can(regex("^arn:aws:iam::[0-9]{12}:role/", var.access_lambda_role_arn))
+    )
+    error_message = "access_lambda_role_arn must be a valid IAM role ARN when deployment_target is mc."
+  }
 }
 
-variable "boundary_task_definition_arn" {
-  description = "ARN of the ZOA Boundary ECS task definition. Written to SSM target for Access Lambda to use in RunTask."
+variable "boundary_log_retention_days" {
+  description = "CloudWatch retention for boundary logs. US regions enforce at least 365 days."
+  type        = number
+  default     = 30
+}
+
+variable "boundary_cpu" {
+  description = "Fargate CPU units for the boundary task (256, 512, 1024, 2048, 4096)."
   type        = string
-  default     = ""
+  default     = "512"
+}
+
+variable "boundary_memory" {
+  description = "Fargate memory (MB) for the boundary task."
+  type        = string
+  default     = "1024"
+}
+
+variable "boundary_ecs_exec_interactive_command" {
+  description = "Shell command for ecs:ExecuteCommand on boundary tasks (ZOA_ECS_EXEC_COMMAND)."
+  type        = string
+  default     = "runuser -u sre -- /bin/bash -l"
+}
+
+variable "claude_code_bedrock_primary_model" {
+  description = "ANTHROPIC_MODEL for Claude Code in boundary tasks."
+  type        = string
+  default     = "us.anthropic.claude-sonnet-5"
+}
+
+variable "breakglass_role_arns" {
+  description = "IAM role ARNs the boundary task role may assume for break-glass access."
+  type        = list(string)
+  default     = []
 }

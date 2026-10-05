@@ -173,13 +173,12 @@ module "zoa_lambda" {
   data_access_role_arn = var.zoa_data_access_role_arn
 
   # Boundary integration (MC targets register in RC's SSM via cross-account)
-  sessions_table_name          = var.zoa_sessions_table_name
-  deployment_name              = var.zoa_deployment_name
-  targets_ssm_prefix           = local.zoa_targets_ssm_prefix
-  vpc_id                       = module.vpc.vpc_id
-  boundary_security_group_id   = module.zoa_boundary.security_group_id
-  boundary_ecs_cluster_arn     = module.zoa_boundary.ecs_cluster_arn
-  boundary_task_definition_arn = module.zoa_boundary.task_definition_arn
+  sessions_table_name    = var.zoa_sessions_table_name
+  deployment_name        = var.zoa_deployment_name
+  targets_ssm_prefix     = local.zoa_targets_ssm_prefix
+  vpc_id                 = module.vpc.vpc_id
+  boundary_image         = var.zoa_boundary_image
+  access_lambda_role_arn = var.zoa_access_lambda_role_arn
 }
 
 # =============================================================================
@@ -188,28 +187,6 @@ module "zoa_lambda" {
 
 module "bedrock" {
   source = "../../modules/bedrock"
-}
-
-# =============================================================================
-# ZOA Boundary (ECS Fargate tasks — MC VPC)
-# =============================================================================
-
-module "zoa_boundary" {
-  source = "../../modules/zoa-boundary"
-
-  cluster_id                = var.management_id
-  cluster_name              = module.management_cluster.cluster_name
-  cluster_security_group_id = module.vpc.cluster_security_group_id
-  vpc_id                    = module.vpc.vpc_id
-  private_subnet_ids        = module.vpc.private_subnet_ids
-  deployment_name           = var.zoa_deployment_name
-
-  boundary_image          = var.zoa_boundary_image
-  zoa_function_url        = module.zoa_lambda.api_function_url
-  zoa_lambda_function_arn = module.zoa_lambda.api_function_arn
-  kms_key_arn             = var.zoa_kms_key_arn
-
-  access_lambda_role_arn = var.zoa_access_lambda_role_arn
 }
 
 # =============================================================================

@@ -1,13 +1,15 @@
 # ZOA per-VPC Lambda Module
 
-Deploys ZOA Lambda functions (API + Worker) into a target VPC with direct EKS API access.
+Deploys ZOA Lambda functions (API + Worker) and **ZOA Boundary** (ECS Fargate) into a target VPC with direct EKS API access. One module per RC or MC cluster avoids a Terraform dependency cycle between API Lambda and boundary.
 
 ## Architecture
 
-Two Lambda functions per deployment:
-
 - **API Lambda** — Function URL with native Go streaming. Handles CLI requests and sync TA execution.
 - **Worker Lambda** — Standard handler. Handles reconciler, GC, reaper (EventBridge-scheduled) and async TA execution (self-invoked from reconciler).
+- **Boundary ECS** — Audited SRE sessions via ECS Exec; task env uses this module's API Function URL.
+- **RC only:** shell IAM role for the ZOA Access Lambda (`aws_iam_role.access_lambda`); `module.zoa-access` attaches policies and the function. Boundary trust policies reference that role's ARN in this module.
+
+Terraform layout: `main.tf` (Lambda + SSM), `boundary-*.tf`, `access-trust-role.tf`.
 
 ## Usage
 
@@ -34,8 +36,15 @@ module "zoa_lambda" {
   artifact_bucket_arn       = module.zoa.artifact_bucket_arn
   kms_key_arn               = module.zoa.kms_key_arn
   uploader_role_arn         = module.zoa.uploader_role_arn
+  vpc_id                    = module.vpc.vpc_id
+  boundary_image            = var.zoa_boundary_image
+  deployment_name           = var.deployment_name
+  sessions_table_name       = module.zoa.sessions_table_name
+  targets_ssm_prefix        = "/zoa/targets/${var.deployment_name}"
 }
 ```
+
+After apply, wire **`module.zoa_access`** with boundary outputs and `access_lambda_role_*` from **`module.zoa_lambda`** (RC only).
 
 ## Cross-Account (MC → RC)
 

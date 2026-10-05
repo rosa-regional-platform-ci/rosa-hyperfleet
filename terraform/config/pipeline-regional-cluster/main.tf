@@ -398,7 +398,7 @@ resource "aws_codepipeline" "central_pipeline" {
             "terraform/modules/zoa/**",
             "terraform/modules/zoa-lambda/**",
             "terraform/modules/zoa-access/**",
-            "terraform/modules/zoa-boundary/**",
+            "terraform/modules/zoa-lambda/**",
             "scripts/buildspec/build-zoa-lambda.sh",
           ]
         }

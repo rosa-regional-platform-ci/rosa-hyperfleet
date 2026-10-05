@@ -1,32 +1,26 @@
-# ZOA Boundary ECS task — audited session container for ZOA operations
-# in private EKS cluster VPCs via ECS Exec (SSM).
-
-# =============================================================================
-# Task Definition
-# =============================================================================
+data "aws_partition" "current" {}
 
 resource "aws_ecs_task_definition" "boundary" {
   family                   = "${var.cluster_id}-zoa-boundary"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = var.cpu
-  memory                   = var.memory
+  cpu                      = var.boundary_cpu
+  memory                   = var.boundary_memory
   execution_role_arn       = aws_iam_role.execution.arn
   task_role_arn            = aws_iam_role.task.arn
 
   container_definitions = jsonencode([
     {
-      name      = local.container_name
-      image     = var.boundary_image
-      essential = true
-      # Grace period for SIGTERM before SIGKILL (Fargate default scale); allows exec/CW flush on stop.
+      name        = local.boundary_container_name
+      image       = var.boundary_image
+      essential   = true
       stopTimeout = 30
       user        = "1000"
 
       environment = flatten([
         {
           name  = "ZOA_API_URL"
-          value = var.zoa_function_url
+          value = aws_lambda_function_url.api.function_url
         },
         {
           name  = "ZOA_TARGET"
@@ -58,7 +52,7 @@ resource "aws_ecs_task_definition" "boundary" {
         },
         {
           name  = "ZOA_ECS_EXEC_COMMAND"
-          value = var.ecs_exec_interactive_command
+          value = var.boundary_ecs_exec_interactive_command
         },
         {
           name  = "ANTHROPIC_MODEL"
@@ -75,7 +69,6 @@ resource "aws_ecs_task_definition" "boundary" {
         }
       }
 
-      # Required for ECS Exec
       linuxParameters = {
         initProcessEnabled = true
       }
@@ -83,29 +76,25 @@ resource "aws_ecs_task_definition" "boundary" {
   ])
 
   tags = local.common_tags
-}
 
-# =============================================================================
-# Task Role — ZOA CLI access + ECS Exec (SSM)
-# =============================================================================
-# No EKS access by design — boundary containers operate exclusively through
-# per-VPC Lambda Function URLs. Break-glass will add sts:AssumeRole to
-# specific roles via var.breakglass_role_arns in a future epic.
+  depends_on = [
+    aws_lambda_function.api,
+    aws_lambda_function_url.api,
+  ]
+}
 
 resource "aws_iam_role" "task" {
   name = "${var.cluster_id}-zoa-boundary-task"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ecs-tasks.amazonaws.com"
       }
-    ]
+    }]
   })
 
   tags = local.common_tags
@@ -158,7 +147,7 @@ resource "aws_iam_role_policy" "task_ssm" {
           "kms:Decrypt",
           "kms:DescribeKey",
         ]
-        Resource = local.encryption_kms_arn
+        Resource = local.boundary_encryption_kms_arn
       }
     ]
   })
@@ -170,20 +159,17 @@ resource "aws_iam_role_policy" "task_ssm_params" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "SSMParameterRead"
-        Effect = "Allow"
-        Action = [
-          "ssm:GetParameter"
-        ]
-        Resource = "arn:aws:ssm:${data.aws_region.current.region}:${local.account_id}:parameter/zoa/deployments/*"
-      }
-    ]
+    Statement = [{
+      Sid    = "SSMParameterRead"
+      Effect = "Allow"
+      Action = [
+        "ssm:GetParameter"
+      ]
+      Resource = "arn:aws:ssm:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:parameter/zoa/deployments/*"
+    }]
   })
 }
 
-# ZOA CLI invokes the per-VPC API Lambda via Function URL (IAM auth).
 resource "aws_iam_role_policy" "task_lambda" {
   name = "lambda-function-url"
   role = aws_iam_role.task.id
@@ -196,7 +182,7 @@ resource "aws_iam_role_policy" "task_lambda" {
       Action = [
         "lambda:InvokeFunctionUrl",
       ]
-      Resource = var.zoa_lambda_function_arn
+      Resource = aws_lambda_function.api.arn
       Condition = {
         StringEquals = {
           "lambda:FunctionUrlAuthType" = "AWS_IAM"
@@ -206,7 +192,6 @@ resource "aws_iam_role_policy" "task_lambda" {
   })
 }
 
-# Classic Bedrock Invoke — broad IAM; Claude Code picks the model.
 resource "aws_iam_role_policy" "task_bedrock" {
   name = "bedrock-invoke"
   role = aws_iam_role.task.id
@@ -254,7 +239,6 @@ resource "aws_iam_role_policy" "task_bedrock" {
   })
 }
 
-# Break-glass STS AssumeRole — empty by default, populated by break-glass epic
 resource "aws_iam_role_policy" "task_breakglass" {
   count = length(var.breakglass_role_arns) > 0 ? 1 : 0
   name  = "breakglass-assume-role"
@@ -262,13 +246,11 @@ resource "aws_iam_role_policy" "task_breakglass" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Sid      = "BreakglassAssumeRole"
-        Effect   = "Allow"
-        Action   = "sts:AssumeRole"
-        Resource = var.breakglass_role_arns
-      }
-    ]
+    Statement = [{
+      Sid      = "BreakglassAssumeRole"
+      Effect   = "Allow"
+      Action   = "sts:AssumeRole"
+      Resource = var.breakglass_role_arns
+    }]
   })
 }

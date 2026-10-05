@@ -223,26 +223,29 @@ terraform/modules/zoa-lambda/   → Per-VPC compute (one per target VPC: RC + ea
 | Invoker role   | Central-trusted role; SREs assume via Central Account to call the Function URL.                            |
 | SSM parameters | Publishes Access Function URL and deployment metadata for CLI autodiscovery.                               |
 
-### `modules/zoa-boundary/` — Investigation containers (RC + MC VPC)
+### `modules/zoa-lambda/` — Per-VPC TA plane + boundary (RC + MC VPC)
 
-Deployed in **each** target VPC (RC + every MC). Operator workflows, session model, and container contents are documented in the [ZOA repo — Boundary](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/boundary/README.md).
+API + worker Lambdas, **boundary ECS**, SSM target registration, and (on RC) the **Access Lambda execution role shell** live in one module so API Function URL and boundary share a single apply graph.
 
 | Resource                      | Details                                                                                                                                                                                   |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API + Worker Lambda           | Function URL, VPC attachment, EKS access, reaper when sessions table is set.                                                                                                              |
 | ECS cluster + task definition | Fargate `zoa-boundary` image, ECS Exec, shared regional ZOA CMK (`kms_key_arn`).                                                                                                          |
 | CloudWatch Logs               | `/ecs/<cluster_id>/zoa-boundary` + `.../ssm-sessions` (see [session logging](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/design/boundary-session-logging.md)). |
-| Bedrock                       | Task IAM + optional `aws_bedrock_foundation_model_agreement` and account Bedrock budget (module defaults; see `terraform/modules/zoa-boundary/README.md`).                                |
-| VPC                           | Uses shared `terraform/modules/vpc` endpoints (S3, DynamoDB, KMS, SSM/Exec, bedrock-runtime).                                                                                             |
+| Bedrock                       | Boundary task IAM (`bedrock:InvokeModel`). Account agreements/budget: `modules/bedrock`.                                                                                                  |
+| RC only                       | `aws_iam_role.access_lambda` — trust target for boundary-access / exec-scoped; policies + Access function in `modules/zoa-access`.                                                        |
+
+Operator workflows: [ZOA repo — Boundary](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/boundary/README.md).
 
 ### RC/MC Config Wiring
 
-- **RC** instantiates `modules/zoa`, `modules/zoa-lambda`, `modules/zoa-access`, and `modules/zoa-boundary` (RC VPC). Exports data-access role ARN and ECR URL as outputs for MC consumption.
-- **MC** instantiates `modules/zoa-lambda` and `modules/zoa-boundary`, consuming RC outputs (ECR URL, DynamoDB, S3, KMS, data-access role, sessions table, Access metadata).
+- **RC** instantiates `modules/zoa`, `modules/zoa-lambda` (Lambda + boundary + access role shell), and `modules/zoa-access`. Exports data-access role ARN, ECR URL, and `zoa_access_lambda_role_arn` for MC.
+- **MC** instantiates `modules/zoa-lambda` only (Lambda + boundary), consuming RC outputs (ECR URL, DynamoDB, S3, KMS, data-access role, sessions table, `zoa_access_lambda_role_arn`).
 - **Cross-account access**: MC Lambdas assume `zoa-data-access` role via STS to reach RC's DynamoDB and S3. Both DynamoDB tables and S3 bucket also have resource-based policies scoped by MC OU path — defense in depth (either mechanism alone would suffice).
 
 ### AWS cost allocation tags (ZOA)
 
-All ZOA Terraform modules set **`Component=zoa`** and **`function=zoa`** on taggable resources (in addition to provider **`default_tags`**: `app-code`, `service-phase`, `cost-center`, `environment`). Modules: `zoa`, `zoa-lambda`, `zoa-access`, `zoa-boundary`. Central-account SSM deployment discovery uses the **`aws.central`** provider with the same org **`default_tags`**.
+All ZOA Terraform modules set **`Component=zoa`** and **`function=zoa`** on taggable resources (in addition to provider **`default_tags`**: `app-code`, `service-phase`, `cost-center`, `environment`). Modules: `zoa`, `zoa-lambda`, `zoa-access`. Central-account SSM deployment discovery uses the **`aws.central`** provider with the same org **`default_tags`**.
 
 Access Lambda sets **`Component`** and **`function`** on boundary **ECS tasks** at `RunTask` (with session attribution tags). Activate these keys as cost allocation tags in AWS Billing for per-component reports.
 
@@ -394,7 +397,7 @@ sequenceDiagram
 
 ### In this repository
 
-- Terraform modules: [`terraform/modules/zoa/`](../../terraform/modules/zoa/), [`terraform/modules/zoa-lambda/`](../../terraform/modules/zoa-lambda/), [`terraform/modules/zoa-access/`](../../terraform/modules/zoa-access/), [`terraform/modules/zoa-boundary/`](../../terraform/modules/zoa-boundary/)
+- Terraform modules: [`terraform/modules/zoa/`](../../terraform/modules/zoa/), [`terraform/modules/zoa-lambda/`](../../terraform/modules/zoa-lambda/), [`terraform/modules/zoa-access/`](../../terraform/modules/zoa-access/), [`terraform/modules/bedrock/`](../../terraform/modules/bedrock/)
 - RC config: [`terraform/config/regional-cluster/`](../../terraform/config/regional-cluster/) (instantiates both modules)
 - MC config: [`terraform/config/management-cluster/`](../../terraform/config/management-cluster/) (instantiates `zoa-lambda` only)
 

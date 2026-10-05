@@ -1,11 +1,5 @@
-# =============================================================================
-# Cross-account boundary access + ECS Exec credential roles
-# =============================================================================
-# RC ZOA Access Lambda assumes boundary-access in the target account to RunTask/
-# StopTask. It assumes exec-scoped (with session policy) to vend SRE credentials.
-
 locals {
-  access_trust_principals = [var.access_lambda_role_arn]
+  boundary_access_trust_principals = [local.access_lambda_role_arn]
 
   boundary_cluster_name    = element(split("/", aws_ecs_cluster.boundary.arn), 1)
   boundary_task_arn_prefix = "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task/${local.boundary_cluster_name}/"
@@ -20,7 +14,7 @@ resource "aws_iam_role" "boundary_access" {
     Statement = [{
       Effect = "Allow"
       Principal = {
-        AWS = local.access_trust_principals
+        AWS = local.boundary_access_trust_principals
       }
       Action = "sts:AssumeRole"
     }]
@@ -96,7 +90,7 @@ resource "aws_iam_role" "exec_scoped" {
     Statement = [{
       Effect = "Allow"
       Principal = {
-        AWS = local.access_trust_principals
+        AWS = local.boundary_access_trust_principals
       }
       Action = "sts:AssumeRole"
     }]
@@ -148,7 +142,7 @@ resource "aws_iam_role_policy" "exec_scoped_base" {
           "kms:GenerateDataKey",
           "kms:DescribeKey",
         ]
-        Resource = local.encryption_kms_arn
+        Resource = local.boundary_encryption_kms_arn
       },
     ]
   })

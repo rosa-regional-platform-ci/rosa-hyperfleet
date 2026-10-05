@@ -82,18 +82,18 @@ variable "session_max_duration_hours" {
 }
 
 variable "boundary_ecs_exec_command" {
-  description = "Interactive ecs:ExecuteCommand shell for boundary join (must match zoa-boundary module ecs_exec_interactive_command / task env ZOA_ECS_EXEC_COMMAND)."
+  description = "Interactive ecs:ExecuteCommand shell for boundary join (must match module.zoa-lambda boundary_ecs_exec_interactive_command / task env ZOA_ECS_EXEC_COMMAND)."
   type        = string
   default     = "runuser -u sre -- /bin/bash -l"
 }
 
 variable "exec_scoped_role_arn" {
-  description = "RC boundary exec-scoped IAM role ARN (from zoa-boundary module). Used as default for RC targets and EXEC_SCOPED_ROLE_ARN on the Lambda."
+  description = "RC boundary exec-scoped IAM role ARN (from module.zoa-lambda). Used as default for RC targets and EXEC_SCOPED_ROLE_ARN on the Lambda."
   type        = string
 }
 
 variable "lambda_execution_role_arn" {
-  description = "ARN of the Access Lambda execution role from module.zoa-access-role (regional stack)."
+  description = "ARN of the Access Lambda execution role from module.zoa-lambda (regional stack)."
   type        = string
 
   validation {

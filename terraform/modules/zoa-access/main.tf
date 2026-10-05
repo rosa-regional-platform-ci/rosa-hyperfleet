@@ -18,8 +18,9 @@
 # then assume this invoker role in the RC account to call the Function URL.
 # Trust is scoped to configured role names in the central account only.
 #
-# The Lambda execution role is created by module.zoa-access-role in the regional
-# stack; this module attaches policies and the function to that role.
+# The Lambda execution role shell is created in module.zoa-lambda (RC only) so boundary
+# trust policies reference a real aws_iam_role ARN. This module attaches policies and
+# the Access Lambda function to that role.
 # =============================================================================
 
 data "aws_caller_identity" "current" {}
@@ -193,7 +194,7 @@ resource "aws_iam_role_policy" "invoker_function_url" {
 }
 
 # =============================================================================
-# IAM policies on the Access Lambda execution role (role owned by zoa-access-role)
+# IAM policies on the Access Lambda execution role (role shell in module.zoa-lambda on RC).
 # =============================================================================
 
 resource "aws_iam_role_policy_attachment" "lambda_basic" {

@@ -1,38 +1,18 @@
-# ECS Fargate ZOA Boundary Module
-# Provides audited ZOA sessions in private EKS cluster VPCs via ECS Exec (SSM).
-# Boundary tasks have no standing EKS access (HyperFleet bastion may grant cluster access).
-# All operations go through per-VPC Lambda Function URLs using the ZOA CLI.
+# ZOA Boundary (ECS Fargate) — per-VPC audited sessions via ECS Exec.
+# Merged into zoa-lambda so API/worker Lambda and boundary share one apply graph.
 
 locals {
-  container_name               = "zoa-boundary"
-  effective_log_retention_days = max(365, var.log_retention_days)
-  encryption_kms_arn           = var.kms_key_arn
-
-  # CloudWatch: container stdout (task startup) vs ECS Exec session transcripts (audit).
-  boundary_container_log_group_name = "/ecs/${var.cluster_id}/zoa-boundary"
-  boundary_exec_log_group_name      = "/ecs/${var.cluster_id}/zoa-boundary/ssm-sessions"
-
-  common_tags = merge(
-    var.tags,
-    {
-      function  = "zoa"
-      module    = "zoa-boundary"
-      Component = "zoa"
-      ManagedBy = "terraform"
-    }
-  )
+  boundary_container_name               = "zoa-boundary"
+  boundary_effective_log_retention_days = max(365, var.boundary_log_retention_days)
+  boundary_encryption_kms_arn           = var.kms_key_arn
+  boundary_container_log_group_name     = "/ecs/${var.cluster_id}/zoa-boundary"
+  boundary_exec_log_group_name          = "/ecs/${var.cluster_id}/zoa-boundary/ssm-sessions"
 }
-
-data "aws_region" "current" {}
-
-# =============================================================================
-# CloudWatch Log Groups (regional ZOA CMK — container vs ECS Exec session I/O)
-# =============================================================================
 
 resource "aws_cloudwatch_log_group" "boundary" {
   name              = local.boundary_container_log_group_name
-  retention_in_days = local.effective_log_retention_days
-  kms_key_id        = local.encryption_kms_arn
+  retention_in_days = local.boundary_effective_log_retention_days
+  kms_key_id        = local.boundary_encryption_kms_arn
 
   tags = merge(local.common_tags, {
     Name = "${var.cluster_id}-zoa-boundary-container-logs"
@@ -41,17 +21,13 @@ resource "aws_cloudwatch_log_group" "boundary" {
 
 resource "aws_cloudwatch_log_group" "boundary_exec" {
   name              = local.boundary_exec_log_group_name
-  retention_in_days = local.effective_log_retention_days
-  kms_key_id        = local.encryption_kms_arn
+  retention_in_days = local.boundary_effective_log_retention_days
+  kms_key_id        = local.boundary_encryption_kms_arn
 
   tags = merge(local.common_tags, {
     Name = "${var.cluster_id}-zoa-boundary-exec-logs"
   })
 }
-
-# =============================================================================
-# Security Group
-# =============================================================================
 
 resource "aws_security_group" "boundary" {
   name        = "${var.cluster_id}-zoa-boundary"
@@ -71,7 +47,6 @@ resource "aws_security_group" "boundary" {
   })
 }
 
-# Allow boundary tasks to access EKS control plane (future break-glass)
 resource "aws_security_group_rule" "eks_ingress_from_boundary" {
   type                     = "ingress"
   from_port                = 443
@@ -82,10 +57,6 @@ resource "aws_security_group_rule" "eks_ingress_from_boundary" {
   description              = "Allow ZOA Boundary tasks to access EKS API"
 }
 
-# =============================================================================
-# ECS Cluster (dedicated for ZOA Boundary tasks)
-# =============================================================================
-
 resource "aws_ecs_cluster" "boundary" {
   name = "${var.cluster_id}-zoa-boundary"
 
@@ -94,13 +65,9 @@ resource "aws_ecs_cluster" "boundary" {
     value = "enabled"
   }
 
-  # ECS Exec (FedRAMP AU-09): session data channel + exec transcript logging.
-  # - kms_key_id: CMK for TLS/exec payload (task role + caller need kms:Decrypt/GenerateDataKey).
-  # - cloud_watch_encryption_enabled=true REQUIRES the exec log group to use the same CMK
-  #   (see AWS ECS Exec logging docs).
   configuration {
     execute_command_configuration {
-      kms_key_id = local.encryption_kms_arn
+      kms_key_id = local.boundary_encryption_kms_arn
       logging    = "OVERRIDE"
 
       log_configuration {
@@ -117,12 +84,6 @@ resource "aws_ecs_cluster" "boundary" {
 
   tags = local.common_tags
 }
-
-# =============================================================================
-# Cleanup Running Tasks on Destroy
-# =============================================================================
-# This ensures any running boundary tasks are stopped before the cluster is destroyed.
-# Without this, terraform destroy would fail if a task was left running.
 
 resource "null_resource" "stop_boundary_tasks" {
   depends_on = [aws_ecs_cluster.boundary]

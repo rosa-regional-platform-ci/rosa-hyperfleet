@@ -623,7 +623,7 @@ resource "aws_iam_role_policy" "lambda_boundary_ecs_reaper" {
       Resource = "*"
       Condition = {
         ArnEquals = {
-          "ecs:cluster" = var.boundary_ecs_cluster_arn
+          "ecs:cluster" = aws_ecs_cluster.boundary.arn
         }
       }
     }]
@@ -824,9 +824,9 @@ resource "aws_ssm_parameter" "zoa_target" {
     target_type         = var.deployment_target
     vpc_id              = var.vpc_id
     subnet_ids          = join(",", var.private_subnet_ids)
-    security_group_id   = var.boundary_security_group_id
-    ecs_cluster_arn     = var.boundary_ecs_cluster_arn
-    task_definition_arn = var.boundary_task_definition_arn
+    security_group_id   = aws_security_group.boundary.id
+    ecs_cluster_arn     = aws_ecs_cluster.boundary.arn
+    task_definition_arn = aws_ecs_task_definition.boundary.arn
     function_url        = aws_lambda_function_url.api.function_url
     account_id          = data.aws_caller_identity.current.account_id
     region              = data.aws_region.current.name

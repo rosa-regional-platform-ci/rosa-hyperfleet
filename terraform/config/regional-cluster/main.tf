@@ -505,23 +505,11 @@ module "zoa_lambda" {
   uploader_role_arn    = module.zoa.uploader_role_arn
 
   # Boundary integration — use deployment_name (e.g. us-east-1-eph-xxx), not regional_id.
-  sessions_table_name          = module.zoa.sessions_table_name
-  deployment_name              = var.deployment_name
-  targets_ssm_prefix           = "/zoa/targets/${var.deployment_name}"
-  vpc_id                       = module.regional_cluster.vpc_id
-  boundary_security_group_id   = module.zoa_boundary.security_group_id
-  boundary_ecs_cluster_arn     = module.zoa_boundary.ecs_cluster_arn
-  boundary_task_definition_arn = module.zoa_boundary.task_definition_arn
-}
-
-# =============================================================================
-# ZOA Access Lambda execution role (must exist before boundary trust policies)
-# =============================================================================
-
-module "zoa_access_lambda_role" {
-  source = "../../modules/zoa-access-role"
-
-  regional_id = var.regional_id
+  sessions_table_name = module.zoa.sessions_table_name
+  deployment_name     = var.deployment_name
+  targets_ssm_prefix  = "/zoa/targets/${var.deployment_name}"
+  vpc_id              = module.regional_cluster.vpc_id
+  boundary_image      = var.zoa_boundary_image
 }
 
 # =============================================================================
@@ -532,30 +520,6 @@ module "zoa_access_lambda_role" {
 
 module "bedrock" {
   source = "../../modules/bedrock"
-}
-
-# =============================================================================
-# ZOA Boundary (ECS Fargate tasks — RC VPC)
-# =============================================================================
-
-module "zoa_boundary" {
-  source = "../../modules/zoa-boundary"
-
-  depends_on = [module.zoa, module.zoa_access_lambda_role]
-
-  cluster_id                = var.regional_id
-  cluster_name              = module.regional_cluster.cluster_name
-  cluster_security_group_id = module.regional_cluster.cluster_security_group_id
-  vpc_id                    = module.regional_cluster.vpc_id
-  private_subnet_ids        = module.regional_cluster.private_subnet_ids
-  deployment_name           = var.deployment_name
-
-  boundary_image          = var.zoa_boundary_image
-  zoa_function_url        = module.zoa_lambda.api_function_url
-  zoa_lambda_function_arn = module.zoa_lambda.api_function_arn
-  kms_key_arn             = module.zoa.kms_key_arn
-
-  access_lambda_role_arn = module.zoa_access_lambda_role.arn
 }
 
 # =============================================================================
@@ -570,7 +534,7 @@ module "zoa_access" {
     aws.central = aws.central
   }
 
-  depends_on = [module.zoa, module.zoa_boundary, module.zoa_access_lambda_role]
+  depends_on = [module.zoa, module.zoa_lambda]
 
   regional_id = var.regional_id
   image_uri   = module.zoa.lambda_image_uri
@@ -579,16 +543,16 @@ module "zoa_access" {
   trusted_assumer_role_names = var.zoa_access_trusted_assumer_role_names
   mc_account_ids             = local.mc_account_ids
 
-  sessions_table_name         = module.zoa.sessions_table_name
-  audit_table_name            = module.zoa.audit_table_name
-  targets_ssm_prefix          = "/zoa/targets/${var.deployment_name}"
-  kms_key_arn                 = module.zoa.kms_key_arn
-  deployment_name             = var.deployment_name
-  boundary_ecs_cluster_arn    = module.zoa_boundary.ecs_cluster_arn
-  boundary_ecs_exec_command   = module.zoa_boundary.ecs_exec_interactive_command
-  exec_scoped_role_arn         = module.zoa_boundary.exec_scoped_role_arn
-  lambda_execution_role_arn    = module.zoa_access_lambda_role.arn
-  lambda_execution_role_name   = module.zoa_access_lambda_role.name
+  sessions_table_name        = module.zoa.sessions_table_name
+  audit_table_name           = module.zoa.audit_table_name
+  targets_ssm_prefix         = "/zoa/targets/${var.deployment_name}"
+  kms_key_arn                = module.zoa.kms_key_arn
+  deployment_name            = var.deployment_name
+  boundary_ecs_cluster_arn   = module.zoa_lambda.boundary_ecs_cluster_arn
+  boundary_ecs_exec_command  = module.zoa_lambda.boundary_ecs_exec_interactive_command
+  exec_scoped_role_arn       = module.zoa_lambda.boundary_exec_scoped_role_arn
+  lambda_execution_role_arn  = module.zoa_lambda.access_lambda_role_arn
+  lambda_execution_role_name = module.zoa_lambda.access_lambda_role_name
 }
 
 # =============================================================================

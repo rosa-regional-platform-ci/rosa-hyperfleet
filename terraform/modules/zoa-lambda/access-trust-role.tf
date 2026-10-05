@@ -1,0 +1,29 @@
+# RC-only shell for the ZOA Access Lambda execution role.
+# Boundary trust policies in this module reference this role's ARN directly.
+# module.zoa-access attaches policies and the Access Lambda function to this role.
+
+resource "aws_iam_role" "access_lambda" {
+  count = var.deployment_target == "rc" ? 1 : 0
+
+  name        = "${var.cluster_id}-zoa-access-lambda"
+  description = "Execution role for ZOA Access Lambda in ${var.cluster_id}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+
+  tags = merge(local.common_tags, {
+    Name = "${var.cluster_id}-zoa-access-lambda-role"
+  })
+}
+
+locals {
+  access_lambda_role_arn = var.deployment_target == "rc" ? aws_iam_role.access_lambda[0].arn : var.access_lambda_role_arn
+}
