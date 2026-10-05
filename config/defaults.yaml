@@ -24,6 +24,7 @@ git:
 
 # @doc deployment_name Logical deployment identifier. Equals aws_region for normal deployments; override in ephemeral/CI to disambiguate multiple deployments in the same region (e.g. "us-east-1-xg4y"). Used for DNS zone naming and resource identification.
 # @used-by deployment_name _context
+# @used-by deployment_name pipeline-management-cluster-inputs/terraform.json.j2
 # @used-by deployment_name pipeline-regional-cluster-inputs/terraform.json.j2
 deployment_name: "{{ aws_region }}"
 
@@ -38,6 +39,7 @@ aws:
   # @used-by aws.child_admin_role_name _context
   child_admin_role_name: "OrganizationAccountAccessRole"
   # @doc aws.zoa_access_trusted_assumer_role_names IAM role names in the Central Account that may assume ZOA Access invoker roles in RC. Defaults to OrganizationAccountAccessRole for dev jump; add SAML hub roles per environment when provisioned.
+  # @used-by aws.zoa_access_trusted_assumer_role_names _context
   zoa_access_trusted_assumer_role_names:
     - OrganizationAccountAccessRole
 
