@@ -86,16 +86,20 @@ spec:
           issuer:
             issuerURL: https://a1b2c3d4-….tokens.sts.global.api.aws
             audiences: ["rosa:cluster:3f6c2d1e-…"]
+          oidcClients: []
           claimMappings:
             username:
-              expression: "'aws:' + claims.sub"
+              claim: sub
+              prefixPolicy: Prefix
+              prefix:
+                prefixString: "aws:"
             groups:
               # The cluster creator is cluster-admin.
               expression: "claims.sub.matches(r'^arn:aws:iam::111122223333:role/(?:[^:]*/)?PlatformAdmins$') ? ['system:cluster-admins'] : []"
             uid:
               claim: sub
             extra:
-              - key: rosa.openshift.io/source-identity
+              - key: hyperfleet.io/aws-source-identity
                 valueExpression: "has(claims['https://sts.amazonaws.com/'].source_identity) ? claims['https://sts.amazonaws.com/'].source_identity : ''"
           claimValidationRules:
             - type: CEL
@@ -231,7 +235,7 @@ users:
 ### Reliability
 
 - **Scalability**: Token validation happens in each hosted KAS with cached keys. There is no per-request call to AWS or to our services.
-- **Observability**: Alert on KAS JWT authenticator failures and JWKS fetch errors per hosted control plane. `rosa.openshift.io/source-identity` puts the human behind a shared role into KAS audit logs.
+- **Observability**: Alert on KAS JWT authenticator failures and JWKS fetch errors per hosted control plane. `hyperfleet.io/aws-source-identity` puts the human behind a shared role into KAS audit logs.
 - **Resiliency**: The issuer endpoint is an external dependency for key refresh only. Already-cached keys keep validating tokens during short issuer outages. The Platform API is not in the login path, and the SRE break-glass client certificate path is unaffected.
 
 ### Security
