@@ -8,8 +8,8 @@ hyperfleet:
   project: default
 
   source:
-    repoURL: https://github.com/openshift-online/rosa-hyperfleet-api.git
-    targetRevision: 20da14928ff3b91e288849e5a7e4049c270495df
+    repoURL: https://github.com/typeid/rosa-hyperfleet-api.git
+    targetRevision: managed_ingress
     path: hyperfleet-operator/charts
 
   syncPolicy:
@@ -19,8 +19,8 @@ hyperfleet:
 
   helmValues:
     image:
-      repository: quay.io/redhat-user-workloads/rosa-tenant/hyperfleet-operator
-      tag: "20da14928ff3b91e288849e5a7e4049c270495df"
+      repository: quay.io/cbusse_openshift/hyperfleet-operator
+      tag: "managed-ingress-dns-1159b86"
       pullPolicy: Always
 
     replicaCount: 2
