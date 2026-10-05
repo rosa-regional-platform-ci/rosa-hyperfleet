@@ -1,6 +1,10 @@
 # RC-only shell for the ZOA Access Lambda execution role.
-# Boundary trust policies in this module reference this role's ARN directly.
-# module.zoa-access attaches policies and the Access Lambda function to this role.
+# Boundary trust policies in this module reference this role's ARN directly
+# (aws_iam_role.access_lambda), not a constructed ARN string.
+#
+# This module does NOT attach session/ECS/DynamoDB policies — those live in
+# module.zoa-access (policies + aws_lambda_function + invoker role).
+# Destroy order: zoa-access first, then this role in zoa-lambda.
 
 resource "aws_iam_role" "access_lambda" {
   count = var.deployment_target == "rc" ? 1 : 0

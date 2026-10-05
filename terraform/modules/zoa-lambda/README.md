@@ -11,6 +11,15 @@ Deploys ZOA Lambda functions (API + Worker) and **ZOA Boundary** (ECS Fargate) i
 
 Terraform layout: `main.tf` (Lambda + SSM), `boundary-*.tf`, `access-trust-role.tf`.
 
+### Access execution role vs `zoa-access`
+
+| In `zoa-lambda`                                         | In `zoa-access`                                         |
+| ------------------------------------------------------- | ------------------------------------------------------- |
+| `access-trust-role.tf`: IAM role + Lambda service trust | Inline IAM policies (DynamoDB, ECS, STS, SSM, KMS, ECR) |
+| Outputs `access_lambda_role_arn` / `name`               | `aws_lambda_function`, Function URL, invoker role       |
+
+Session permissions stay in `zoa-access` so apply/destroy order stays one-way. See [`../zoa-access/README.md`](../zoa-access/README.md).
+
 ## Usage
 
 Called once per VPC: once for the Regional Cluster (RC) and once per Management Cluster (MC).

@@ -194,8 +194,11 @@ resource "aws_iam_role_policy" "invoker_function_url" {
 }
 
 # =============================================================================
-# IAM policies on the Access Lambda execution role (role shell in module.zoa-lambda on RC).
+# IAM policies on the Access Lambda execution role
 # =============================================================================
+# Role shell (aws_iam_role + lambda.amazonaws.com trust) is in module.zoa-lambda
+# access-trust-role.tf (RC). This module attaches least-privilege inline policies
+# and the Access Lambda function to that role by name/ARN from module outputs.
 
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = local.lambda_role_name
