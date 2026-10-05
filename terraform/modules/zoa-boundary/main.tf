@@ -137,7 +137,6 @@ resource "aws_security_group" "boundary" {
   description = "Security group for ZOA Boundary ECS tasks"
   vpc_id      = var.vpc_id
 
-  # Allow all outbound traffic (needed for SSM endpoints, NAT to Function URL, future break-glass EKS API)
   egress {
     from_port   = 0
     to_port     = 0

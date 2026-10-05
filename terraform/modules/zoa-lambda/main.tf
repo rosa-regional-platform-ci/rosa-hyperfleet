@@ -49,7 +49,10 @@ locals {
     ASYNC_SCHEDULING_OVERHEAD_SECONDS = tostring(var.async_scheduling_overhead_seconds)
     LOG_LEVEL                         = var.log_level
     }, var.data_access_role_arn != "" ? { DATA_STORE_ROLE_ARN = var.data_access_role_arn } : {},
-  var.sessions_table_name != "" ? { SESSIONS_TABLE = var.sessions_table_name } : {})
+    var.sessions_table_name != "" ? {
+      SESSIONS_TABLE               = var.sessions_table_name
+      SESSION_IDLE_TIMEOUT_SECONDS = tostring(var.session_idle_timeout_seconds)
+  } : {})
 
   common_tags = {
     Component = "zoa"
@@ -624,6 +627,31 @@ resource "aws_iam_role_policy" "lambda_boundary_ecs_reaper" {
         }
       }
     }]
+  })
+}
+
+# Worker reaper idle: correlate ECS Exec sessions (SSM) and terminal activity (CloudWatch).
+resource "aws_iam_role_policy" "lambda_boundary_reaper_idle" {
+  count = var.sessions_table_name != "" ? 1 : 0
+  name  = "${local.function_prefix}-boundary-reaper-idle"
+  role  = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ssm:DescribeSessions"]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogStreams",
+        ]
+        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${var.cluster_id}/zoa-boundary/ssm-sessions:*"
+      },
+    ]
   })
 }
 

@@ -11,7 +11,7 @@ ECS Fargate boundary tasks for audited ZOA sessions (ECS Exec + CloudWatch).
 
 Both use the regional ZOA CMK (`kms_key_arn`).
 
-Baked files live under **`/home/sre`**: `.claude/CLAUDE.md`, `.claude/ZOA_SESSION.md` (stub in image; **`boundary/zoa-boundary-entrypoint.sh`** overwrites the session table at task start from ECS env).
+Baked files live under **`/home/sre`**: `.claude/CLAUDE.md`, `.bashrc.d/` (two-line PS1), `.claude/ZOA_SESSION.md` and **`.claude/ZOA_ACTIONS.md`** (regenerated at task start). Access Lambda injects **`ZOA_SESSION_ID`** and **`ZOA_OPERATOR`** at `RunTask`; Terraform sets deployment/target/API URL on the task definition.
 
 Task bootstrap (banner, tool checks, keep-alive) lives in the **zoa-boundary image** entrypoint; Terraform only sets **environment**, IAM, and logging.
 

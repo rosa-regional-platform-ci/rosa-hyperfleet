@@ -225,11 +225,14 @@ terraform/modules/zoa-lambda/   → Per-VPC compute (one per target VPC: RC + ea
 
 ### `modules/zoa-boundary/` — Investigation containers (RC + MC VPC)
 
-| Resource                      | Details                                                                                                      |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| ECS cluster + task definition | Fargate boundary container (`zoa-boundary` image), ECS Exec enabled, `stopTimeout` 30s.                      |
-| CloudWatch Logs               | Container group `/ecs/<cluster_id>/zoa-boundary`; exec transcripts `/ecs/.../ssm-sessions` (single KMS key). |
-| IAM                           | Task role: per-VPC API Function URL, Bedrock (Claude), SSM messages, exec log writes. No standing EKS admin. |
+Deployed in **each** target VPC (RC + every MC). Operator workflows, session model, and container contents are documented in the [ZOA repo — Boundary](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/boundary/README.md).
+
+| Resource                      | Details                                                                                                                                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ECS cluster + task definition | Fargate `zoa-boundary` image, ECS Exec, shared regional ZOA CMK (`kms_key_arn`).                                                                                                          |
+| CloudWatch Logs               | `/ecs/<cluster_id>/zoa-boundary` + `.../ssm-sessions` (see [session logging](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/design/boundary-session-logging.md)). |
+| Bedrock                       | Task IAM + optional `aws_bedrock_foundation_model_agreement` and account Bedrock budget (module defaults; see `terraform/modules/zoa-boundary/README.md`).                                |
+| VPC                           | Uses shared `terraform/modules/vpc` endpoints (S3, DynamoDB, KMS, SSM/Exec, bedrock-runtime).                                                                                             |
 
 ### RC/MC Config Wiring
 
@@ -406,5 +409,6 @@ sequenceDiagram
 - [E2E Testing](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/e2e-testing.md) — Functional and monitoring E2E suites, smoke vs full, CI integration
 - [Observability](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/observability.md) — EMF metrics catalog, cost model, Lambda logs, Grafana Explorer
 - [API Reference](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/api-reference.md) — Lambda Function URL HTTP API endpoints
+- [ZOA Boundary documentation](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/boundary/README.md) — architecture, SRE access, container image (source of truth)
 - [Boundary session logging](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/design/boundary-session-logging.md) — CloudWatch log groups for container vs ECS Exec
 - [Konflux](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/konflux.md) — Container image build pipeline

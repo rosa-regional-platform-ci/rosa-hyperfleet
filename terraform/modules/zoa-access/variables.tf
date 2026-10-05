@@ -75,6 +75,12 @@ variable "boundary_ecs_cluster_arn" {
   type        = string
 }
 
+variable "session_max_duration_hours" {
+  description = "Default boundary session length (hours) and maximum timeout_hours on session start."
+  type        = number
+  default     = 4
+}
+
 variable "boundary_ecs_exec_command" {
   description = "Interactive ecs:ExecuteCommand shell for boundary join (must match zoa-boundary module ecs_exec_interactive_command / task env ZOA_ECS_EXEC_COMMAND)."
   type        = string

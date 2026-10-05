@@ -74,6 +74,7 @@ resource "aws_lambda_function" "access" {
       ZOA_ECS_EXEC_COMMAND             = var.boundary_ecs_exec_command
       EXEC_SCOPED_ROLE_ARN             = var.exec_scoped_role_arn
       EXEC_CREDENTIAL_DURATION_SECONDS = "3600"
+      SESSION_MAX_DURATION_HOURS       = tostring(var.session_max_duration_hours)
     }
   }
 

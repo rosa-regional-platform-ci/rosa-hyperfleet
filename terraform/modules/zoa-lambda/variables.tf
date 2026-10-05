@@ -207,6 +207,12 @@ variable "sessions_table_name" {
   default     = ""
 }
 
+variable "session_idle_timeout_seconds" {
+  description = "Terminal inactivity (seconds) before the boundary reaper stops an active session. Used when sessions_table_name is set."
+  type        = number
+  default     = 3600
+}
+
 variable "deployment_name" {
   description = "Deployment name (e.g. us-east-1, us-east-1-eph-abc123). Used for SSM target registration."
   type        = string

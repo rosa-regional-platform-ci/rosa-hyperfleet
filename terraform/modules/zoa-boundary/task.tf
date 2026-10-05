@@ -183,8 +183,7 @@ resource "aws_iam_role_policy" "task_ssm_params" {
   })
 }
 
-# Lambda Function URL — ZOA CLI calls the per-VPC Lambda from inside the container.
-# Function URLs are public HTTPS endpoints; traffic goes through NAT Gateway.
+# ZOA CLI invokes the per-VPC API Lambda via Function URL (IAM auth).
 resource "aws_iam_role_policy" "task_lambda" {
   name = "lambda-function-url"
   role = aws_iam_role.task.id
