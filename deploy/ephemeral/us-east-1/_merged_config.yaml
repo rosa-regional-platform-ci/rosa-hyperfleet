@@ -264,6 +264,18 @@ applications:
               bindingMode: role-membership
               scope: regional
               region: us-east-1
+            - id: ci-e2e-720644165472
+              policyID: ci-read-clusters-720644165472
+              principalARN: arn:aws:iam::720644165472:user/e2e
+              bindingMode: exact-principal
+              scope: regional
+              region: us-east-1
+            - id: ci-e2e-313828097858
+              policyID: ci-read-clusters-313828097858
+              principalARN: arn:aws:iam::313828097858:user/rrp-hcp-customer
+              bindingMode: exact-principal
+              scope: regional
+              region: us-east-1
           {% else %}
           registeredAccounts: []
           policies: []
