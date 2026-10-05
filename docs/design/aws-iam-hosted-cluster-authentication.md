@@ -20,7 +20,7 @@ Customers log in to their hosted cluster's kube-apiserver (KAS) with their exist
 - **Assumptions**:
   - Customers enable IAM outbound identity federation in their AWS account once (`aws iam enable-outbound-web-identity-federation`). This gives the account a unique, AWS-hosted issuer URL of the form `https://<id>.tokens.sts.global.api.aws`.
   - Principals that log in have `sts:GetWebIdentityToken`.
-  - The hosted cluster's OpenShift release enables `ExternalOIDCWithUpstreamParity` (CEL claim mappings and validation rules) in the `Default` feature set. HyperShift's CPO enables it there today (`control-plane-operator/featuregates/featuregates.go`).
+  - The hosted cluster's OpenShift release enables `ExternalOIDCWithUpstreamParity` (CEL claim mappings and validation rules) in the `Default` feature set. The control-plane operator in `5.0.0-ec.6` does not and silently drops the creator mapping; `5.0.0-rc.5` is used instead. The management cluster's HyperShift operator must also install a HostedCluster CRD with these fields (HyperShift `main` from 2026-07-07 or later).
 
 ## Architecture
 
@@ -95,25 +95,15 @@ spec:
                 prefixString: "aws:"
             groups:
               # The cluster creator is cluster-admin.
-              expression: "claims.sub.matches(r'^arn:aws:iam::111122223333:role/(?:[^:]*/)?PlatformAdmins$') ? ['system:cluster-admins'] : []"
-            uid:
-              claim: sub
-            extra:
-              - key: hyperfleet.io/aws-source-identity
-                valueExpression: "has(claims['https://sts.amazonaws.com/'].source_identity) ? claims['https://sts.amazonaws.com/'].source_identity : ''"
+              expression: "claims.sub.startsWith('arn:aws:iam::111122223333:role/') && claims.sub.endsWith('/PlatformAdmins') ? ['system:cluster-admins'] : []"
           claimValidationRules:
             - type: CEL
               cel:
                 expression: "claims['https://sts.amazonaws.com/'].aws_account == '111122223333'"
                 message: token is from a different AWS account
-            - type: CEL
-              cel:
-                expression: "claims.exp - claims.iat <= 900"
-                message: token lifetime exceeds 15 minutes
-          userValidationRules:
-            - expression: "!user.username.startsWith('system:')"
-              message: reserved username
 ```
+
+The configuration is written only by the service, so it stays minimal: trust (issuer, audience), naming (`aws:` + `sub`), the creator's admin group, and the account rule. Token lifetime is enforced by STS and, optionally, customer IAM policies (`sts:DurationSeconds`).
 
 ### Access Model
 
@@ -143,7 +133,7 @@ Nothing new outside the existing Cluster record. No S3 bucket, no keys, no per-a
 
 ### Creator Normalisation
 
-API Gateway reports role sessions as `arn:aws:sts::<acct>:assumed-role/<Name>/<session>`, but STS tokens carry `sub = arn:aws:iam::<acct>:role/[<path>/]<Name>`. IAM role names are unique within an account regardless of path, so the creator is matched on `(account, role name)` with `^arn:<partition>:iam::<acct>:role/(?:[^:]*/)?<Name>$`, with every interpolated value passed through `regexp.QuoteMeta`. IAM users (`arn:aws:iam::<acct>:user/...`) are matched exactly. Root and federated-user callers are rejected at create time, so the error is synchronous. The validation and matching rules live in the shared `api/iamauth` package so the Platform API and the operator cannot drift apart.
+API Gateway reports role sessions as `arn:aws:sts::<acct>:assumed-role/<Name>/<session>`, but STS tokens carry `sub = arn:aws:iam::<acct>:role/[<path>/]<Name>`. IAM role names are unique within an account regardless of path, so the creator is matched with `claims.sub.startsWith('arn:<partition>:iam::<acct>:role/') && claims.sub.endsWith('/<Name>')`. IAM users (`arn:aws:iam::<acct>:user/...`) are matched exactly. Root and federated-user callers are rejected at create time, so the error is synchronous. The validation and matching rules live in the shared `api/iamauth` package so the Platform API and the operator cannot drift apart.
 
 ### Exec Plugin and Kubeconfig
 
@@ -226,7 +216,7 @@ users:
 
 - The `oidcProviders` list allows one entry (`MaxItems=1`), so AWS IAM occupies the only slot. Customers cannot add their own IdP (Entra ID, Okta) alongside it until openshift/api raises the limit.
 - Customers must enable outbound identity federation in their account, an extra onboarding step compared with `sts:GetCallerIdentity`.
-- Principals assuming the same role share one Kubernetes identity. Per-person attribution relies on `source_identity` in audit logs.
+- Principals assuming the same role share one Kubernetes identity; audit logs show the role, not the person.
 - Each cluster trusts one account's issuer. Principals from other accounts must assume a role in the cluster's account.
 - A wrong issuer URL is only detected at first login unless the create-time JWKS check catches it.
 
@@ -235,7 +225,7 @@ users:
 ### Reliability
 
 - **Scalability**: Token validation happens in each hosted KAS with cached keys. There is no per-request call to AWS or to our services.
-- **Observability**: Alert on KAS JWT authenticator failures and JWKS fetch errors per hosted control plane. `hyperfleet.io/aws-source-identity` puts the human behind a shared role into KAS audit logs.
+- **Observability**: Alert on KAS JWT authenticator failures and JWKS fetch errors per hosted control plane.
 - **Resiliency**: The issuer endpoint is an external dependency for key refresh only. Already-cached keys keep validating tokens during short issuer outages. The Platform API is not in the login path, and the SRE break-glass client certificate path is unaffected.
 
 ### Security
@@ -244,9 +234,9 @@ users:
 - **Cluster isolation within an account**: The audience `rosa:cluster:<id>` makes tokens valid for one cluster only. Cluster IDs must never be reused.
 - **SSRF**: The KAS fetches keys from the issuer URL inside the management cluster network. The Platform API only accepts `^https://[a-z0-9-]+\.tokens\.sts\.global\.api\.aws$` (plus partition-specific hosts when added), enforced again by CRD validation.
 - **Privilege mapping**: The only group the configuration ever emits is `system:cluster-admins`, and only for an exact match on the service-controlled creator `sub`. Groups are never derived from `request_tags` (caller-controlled) or `principal_tags` (overridable by session tags).
-- **Identity namespace**: Usernames are prefixed `aws:`, and a user validation rule rejects any `system:` username.
-- **Token lifetime and revocation**: A CEL rule rejects tokens valid for more than 15 minutes. Tokens cannot be revoked individually; customers stop new tokens immediately with an IAM deny or by disabling federation.
-- **CEL injection**: Every value interpolated into CEL (account ID, partition, role name, user ARN) is validated by CRD patterns and regex-escaped.
+- **Identity namespace**: Usernames are always prefixed `aws:`, so they can never collide with `system:` users.
+- **Token lifetime and revocation**: `rosactl` requests tokens valid for at most 15 minutes, and customers can cap the lifetime with `sts:DurationSeconds`. Tokens cannot be revoked individually; customers stop new tokens immediately with an IAM deny or by disabling federation.
+- **CEL injection**: Every value interpolated into CEL (account ID, partition, role name, user ARN) is restricted to characters that need no escaping in a CEL string.
 - **Intra-account authentication**: Any principal in the account that can mint tokens can authenticate, but without RBAC bindings it only has `system:authenticated` permissions. Customers restrict minting per cluster with IAM policies.
 
 ### Performance
