@@ -515,6 +515,16 @@ module "zoa_lambda" {
 }
 
 # =============================================================================
+# ZOA Access Lambda execution role (must exist before boundary trust policies)
+# =============================================================================
+
+module "zoa_access_lambda_role" {
+  source = "../../modules/zoa-access-role"
+
+  regional_id = var.regional_id
+}
+
+# =============================================================================
 # Bedrock account primitives (agreements, budget; optional logging)
 # =============================================================================
 # Per-account resources; skip-if-exists for shared pool accounts. Not wired to ZOA.
@@ -531,7 +541,7 @@ module "bedrock" {
 module "zoa_boundary" {
   source = "../../modules/zoa-boundary"
 
-  depends_on = [module.zoa, aws_iam_role.zoa_access_lambda]
+  depends_on = [module.zoa, module.zoa_access_lambda_role]
 
   cluster_id                = var.regional_id
   cluster_name              = module.regional_cluster.cluster_name
@@ -545,7 +555,7 @@ module "zoa_boundary" {
   zoa_lambda_function_arn = module.zoa_lambda.api_function_arn
   kms_key_arn             = module.zoa.kms_key_arn
 
-  access_lambda_role_arn = aws_iam_role.zoa_access_lambda.arn
+  access_lambda_role_arn = module.zoa_access_lambda_role.arn
 }
 
 # =============================================================================
@@ -560,7 +570,7 @@ module "zoa_access" {
     aws.central = aws.central
   }
 
-  depends_on = [module.zoa, module.zoa_boundary]
+  depends_on = [module.zoa, module.zoa_boundary, module.zoa_access_lambda_role]
 
   regional_id = var.regional_id
   image_uri   = module.zoa.lambda_image_uri
@@ -576,9 +586,9 @@ module "zoa_access" {
   deployment_name             = var.deployment_name
   boundary_ecs_cluster_arn    = module.zoa_boundary.ecs_cluster_arn
   boundary_ecs_exec_command   = module.zoa_boundary.ecs_exec_interactive_command
-  exec_scoped_role_arn        = module.zoa_boundary.exec_scoped_role_arn
-  create_lambda_execution_role = false
-  lambda_execution_role_arn    = aws_iam_role.zoa_access_lambda.arn
+  exec_scoped_role_arn         = module.zoa_boundary.exec_scoped_role_arn
+  lambda_execution_role_arn    = module.zoa_access_lambda_role.arn
+  lambda_execution_role_name   = module.zoa_access_lambda_role.name
 }
 
 # =============================================================================

@@ -17,6 +17,9 @@
 # Cross-account access: SREs authenticate in the environment Central Account,
 # then assume this invoker role in the RC account to call the Function URL.
 # Trust is scoped to configured role names in the central account only.
+#
+# The Lambda execution role is created by module.zoa-access-role in the regional
+# stack; this module attaches policies and the function to that role.
 # =============================================================================
 
 data "aws_caller_identity" "current" {}
@@ -54,9 +57,9 @@ resource "aws_cloudwatch_log_group" "access" {
 # =============================================================================
 
 locals {
-  lambda_role_name = "${local.function_name}-lambda"
-  lambda_role_arn  = var.create_lambda_execution_role ? aws_iam_role.lambda[0].arn : var.lambda_execution_role_arn
-  lambda_role_id   = var.create_lambda_execution_role ? aws_iam_role.lambda[0].id : local.lambda_role_name
+  lambda_role_arn  = var.lambda_execution_role_arn
+  lambda_role_name = var.lambda_execution_role_name
+  lambda_role_id   = var.lambda_execution_role_name
 }
 
 resource "aws_lambda_function" "access" {
@@ -190,30 +193,8 @@ resource "aws_iam_role_policy" "invoker_function_url" {
 }
 
 # =============================================================================
-# IAM Role for Lambda Execution
+# IAM policies on the Access Lambda execution role (role owned by zoa-access-role)
 # =============================================================================
-
-resource "aws_iam_role" "lambda" {
-  count = var.create_lambda_execution_role ? 1 : 0
-
-  name        = local.lambda_role_name
-  description = "Execution role for ZOA Access Lambda in ${var.regional_id}"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = {
-        Service = "lambda.amazonaws.com"
-      }
-      Action = "sts:AssumeRole"
-    }]
-  })
-
-  tags = merge(local.common_tags, {
-    Name = "${local.function_name}-lambda-role"
-  })
-}
 
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = local.lambda_role_name
