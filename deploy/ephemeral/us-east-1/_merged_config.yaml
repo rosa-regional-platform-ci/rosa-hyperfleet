@@ -237,9 +237,14 @@ applications:
         # @doc applications.regional-cluster.platformApi.authz.config Serialized version-1 authorization bundle. Empty arrays deny protected reads. Override only with verified caller records.
         # @used-by applications.regional-cluster.platformApi.authz.config _context
         config: |
+          {% set registered_accounts = ["720644165472", "313828097858"] if ci else [] -%}
+          {% if eph_prefix and account_id is string and account_id | length == 12 and account_id.isascii() and account_id.isdigit() -%}
+          {% set registered_accounts = registered_accounts + [account_id] -%}
+          {% endif -%}
           formatVersion: 1
-          {% if ci %}
-          registeredAccounts: ["720644165472", "313828097858"]
+
+          registeredAccounts: {{ registered_accounts | unique | list | tojson }}
+          {% if ci -%}
           policies:
             - id: ci-read-clusters-720644165472
               ownerAccountID: "720644165472"
@@ -276,8 +281,7 @@ applications:
               bindingMode: exact-principal
               scope: regional
               region: us-east-1
-          {% else %}
-          registeredAccounts: []
+          {% else -%}
           policies: []
           attachments: []
           {% endif %}

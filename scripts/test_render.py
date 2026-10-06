@@ -2491,18 +2491,26 @@ class TestAuthzDelivery:
             "formatVersion": 1, "registeredAccounts": [], "policies": [], "attachments": [],
         }
 
-    def test_ci_role_grants(self, tmp_path, monkeypatch):
-        # Only actual CI provisioning receives these feature-branch caller grants.
-        monkeypatch.setenv("BUILD_ID", "test-ci")
-        values = _authz_values(tmp_path, "ephemeral", eph_prefix="authz-test")
+    @pytest.mark.parametrize("ci,account_id,expected_accounts", [
+        (False, "987654321098", ["987654321098"]),
+        (True, "987654321098", ["720644165472", "313828097858", "987654321098"]),
+        (True, "720644165472", ["720644165472", "313828097858"]),
+    ])
+    def test_runtime_rc_enrollment(self, tmp_path, monkeypatch, ci, account_id, expected_accounts):
+        monkeypatch.setenv("BUILD_ID", "test-ci" if ci else "")
+        overrides = {"aws": {"account_id": account_id}}
+        values = _authz_values(tmp_path, "ephemeral", overrides, eph_prefix="authz-test")
         resources, _ = _helm_platform(tmp_path, values)
         bundle = yaml.safe_load(_resource(resources, "ConfigMap", "authz-config")["data"]["config.yaml"])
         assert bundle["formatVersion"] == 1
-        assert bundle["registeredAccounts"] == ["720644165472", "313828097858"]
+        assert bundle["registeredAccounts"] == expected_accounts
+        if not ci:
+            assert bundle["policies"] == bundle["attachments"] == []
+            return
         assert len(bundle["policies"]) == 2
         assert len(bundle["attachments"]) == 4
         for account, user, attachment in zip(
-            bundle["registeredAccounts"], ["e2e", "rrp-hcp-customer"],
+            ["720644165472", "313828097858"], ["e2e", "rrp-hcp-customer"],
             bundle["attachments"][2:], strict=True,
         ):
             assert attachment == {
@@ -2511,7 +2519,7 @@ class TestAuthzDelivery:
                 "bindingMode": "exact-principal", "scope": "regional", "region": "us-east-1",
             }
         for account, policy, attachment in zip(
-            bundle["registeredAccounts"], bundle["policies"], bundle["attachments"][:2], strict=True,
+            ["720644165472", "313828097858"], bundle["policies"], bundle["attachments"][:2], strict=True,
         ):
             assert policy == {
                 "id": f"ci-read-clusters-{account}", "ownerAccountID": account,
@@ -2526,9 +2534,13 @@ class TestAuthzDelivery:
 
     @pytest.mark.parametrize("binding,scope", [
         ("role-membership", "regional"), ("exact-principal", "global"),
+        ("deny-all", "regional"),
     ])
-    def test_bundle_passes_through(self, tmp_path, binding, scope):
+    def test_bundle_passes_through(self, tmp_path, monkeypatch, binding, scope):
+        monkeypatch.setenv("BUILD_ID", "test-ci")
         content = AUTHZ_BUNDLE.replace("bindingMode: role-membership", f"bindingMode: {binding}")
+        if binding == "deny-all":
+            content = "formatVersion: 1\nregisteredAccounts: []\npolicies: []\nattachments: []\n"
         if scope == "global":
             content = content.replace("scope: regional\n    region: us-east-1", "scope: global")
             content = content.replace("iam::012345678901:role/platform/readers",
@@ -2537,7 +2549,8 @@ class TestAuthzDelivery:
         overrides = {"applications": {"regional-cluster": {"platformApi": {
             "authz": {"resolver": "config", "config": content},
         }}}}
-        values = _authz_values(tmp_path, "ephemeral", overrides)
+        overrides["aws"] = {"account_id": "987654321098"}
+        values = _authz_values(tmp_path, "ephemeral", overrides, eph_prefix="authz-test")
         assert values["platformApi"]["authz"] == {
             "resolver": "config", "config": content.removesuffix("\n"),
         }
@@ -2545,7 +2558,7 @@ class TestAuthzDelivery:
         config = _resource(resources, "ConfigMap", "authz-config")["data"]["config.yaml"]
         assert config == content
         assert yaml.safe_load(config) == bundle
-        assert yaml.safe_load(config)["registeredAccounts"] == ["012345678901"]
+        assert yaml.safe_load(config)["registeredAccounts"] == ([] if binding == "deny-all" else ["012345678901"])
 
     def test_dev_override(self, tmp_path):
         overrides = load_yaml(AUTHZ_EXAMPLE / "defaults.yaml")
