@@ -43,7 +43,9 @@ aws:
   child_admin_role_name: "OrganizationAccountAccessRole"
   # @doc aws.zoa_access_trusted_assumer_role_names IAM role names in the Central Account that may assume ZOA Access invoker roles in RC. No default — set explicitly per environment (e.g. ephemeral dev jump or SAML hub roles).
   # @used-by aws.zoa_access_trusted_assumer_role_names _context
-  zoa_access_trusted_assumer_role_names: []
+  zoa_access_trusted_assumer_role_names:
+  - OrganizationAccountAccessRole
+
 
 dns:
   # @doc dns.domain Base domain for the environment. Must be set per environment. See config/ephemeral/defaults.yaml for how the ephemeral template selects between CI and dev account pools.
