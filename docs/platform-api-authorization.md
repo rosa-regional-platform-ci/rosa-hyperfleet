@@ -4,7 +4,7 @@ This chart delivers a mandatory startup authorization bundle. Global and chart
 values deny protected reads by default. Enrollment alone grants no action.
 
 The feature branch pins the API image built from commit
-`e6610c5ca12c0bfd776452055d82d59d0b5e64bc` by digest. Rendering is not a
+`69c97bf083e313135885298b6a036c5e42d39cfe` by digest. Rendering is not a
 server-startup or shared-deployment proof.
 
 ## Deployment identity trust gap
