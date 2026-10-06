@@ -14,7 +14,7 @@ variable "cluster_id" {
 }
 
 variable "deployment_target" {
-  description = "ZOA deployment target for this Lambda: rc (regional cluster) or mc (management cluster). Passed to the runtime as ZOA_DEPLOYMENT_TARGET."
+  description = "ZOA target type for this Lambda: rc (regional cluster) or mc (management cluster). Passed to the runtime as ZOA_TARGET_TYPE."
   type        = string
 
   validation {
