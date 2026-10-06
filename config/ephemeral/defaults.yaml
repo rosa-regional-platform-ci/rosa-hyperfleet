@@ -16,6 +16,11 @@
 
 deployment_name: "{{ aws_region }}{% if eph_prefix %}-{{ eph_prefix }}{% endif %}"
 
+# ZOA Access invoker trust: explicit Central Account role names only (no repo-wide default).
+aws:
+  zoa_access_trusted_assumer_role_names:
+    - OrganizationAccountAccessRole
+
 dns:
   domain: "{% if ci %}ci00{% else %}dev0{% endif %}.rosa.devshift.net"
 

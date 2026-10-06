@@ -54,9 +54,14 @@ variable "central_aws_profile" {
 }
 
 variable "zoa_access_trusted_assumer_role_names" {
-  description = "Central Account IAM role names allowed to assume the ZOA Access invoker role. Extend when Red Hat SAML hub roles are provisioned."
+  description = "Central Account IAM role names allowed to assume the ZOA Access invoker role. Must be set explicitly in environment config."
   type        = list(string)
-  default     = ["OrganizationAccountAccessRole"]
+  default     = []
+
+  validation {
+    condition     = length(var.zoa_access_trusted_assumer_role_names) > 0
+    error_message = "zoa_access_trusted_assumer_role_names must be set explicitly in environment config (no implicit Central Account trust)."
+  }
 }
 
 variable "app_code" {

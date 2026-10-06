@@ -53,10 +53,8 @@ variable "central_account_id" {
 }
 
 variable "trusted_assumer_role_names" {
-  description = "IAM role names in the Central Account allowed to assume the invoker role (full role ARNs are derived). Add future Red Hat SAML hub roles here."
+  description = "IAM role names in the Central Account allowed to assume the invoker role (full role ARNs are derived). Must be passed from environment config."
   type        = list(string)
-
-  default = ["OrganizationAccountAccessRole"]
 
   validation {
     condition     = length(var.trusted_assumer_role_names) > 0

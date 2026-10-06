@@ -332,7 +332,7 @@ def build_context(
         aws.get("child_admin_role_name", "OrganizationAccountAccessRole"), ctx
     )
     ctx["zoa_access_trusted_assumer_role_names"] = aws.get(
-        "zoa_access_trusted_assumer_role_names", ["OrganizationAccountAccessRole"]
+        "zoa_access_trusted_assumer_role_names", []
     )
     ctx["terraform_tags"] = resolve_templates(ctx.get("terraform_tags", {}), ctx)
     ctx["regional_cluster"] = resolve_templates(ctx.get("regional_cluster", {}), ctx)
