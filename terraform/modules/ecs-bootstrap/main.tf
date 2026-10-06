@@ -116,61 +116,16 @@ resource "aws_ecs_task_definition" "bootstrap" {
           git clone --depth 1 -b "$REPOSITORY_BRANCH" "$REPOSITORY_URL" "$REPO_DIR"
           echo "✓ Repository cloned"
 
-           # Configure kubectl for EKS
-           aws eks update-kubeconfig --name $CLUSTER_NAME
+          # Configure kubectl for EKS
+          aws eks update-kubeconfig --name $CLUSTER_NAME
 
-           # Install the VPC CNI before ArgoCD. A fresh cluster no longer has
-           # the EKS-managed vpc-cni addon, and ArgoCD requires pod networking.
-           echo "Installing self-managed AWS VPC CNI..."
-           VPC_CNI_IMAGE_REGISTRY=$(aws ssm get-parameter \
-             --name /argocd/vpc-cni/image-registry \
-             --query 'Parameter.Value' \
-             --output text \
-             --region "$AWS_REGION")
-           VPC_CNI_IMAGE_REGISTRY="$${VPC_CNI_IMAGE_REGISTRY%/}"
-           if [[ "$VPC_CNI_IMAGE_REGISTRY" == "None" || ! "$VPC_CNI_IMAGE_REGISTRY" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
-             echo "ERROR: /argocd/vpc-cni/image-registry must contain only a registry hostname" >&2
-             exit 1
-           fi
+          # The CNI resources were seeded before the node group was created.
+          # Wait for the DaemonSet now that nodes are available.
+          source "$REPO_DIR/scripts/bootstrap-vpc-cni.sh"
+          kubectl rollout status daemonset/aws-node -n kube-system --timeout=10m
+          echo "✓ Self-managed AWS VPC CNI is ready"
 
-           CLUSTER_ENDPOINT=$(aws eks describe-cluster \
-             --name "$CLUSTER_NAME" \
-             --region "$AWS_REGION" \
-             --query 'cluster.endpoint' \
-             --output text)
-
-           helm repo add aws-eks https://aws.github.io/eks-charts
-           helm dependency build "$REPO_DIR/argocd/config/shared/kube-system"
-
-           VPC_CNI_VALUES=/tmp/vpc-cni-bootstrap-values.yaml
-           cat > "$VPC_CNI_VALUES" <<-VPC_CNI_VALUES_EOF
-           aws-vpc-cni:
-             image:
-               overrideRepository: $${VPC_CNI_IMAGE_REGISTRY}/amazon-k8s-cni
-             init:
-               image:
-                 overrideRepository: $${VPC_CNI_IMAGE_REGISTRY}/amazon-k8s-cni-init
-             nodeAgent:
-               image:
-                 overrideRepository: $${VPC_CNI_IMAGE_REGISTRY}/amazon/aws-network-policy-agent
-             extraEnv:
-               - name: CLUSTER_ENDPOINT
-                 value: $${CLUSTER_ENDPOINT}
-               - name: CLUSTER_NAME
-                 value: $${CLUSTER_NAME}
-               - name: VPC_ID
-                 value: $${VPC_ID}
-        VPC_CNI_VALUES_EOF
-
-           helm template kube-system \
-             "$REPO_DIR/argocd/config/shared/kube-system" \
-             --namespace kube-system \
-             -f "$VPC_CNI_VALUES" \
-             | kubectl apply --server-side -f -
-           kubectl rollout status daemonset/aws-node -n kube-system --timeout=10m
-           echo "✓ Self-managed AWS VPC CNI is ready"
-
-           # Wait for essential addons on the bootstrap node group before
+          # Wait for essential addons on the bootstrap node group before
           # installing ArgoCD. Pod Identity agent must be active so that
           # workloads deployed by ArgoCD (LBC, EBS CSI) can authenticate.
           for ADDON in coredns metrics-server eks-pod-identity-agent; do
@@ -365,4 +320,122 @@ resource "aws_ecs_task_definition" "bootstrap" {
   tags = merge(local.common_tags, {
     Name = "${var.cluster_id}-bootstrap"
   })
+}
+
+# Terraform-managed one-shot task used before the bootstrap node group exists.
+# It applies the CNI resources and exits; aws-node becomes ready when nodes join.
+resource "aws_ecs_task_definition" "cni_seed" {
+  family                   = "${var.cluster_id}-cni-seed"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+
+  container_definitions = jsonencode([
+    {
+      name  = "cni-seed"
+      image = var.container_image
+
+      entryPoint = ["/bin/bash", "-c"]
+      command = [
+        <<-EOF
+          set -euo pipefail
+          REPO_DIR=/tmp/repo
+          git clone --depth 1 -b "$REPOSITORY_BRANCH" "$REPOSITORY_URL" "$REPO_DIR"
+          aws eks update-kubeconfig --name "$CLUSTER_NAME"
+          source "$REPO_DIR/scripts/bootstrap-vpc-cni.sh"
+          kubectl get daemonset aws-node -n kube-system --request-timeout=30s
+          echo "=== VPC CNI seed completed ==="
+        EOF
+      ]
+
+      essential = true
+
+      environment = [
+        {
+          name  = "AWS_REGION"
+          value = data.aws_region.current.region
+        },
+        {
+          name  = "AWS_DEFAULT_REGION"
+          value = data.aws_region.current.region
+        },
+        {
+          name  = "CLUSTER_NAME"
+          value = var.eks_cluster_name
+        },
+        {
+          name  = "REPOSITORY_URL"
+          value = var.repository_url
+        },
+        {
+          name  = "REPOSITORY_BRANCH"
+          value = var.repository_branch
+        },
+        {
+          name  = "VPC_ID"
+          value = var.vpc_id
+        }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.bootstrap.name
+          awslogs-region        = data.aws_region.current.region
+          awslogs-stream-prefix = "cni-seed"
+        }
+      }
+    }
+  ])
+
+  tags = merge(local.common_tags, {
+    Name = "${var.cluster_id}-cni-seed"
+  })
+}
+
+resource "null_resource" "cni_seed" {
+  triggers = {
+    task_definition = aws_ecs_task_definition.cni_seed.arn
+  }
+
+  depends_on = [aws_eks_access_policy_association.bootstrap_cluster_admin]
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      TASK_ARN=$(aws ecs run-task \
+        --region ${data.aws_region.current.region} \
+        --cluster ${aws_ecs_cluster.bootstrap.arn} \
+        --task-definition ${aws_ecs_task_definition.cni_seed.arn} \
+        --launch-type FARGATE \
+        --network-configuration "awsvpcConfiguration={subnets=[${join(",", var.private_subnets)}],securityGroups=[${aws_security_group.bootstrap_task.id}],assignPublicIp=DISABLED}" \
+        --query 'tasks[0].taskArn' \
+        --output text)
+
+      if [[ -z "$TASK_ARN" || "$TASK_ARN" == "None" ]]; then
+        echo "ERROR: Failed to start the VPC CNI seed ECS task" >&2
+        exit 1
+      fi
+
+      aws ecs wait tasks-stopped \
+        --region ${data.aws_region.current.region} \
+        --cluster ${aws_ecs_cluster.bootstrap.arn} \
+        --tasks "$TASK_ARN"
+
+      EXIT_CODE=$(aws ecs describe-tasks \
+        --region ${data.aws_region.current.region} \
+        --cluster ${aws_ecs_cluster.bootstrap.arn} \
+        --tasks "$TASK_ARN" \
+        --query 'tasks[0].containers[0].exitCode' \
+        --output text)
+      if [[ "$EXIT_CODE" != "0" ]]; then
+        echo "ERROR: VPC CNI seed ECS task failed with exit code $EXIT_CODE" >&2
+        exit 1
+      fi
+    EOT
+  }
 }

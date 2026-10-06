@@ -127,16 +127,17 @@ When `bootstrap_enabled` is `true`, the module automatically installs ArgoCD for
 
 ### Bootstrap Process
 
-The ECS bootstrap task:
+The Terraform/ECS bootstrap sequence:
 
-- Runs in the cluster's private subnets for network access
-- Updates kubeconfig using EKS access entries
+- Creates the EKS control plane and ECS bootstrap task infrastructure
+- Runs a CNI seed task in the cluster's private subnets before the node group
+- Creates the `karpenter-bootstrap` managed node group after the seed task exits
 - Waits for CoreDNS, metrics-server, and Pod Identity agent to become Active
-- Installs ArgoCD using Helm from the official repository
-- Creates bootstrap application pointing to your repository
+- Runs the full ECS bootstrap task, which installs ArgoCD using Helm
+- Creates the bootstrap application pointing to your repository
 - Enables ArgoCD to take over cluster management
 
-- **`karpenter-bootstrap` managed node group**: 2x AL2023 m7i.xlarge nodes. ArgoCD and Karpenter schedule here via the `system-cluster-critical` PriorityClass (able to preempt lower-priority pods rather than excluding them via a taint). Hosts Karpenter controller, CoreDNS, and metrics-server.
+- **`karpenter-bootstrap` managed node group**: 2x AL2023 m7i.xlarge nodes, created by the `eks-bootstrap-node-group` module after CNI seeding. ArgoCD and Karpenter schedule here via the `system-cluster-critical` PriorityClass (able to preempt lower-priority pods rather than excluding them via a taint). Hosts Karpenter controller, CoreDNS, and metrics-server.
 - **Karpenter controller IAM role**: Pod Identity-backed, scoped to `karpenter/karpenter` ServiceAccount with SQS, EC2, and IAM instance profile permissions.
 - **Karpenter node IAM role**: Full `AmazonEKSWorkerNodePolicy`, VPC CNI, ECR pull-only, and optional KMS decrypt for FIPS AMI snapshots.
 - **SQS queue**: Receives EC2 interruption events (spot reclamation, instance health, rebalance) for graceful node draining.

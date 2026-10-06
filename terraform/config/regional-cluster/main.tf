@@ -197,11 +197,11 @@ module "regional_cluster" {
 # install software via the helm provider.
 #
 # This ecs_bootstrap module creates ECS Fargate infrastructure that runs in the
-# cluster's VPC and can reach the private EKS API. A one-time bootstrap task
-# installs the self-managed VPC CNI, then installs ArgoCD onto the bootstrap
-# nodes, and exits. ArgoCD then installs Karpenter and everything else via
-# GitOps. Both continue running on the managed node group. The ECS
-# infrastructure remains available for future audited SRE operations.
+# cluster's VPC and can reach the private EKS API. Terraform runs a short CNI
+# seed task before creating the bootstrap node group. The post-apply bootstrap
+# task then installs ArgoCD onto the nodes and exits. ArgoCD installs Karpenter
+# and everything else via GitOps. The ECS infrastructure remains available for
+# future audited SRE operations.
 #
 # See docs/design/fully-private-eks-bootstrap.md for the full architecture.
 # =============================================================================
@@ -227,6 +227,22 @@ module "ecs_bootstrap" {
 
   rc_aws_account_id = var.target_account_id
   redis_endpoint    = var.enable_rate_limit_redis ? "${module.elasticache_valkey[0].endpoint}:${module.elasticache_valkey[0].port}" : ""
+}
+
+# The CNI seed task runs during Terraform apply, after the control plane and
+# ECS task definition exist but before the bootstrap node group is created.
+module "bootstrap_node_group" {
+  source = "../../modules/eks-bootstrap-node-group"
+
+  cluster_id              = var.regional_id
+  cluster_name            = module.regional_cluster.cluster_name
+  node_role_arn           = module.regional_cluster.node_iam_role_arn
+  private_subnet_ids      = module.vpc.private_subnet_ids
+  launch_template_id      = module.regional_cluster.bootstrap_launch_template_id
+  launch_template_version = module.regional_cluster.bootstrap_launch_template_version
+  worker_node_ami_id      = var.worker_node_ami_id
+
+  depends_on = [module.regional_cluster, module.ecs_bootstrap]
 }
 
 # =============================================================================

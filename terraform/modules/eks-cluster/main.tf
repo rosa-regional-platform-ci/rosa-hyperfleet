@@ -209,45 +209,9 @@ resource "aws_eks_cluster" "main" {
   }
 }
 
-# -----------------------------------------------------------------------------
-# EKS Managed Addons
-#
-# Essential addons for cluster functionality:
-# - CoreDNS: cluster DNS resolution
-# - metrics-server: pod/node metrics for HPA and kubectl top
-# - Pod Identity Agent: AWS IAM integration for workloads (DaemonSet, safe pre-node)
-# - AWS Secrets Store CSI Driver Provider: Secret mounting (DaemonSet, safe pre-node)
-#
-# CoreDNS and metrics-server are declared here so Terraform creates them before
-# the ECS bootstrap task runs. The built-in "system" pool provides nodes for them
-# to schedule on, so there is no deadlock. Without this declaration, a fresh cluster
-# has no coredns/metrics-server addons and the bootstrap wait-addon-active call fails
-# with ResourceNotFoundException.
-# -----------------------------------------------------------------------------
-
-resource "aws_eks_addon" "coredns" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "coredns"
-  tags         = local.common_tags
-  depends_on   = [aws_eks_node_group.karpenter_bootstrap]
-}
-
-resource "aws_eks_addon" "metrics_server" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "metrics-server"
-  tags         = local.common_tags
-  depends_on   = [aws_eks_node_group.karpenter_bootstrap]
-}
-
-resource "aws_eks_addon" "pod_identity" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "eks-pod-identity-agent"
-  tags         = local.common_tags
-  depends_on   = [aws_eks_node_group.karpenter_bootstrap]
-}
-
-# Fixed-size node group for Karpenter + ArgoCD (system-cluster-critical).
-# Karpenter provisions all other nodes.
+# Launch template for the fixed-size Karpenter + ArgoCD bootstrap node group.
+# The node group itself is created by eks-bootstrap-node-group after the CNI
+# seed task completes.
 # -----------------------------------------------------------------------------
 
 resource "aws_launch_template" "karpenter_bootstrap" {
@@ -281,74 +245,4 @@ resource "aws_launch_template" "karpenter_bootstrap" {
       volume_size = var.worker_node_root_volume_size
     }
   }
-}
-
-resource "aws_eks_node_group" "karpenter_bootstrap" {
-  cluster_name    = aws_eks_cluster.main.name
-  node_group_name = "${local.cluster_id}-karpenter-bootstrap"
-  node_role_arn   = aws_iam_role.karpenter_node.arn
-  subnet_ids      = var.private_subnet_ids
-
-  # CUSTOM required when the launch template pins a non-EKS-optimized AMI (e.g. RHEL);
-  # otherwise use the EKS-optimized AL2023 AMI managed by the node group.
-  ami_type       = var.worker_node_ami_id != "" ? "CUSTOM" : "AL2023_x86_64_STANDARD"
-  instance_types = ["m7i.xlarge"]
-
-  launch_template {
-    id      = aws_launch_template.karpenter_bootstrap.id
-    version = aws_launch_template.karpenter_bootstrap.latest_version
-  }
-
-  scaling_config {
-    desired_size = 2
-    min_size     = 2
-    max_size     = 2
-  }
-
-  tags = merge(local.common_tags, {
-    "karpenter.sh/discovery" = aws_eks_cluster.main.name
-  })
-
-  depends_on = [aws_iam_role_policy_attachment.karpenter_node_managed]
-}
-
-# -----------------------------------------------------------------------------
-# Explicit Core Addons (Karpenter mode only)
-#
-# bootstrap_self_managed_addons = false prevents EKS from auto-installing these.
-# Auto Mode clusters receive VPC CNI and kube-proxy from the managed control
-# plane; Karpenter clusters must declare them explicitly.
-# -----------------------------------------------------------------------------
-
-resource "aws_eks_addon" "kube_proxy" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "kube-proxy"
-  tags         = local.common_tags
-
-  depends_on = [aws_eks_node_group.karpenter_bootstrap]
-}
-
-resource "aws_eks_addon" "ebs_csi" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "aws-ebs-csi-driver"
-  tags         = local.common_tags
-
-  depends_on = [aws_eks_node_group.karpenter_bootstrap, aws_eks_addon.pod_identity, aws_eks_pod_identity_association.ebs_csi]
-}
-
-# AWS Secrets Store CSI Driver Provider (e.g. for kube-applier or service secret mounting)
-resource "aws_eks_addon" "aws_secrets_store_csi_driver_provider" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "aws-secrets-store-csi-driver-provider"
-  tags         = local.common_tags
-
-  configuration_values = jsonencode({
-    secrets-store-csi-driver = {
-      syncSecret = {
-        enabled = true
-      }
-    }
-  })
-
-  depends_on = [aws_eks_node_group.karpenter_bootstrap]
 }

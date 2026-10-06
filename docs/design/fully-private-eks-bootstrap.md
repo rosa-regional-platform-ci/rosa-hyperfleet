@@ -115,7 +115,9 @@ ECS Fargate-based network and ArgoCD installation:
 - Tasks run in private subnets with controlled EKS API access
 - Tasks are logged in CloudWatch for observability/auditing
 - The task reads `/argocd/vpc-cni/image-registry` from SSM Parameter Store
-- The task renders and applies the VPC CNI before installing ArgoCD
+- A Terraform-run CNI seed task renders and applies the VPC CNI before the
+  bootstrap node group is created
+- A later bootstrap task waits for the CNI and installs ArgoCD
 
 The parameter contains only the registry hostname. It must be present in the
 target account and region before bootstrap runs. The bootstrap node role pulls

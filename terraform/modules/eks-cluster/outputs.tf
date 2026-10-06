@@ -100,3 +100,13 @@ output "karpenter_node_instance_profile_name" {
   description = "Instance profile name for Karpenter-provisioned nodes (matches EC2NodeClass.spec.instanceProfile)"
   value       = aws_iam_instance_profile.karpenter_node.name
 }
+
+output "bootstrap_launch_template_id" {
+  description = "Launch template ID for the Karpenter bootstrap node group"
+  value       = aws_launch_template.karpenter_bootstrap.id
+}
+
+output "bootstrap_launch_template_version" {
+  description = "Launch template version for the Karpenter bootstrap node group"
+  value       = aws_launch_template.karpenter_bootstrap.latest_version
+}
