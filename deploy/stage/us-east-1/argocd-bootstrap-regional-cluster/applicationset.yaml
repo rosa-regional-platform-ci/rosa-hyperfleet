@@ -154,10 +154,10 @@ spec:
             # These values let ArgoCD reconcile the same resources afterward.
             aws-vpc-cni:
               image:
-                overrideRepository: '{{ .metadata.annotations.vpc_cni_image_registry }}/amazon-k8s-cni'
+                overrideRepository: '{{ .metadata.annotations.vpc_cni_image_registry }}/amazon/amazon-k8s-cni'
               init:
                 image:
-                  overrideRepository: '{{ .metadata.annotations.vpc_cni_image_registry }}/amazon-k8s-cni-init'
+                  overrideRepository: '{{ .metadata.annotations.vpc_cni_image_registry }}/amazon/amazon-k8s-cni-init'
               nodeAgent:
                 image:
                   overrideRepository: '{{ .metadata.annotations.vpc_cni_image_registry }}/amazon/aws-network-policy-agent'

@@ -28,10 +28,10 @@ VPC_CNI_VALUES=/tmp/vpc-cni-bootstrap-values.yaml
 cat > "$VPC_CNI_VALUES" <<EOF
 aws-vpc-cni:
   image:
-    overrideRepository: ${VPC_CNI_IMAGE_REGISTRY}/amazon-k8s-cni
+    overrideRepository: ${VPC_CNI_IMAGE_REGISTRY}/amazon/amazon-k8s-cni
   init:
     image:
-      overrideRepository: ${VPC_CNI_IMAGE_REGISTRY}/amazon-k8s-cni-init
+      overrideRepository: ${VPC_CNI_IMAGE_REGISTRY}/amazon/amazon-k8s-cni-init
   nodeAgent:
     image:
       overrideRepository: ${VPC_CNI_IMAGE_REGISTRY}/amazon/aws-network-policy-agent
