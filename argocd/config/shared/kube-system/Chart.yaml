@@ -5,5 +5,5 @@ type: application
 version: 1.0.0
 dependencies:
   - name: aws-vpc-cni
-    version: 1.22.4
+    version: 1.23.2
     repository: https://aws.github.io/eks-charts

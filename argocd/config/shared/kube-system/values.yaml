@@ -9,63 +9,15 @@ aws-vpc-cni:
     name: aws-node
 
   image:
-    pullPolicy: IfNotPresent
     tag: v1.22.4-eksbuild.3
-
-  enableNetworkPolicy: "false"
-  enableWindowsIpam: "false"
-  enableWindowsPrefixDelegation: "false"
-
-  env:
-    ADDITIONAL_ENI_TAGS: "{}"
-    ANNOTATE_POD_IP: "false"
-    AWS_VPC_CNI_NODE_PORT_SUPPORT: "true"
-    AWS_VPC_ENI_MTU: "9001"
-    AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG: "false"
-    AWS_VPC_K8S_CNI_EXTERNALSNAT: "false"
-    AWS_VPC_K8S_CNI_LOGLEVEL: DEBUG
-    AWS_VPC_K8S_CNI_LOG_FILE: /host/var/log/aws-routed-eni/ipamd.log
-    AWS_VPC_K8S_CNI_RANDOMIZESNAT: prng
-    AWS_VPC_K8S_CNI_VETHPREFIX: eni
-    AWS_VPC_K8S_PLUGIN_LOG_FILE: /var/log/aws-routed-eni/plugin.log
-    AWS_VPC_K8S_PLUGIN_LOG_LEVEL: DEBUG
-    DISABLE_INTROSPECTION: "false"
-    DISABLE_METRICS: "false"
-    DISABLE_NETWORK_RESOURCE_PROVISIONING: "false"
-    ENABLE_IMDS_ONLY_MODE: "false"
-    ENABLE_IPv4: "true"
-    ENABLE_IPv6: "false"
-    ENABLE_MULTI_NIC: "false"
-    ENABLE_POD_ENI: "false"
-    ENABLE_PREFIX_DELEGATION: "false"
-    ENABLE_SUBNET_DISCOVERY: "true"
-    NETWORK_POLICY_ENFORCING_MODE: standard
-    VPC_CNI_VERSION: v1.22.4
-    WARM_ENI_TARGET: "1"
-    WARM_PREFIX_TARGET: "1"
 
   init:
     image:
-      pullPolicy: IfNotPresent
       tag: v1.22.4-eksbuild.3
-    env:
-      DISABLE_TCP_EARLY_DEMUX: "false"
-      ENABLE_IPv6: "false"
 
   nodeAgent:
-    enabled: true
     image:
-      pullPolicy: IfNotPresent
       tag: v1.4.0-eksbuild.1
-    enableIpv6: "false"
-    enableCloudWatchLogs: "false"
-    enablePolicyEventLogs: "false"
-    networkPolicyAgentLogFileLocation: /var/log/aws-routed-eni/network-policy-agent.log
-    metricsBindAddr: "8162"
-    healthProbeBindAddr: "8163"
-    conntrackCacheCleanupPeriod: 300
-    conntrackCacheTableSize: 524288
-    logLevel: debug
 
   livenessProbe:
     exec:
@@ -84,38 +36,3 @@ aws-vpc-cni:
         - -connect-timeout=5s
         - -rpc-timeout=5s
     initialDelaySeconds: 1
-
-  resources:
-    requests:
-      cpu: 25m
-
-  updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 10%
-
-  priorityClassName: system-node-critical
-
-  tolerations:
-    - operator: Exists
-
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: kubernetes.io/os
-                operator: In
-                values:
-                  - linux
-              - key: kubernetes.io/arch
-                operator: In
-                values:
-                  - amd64
-                  - arm64
-              - key: eks.amazonaws.com/compute-type
-                operator: NotIn
-                values:
-                  - fargate
-                  - hybrid
-                  - auto
