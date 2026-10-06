@@ -67,6 +67,24 @@ aws-vpc-cni:
     conntrackCacheTableSize: 524288
     logLevel: debug
 
+  livenessProbe:
+    exec:
+      command:
+        - /app/grpc-health-probe
+        - -addr=unix:///var/run/aws-node/ipamd.sock
+        - -connect-timeout=5s
+        - -rpc-timeout=5s
+    initialDelaySeconds: 60
+
+  readinessProbe:
+    exec:
+      command:
+        - /app/grpc-health-probe
+        - -addr=unix:///var/run/aws-node/ipamd.sock
+        - -connect-timeout=5s
+        - -rpc-timeout=5s
+    initialDelaySeconds: 1
+
   resources:
     requests:
       cpu: 25m
