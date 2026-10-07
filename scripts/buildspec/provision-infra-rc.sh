@@ -183,6 +183,8 @@ if [ -z "${_zoa_boundary_image_tag}" ] || [ -z "${_zoa_boundary_source_image}" ]
     exit 1
 fi
 export TF_VAR_zoa_boundary_image="${_zoa_boundary_source_image}:${_zoa_boundary_image_tag}"
+export TF_VAR_zoa_boundary_session_idle_timeout_seconds=$(jq -r '.zoa_boundary_session_idle_timeout_seconds // 3600' "$DEPLOY_CONFIG_FILE")
+export TF_VAR_zoa_boundary_session_max_duration_hours=$(jq -r '.zoa_boundary_session_max_duration_hours // 4' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_worker_node_ami_id=$(jq -r '.worker_node_ami_id // ""' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_eph_prefix=$(jq -r '.eph_prefix // ""' "$DEPLOY_CONFIG_FILE")
 export ENVIRONMENT="${ENVIRONMENT:-staging}"

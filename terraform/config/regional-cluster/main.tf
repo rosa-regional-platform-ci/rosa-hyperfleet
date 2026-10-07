@@ -510,6 +510,8 @@ module "zoa_lambda" {
   targets_ssm_prefix  = "/zoa/targets/${var.deployment_name}"
   vpc_id              = module.regional_cluster.vpc_id
   boundary_image      = var.zoa_boundary_image
+
+  session_idle_timeout_seconds = var.zoa_boundary_session_idle_timeout_seconds
 }
 
 # =============================================================================
@@ -553,6 +555,9 @@ module "zoa_access" {
   exec_scoped_role_arn       = module.zoa_lambda.boundary_exec_scoped_role_arn
   lambda_execution_role_arn  = module.zoa_lambda.access_lambda_role_arn
   lambda_execution_role_name = module.zoa_lambda.access_lambda_role_name
+
+  session_idle_timeout_seconds = var.zoa_boundary_session_idle_timeout_seconds
+  session_max_duration_hours   = var.zoa_boundary_session_max_duration_hours
 }
 
 # =============================================================================

@@ -179,6 +179,8 @@ module "zoa_lambda" {
   vpc_id                 = module.vpc.vpc_id
   boundary_image         = var.zoa_boundary_image
   access_lambda_role_arn = var.zoa_access_lambda_role_arn
+
+  session_idle_timeout_seconds = var.zoa_boundary_session_idle_timeout_seconds
 }
 
 # =============================================================================

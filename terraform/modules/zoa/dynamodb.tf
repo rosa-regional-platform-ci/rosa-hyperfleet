@@ -249,17 +249,38 @@ resource "aws_dynamodb_resource_policy" "audit_cross_account" {
 # =============================================================================
 # DynamoDB Table for ZOA Boundary Sessions
 # =============================================================================
-# Stores boundary session lifecycle state (start, active, terminated).
-# PK: sessionId (ECS task ID)
-# TTL: 30 days (short retention — FedRAMP audit coverage is in the audit table)
+# Stores boundary session lifecycle (creating → active → terminated).
+# PK: sessionId (UUID from Access session_start; not the ECS task id)
+# TTL: attribute ttl, set from DYNAMODB_TTL_DAYS on write (default 365; same as executions/audit)
 #
-# GSI Architecture (6 indexes):
-#   operator-index (PK=operator, SK=createdAt) — `session list` (own sessions)
-#   status-index (PK=status, SK=createdAt) — general status filtering
-#   target-index (PK=targetCluster, SK=createdAt) — filter by target
-#   date-bucket-index (PK=dateBucket, SK=createdAt) — `session history` (day iteration)
-#   status-deadline-index (PK=status, SK=deadline) — reaper (efficient expiry query)
-#   task-id-index (PK=taskId) — identity bridge (ECS task UUID → session → operator)
+# Operation → Index mapping:
+#
+#   | Operation (code path)                          | Index                 | Frequency          |
+#   |------------------------------------------------|-----------------------|--------------------|
+#   | API: ResolveIdentity → GetByTaskID             | task-id-index         | Per boundary TA    |
+#   | Worker reaper: ListExpired                     | status-deadline-index | EventBridge tick   |
+#   | Worker reaper: ListActiveBeforeDeadline (idle) | status-deadline-index | EventBridge tick   |
+#   | Access: GET /sessions (list/history)           | date-bucket-index     | Human-driven       |
+#   | Get by session UUID: Get                         | Table PK (sessionId)  | Join/stop/exec     |
+#
+# GSI Architecture (3 indexes):
+#
+#   task-id-index (PK=taskId)
+#     Identity bridge — only consumer is API Lambda attribution (pkg/api/identity.go).
+#     ECS sets RoleSessionName on the boundary task role to the task UUID; that value is
+#     written to taskId when the session becomes active. Each boundary zoa run does one
+#     Query (Limit 1) to map task id → human operator + sessionId. No scan.
+#     See rosa-hyperfleet-zoa docs/design/boundary-identity-and-storage.md
+#
+#   status-deadline-index (PK=status, SK=deadline)
+#     Worker Lambda session reaper (pkg/scheduler/reaper.go). Two query patterns on the
+#     same GSI: active items with deadline <= now (max duration), and active items with
+#     deadline > now (idle candidates). EventBridge schedule per VPC — not per request.
+#
+#   date-bucket-index (PK=dateBucket, SK=createdAt)
+#     Human-driven path. Access ListAll for zoa session list / session history — same
+#     day-bucket iteration as executions/audit. scope=mine adds operator FilterExpression.
+#     CLI defaults --since 24h so queries stay bounded.
 
 resource "aws_dynamodb_table" "boundary_sessions" {
   name                        = local.sessions_table_name
@@ -272,15 +293,7 @@ resource "aws_dynamodb_table" "boundary_sessions" {
     type = "S"
   }
   attribute {
-    name = "operator"
-    type = "S"
-  }
-  attribute {
     name = "status"
-    type = "S"
-  }
-  attribute {
-    name = "targetCluster"
     type = "S"
   }
   attribute {
@@ -298,27 +311,6 @@ resource "aws_dynamodb_table" "boundary_sessions" {
   attribute {
     name = "taskId"
     type = "S"
-  }
-
-  global_secondary_index {
-    name            = "operator-index"
-    hash_key        = "operator"
-    range_key       = "createdAt"
-    projection_type = "ALL"
-  }
-
-  global_secondary_index {
-    name            = "status-index"
-    hash_key        = "status"
-    range_key       = "createdAt"
-    projection_type = "ALL"
-  }
-
-  global_secondary_index {
-    name            = "target-index"
-    hash_key        = "targetCluster"
-    range_key       = "createdAt"
-    projection_type = "ALL"
   }
 
   global_secondary_index {

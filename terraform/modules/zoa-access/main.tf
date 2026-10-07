@@ -86,6 +86,7 @@ resource "aws_lambda_function" "access" {
       EXEC_SCOPED_ROLE_ARN             = var.exec_scoped_role_arn
       EXEC_CREDENTIAL_DURATION_SECONDS = "3600"
       SESSION_MAX_DURATION_HOURS       = tostring(var.session_max_duration_hours)
+      SESSION_IDLE_TIMEOUT_SECONDS     = tostring(var.session_idle_timeout_seconds)
     }
   }
 

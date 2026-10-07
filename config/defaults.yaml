@@ -165,6 +165,13 @@ regional_cluster:
   # @used-by regional_cluster.zoa_boundary_source_image pipeline-management-cluster-inputs/terraform.json.j2
   # @used-by regional_cluster.zoa_boundary_source_image pipeline-regional-cluster-inputs/terraform.json.j2
   zoa_boundary_source_image: "quay.io/rrp-dev-ci/zoa-boundary"
+  # @doc regional_cluster.zoa_boundary_session_idle_timeout_seconds Terminal inactivity (seconds) before the boundary reaper stops a session. Wired to RC zoa-lambda (worker reaper) and zoa-access (RunTask MOTD); MC zoa-lambda uses the same value for MC-target reaping.
+  # @used-by regional_cluster.zoa_boundary_session_idle_timeout_seconds pipeline-regional-cluster-inputs/terraform.json.j2
+  # @used-by regional_cluster.zoa_boundary_session_idle_timeout_seconds pipeline-management-cluster-inputs/terraform.json.j2
+  zoa_boundary_session_idle_timeout_seconds: 3600
+  # @doc regional_cluster.zoa_boundary_session_max_duration_hours Default/max boundary session length (hours). RC zoa-access only (deadline in Dynamo + ZOA_SESSION_DEADLINE on task).
+  # @used-by regional_cluster.zoa_boundary_session_max_duration_hours pipeline-regional-cluster-inputs/terraform.json.j2
+  zoa_boundary_session_max_duration_hours: 4
 
 management_cluster_defaults:
   # @doc management_cluster_defaults.enable_bastion Default enable bastion for management clusters.

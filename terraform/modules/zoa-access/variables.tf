@@ -74,9 +74,15 @@ variable "boundary_ecs_cluster_arn" {
 }
 
 variable "session_max_duration_hours" {
-  description = "Default boundary session length (hours) and maximum timeout_hours on session start."
+  description = "Default boundary session length (hours) and maximum timeout_hours on session start. Set from regional-cluster zoa_boundary_session_max_duration_hours."
   type        = number
   default     = 4
+}
+
+variable "session_idle_timeout_seconds" {
+  description = "Terminal inactivity (seconds) before the boundary reaper stops the task. Set from regional-cluster zoa_boundary_session_idle_timeout_seconds (same value as module.zoa-lambda worker)."
+  type        = number
+  default     = 3600
 }
 
 variable "boundary_ecs_exec_command" {

@@ -199,6 +199,17 @@ variable "zoa_boundary_image" {
   }
 }
 
+variable "zoa_boundary_session_idle_timeout_seconds" {
+  description = "Boundary session terminal idle timeout (seconds) for this MC worker reaper. Must match RC zoa_boundary_session_idle_timeout_seconds (same deploy config key)."
+  type        = number
+  default     = 3600
+
+  validation {
+    condition     = var.zoa_boundary_session_idle_timeout_seconds >= 60 && var.zoa_boundary_session_idle_timeout_seconds <= 86400
+    error_message = "zoa_boundary_session_idle_timeout_seconds must be between 60 and 86400."
+  }
+}
+
 variable "zoa_sessions_table_name" {
   description = "DynamoDB table name for ZOA boundary sessions (in RC account, read from RC state)."
   type        = string

@@ -516,6 +516,28 @@ variable "zoa_boundary_image" {
   }
 }
 
+variable "zoa_boundary_session_idle_timeout_seconds" {
+  description = "Boundary session terminal idle timeout (seconds). Passed to module.zoa_lambda (worker reaper) and module.zoa_access (RunTask ZOA_SESSION_IDLE_TIMEOUT_SECONDS). Must stay aligned with MC zoa_lambda for MC targets."
+  type        = number
+  default     = 3600
+
+  validation {
+    condition     = var.zoa_boundary_session_idle_timeout_seconds >= 60 && var.zoa_boundary_session_idle_timeout_seconds <= 86400
+    error_message = "zoa_boundary_session_idle_timeout_seconds must be between 60 and 86400."
+  }
+}
+
+variable "zoa_boundary_session_max_duration_hours" {
+  description = "Default and maximum boundary session length (hours). Passed to module.zoa_access only (SESSION_MAX_DURATION_HOURS; deadline stored in Dynamo)."
+  type        = number
+  default     = 4
+
+  validation {
+    condition     = var.zoa_boundary_session_max_duration_hours >= 1 && var.zoa_boundary_session_max_duration_hours <= 24
+    error_message = "zoa_boundary_session_max_duration_hours must be between 1 and 24."
+  }
+}
+
 variable "worker_node_ami_id" {
   description = "Custom AMI ID for the Karpenter bootstrap managed node group. Empty (default) uses the EKS-optimized AL2023 AMI. When set, the node group switches to a CUSTOM AMI and the launch template supplies nodeadm bootstrap user_data (assumes a nodeadm-compatible image, e.g. RHEL/AL2023)."
   type        = string
