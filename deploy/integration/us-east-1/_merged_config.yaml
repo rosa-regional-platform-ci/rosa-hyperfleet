@@ -168,7 +168,7 @@ regional_cluster:
   # @doc regional_cluster.zoa_boundary_image_tag Immutable tag for the ZOA Boundary ECS image. Required; same commit tag as Lambda/Runner when bumped together.
   # @used-by regional_cluster.zoa_boundary_image_tag pipeline-management-cluster-inputs/terraform.json.j2
   # @used-by regional_cluster.zoa_boundary_image_tag pipeline-regional-cluster-inputs/terraform.json.j2
-  zoa_boundary_image_tag: "9372217"
+  zoa_boundary_image_tag: "9b61bdc"
   # @doc regional_cluster.zoa_boundary_source_image Source registry image for ZOA Boundary (pulled directly by ECS). Override together with zoa_boundary_image_tag when pointing at a fork or CI registry.
   # @used-by regional_cluster.zoa_boundary_source_image pipeline-management-cluster-inputs/terraform.json.j2
   # @used-by regional_cluster.zoa_boundary_source_image pipeline-regional-cluster-inputs/terraform.json.j2
