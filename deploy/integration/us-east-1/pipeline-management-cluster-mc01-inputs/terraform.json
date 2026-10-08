@@ -12,7 +12,7 @@
   "zoa_lambda_image_tag": "9b61bdc",
   "zoa_runner_image_tag": "9b61bdc",
   "zoa_runner_source_image": "quay.io/rrp-dev-ci/zoa-runner",
-  "zoa_boundary_image_tag": "9b61bdc",
+  "zoa_boundary_image_tag": "55e09be",
   "zoa_boundary_source_image": "quay.io/rrp-dev-ci/zoa-boundary",
   "zoa_boundary_session_idle_timeout_seconds": 3600,
   "zoa_deployment_name": "us-east-1",
