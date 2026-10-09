@@ -54,8 +54,6 @@ spec:
           env:
             - name: AWS_REGION
               value: {{ .Values.global.aws_region | quote }}
-            - name: AUTHZ_RESOLVER
-              value: {{ required "platformApi.authz.resolver is required" .Values.platformApi.authz.resolver | quote }}
             - name: AUTHZ_CONFIG_FILE
               value: /etc/platform-api/authz/config.yaml
             - name: POSTGRES_DSN
