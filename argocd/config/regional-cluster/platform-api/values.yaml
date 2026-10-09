@@ -3,6 +3,7 @@
 global:
   git_revision: "unknown"
   aws_region: ""
+  aws_account_id: ""
 
 platformApi:
   # Namespace to deploy into
@@ -19,7 +20,7 @@ platformApi:
     name: platform-api
     image:
       repository: quay.io/redhat-user-workloads/rosa-tenant/platform-api
-      tag: "on-pr-69c97bf083e313135885298b6a036c5e42d39cfe@sha256:29f744b970b3a019df9d2803a4917d1f8b4b093e534a9a7aba472dfc60969c8c"
+      tag: "on-pr-7d07ffac9a66bb8b4a0de1447cc25e26d74335d0@sha256:925a54424f766288b009029aebe2e0a6068c4345eda9da987c74232be58e3a45"
       pullPolicy: Always
 
     # Application arguments
@@ -92,7 +93,8 @@ platformApi:
 
   # Authorization is mandatory. Caller grants belong in environment overrides.
   authz:
-    resolver: config
+    # Complete v1 bundle, delivered as text. Optional @@AWS_ACCOUNT_ID@@ and
+    # @@AWS_REGION@@ markers use trusted bootstrap identity without adding grants.
     config: |
       formatVersion: 1
       registeredAccounts: []
