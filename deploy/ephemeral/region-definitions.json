@@ -3,7 +3,7 @@
     "aws_region": "us-east-1",
     "environment": "ephemeral",
     "management_clusters": [
-      "mc01"
+      "eph-e50a59-mc01"
     ],
     "name": "ephemeral"
   }
