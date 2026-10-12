@@ -157,7 +157,7 @@ There is no principal AST rewrite or `?principal` text replacement.
 Authored equality stays equality, not membership, and can still deny a child
 session. The `binding` error stage remains attachment validation, not AST linking.
 
-STS session ARNs omit IAM role paths. The resolver matches partition, account,
+STS session ARNs omit IAM role paths. The authorizer matches partition, account,
 and final role name without an IAM lookup; only commercial `arn:aws` is supported.
 Keep full IAM role ARNs, but do not configure distinct paths with the same account
 and final role name across either policy domain. STS cannot distinguish them;

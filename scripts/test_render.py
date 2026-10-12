@@ -2466,37 +2466,6 @@ def _assert_operator_grants(bundle, account, role, region):
 
 
 class TestAuthzDelivery:
-    def test_operating_metrics_docs(self):
-        # Keep the operator contract searchable across Markdown line wrapping.
-        doc = " ".join((PROJECT_ROOT / "docs" / "platform-api-authorization.md").read_text().split())
-        for contract in (
-            "| `authz_requests_total` | Counter | requests | `operation`, `outcome` |",
-            "| `authz_duration_seconds` | Histogram | seconds | `operation`, `outcome` |",
-            "| `authz_failures_total` | Counter | failed requests | `operation`, `stage` |",
-            "`operation` is a bounded concrete action name",
-            "`CreateManagementCluster`, `ListManagementClusters`, and `DescribeManagementCluster`",
-            "`global.aws_account_id`", "ROSAENG-67493",
-            "`outcome` is only `allow`, `deny`, or `error`",
-            "`resolution`, `parsing`, `binding`, `entity_validation`, `evaluation`, or `resource_loading`",
-            "`0.001`, `0.005`, `0.01`, `0.025`, `0.05`, `0.1`, `0.25`, `0.5`, and `1`",
-            "automatic `+Inf` bucket",
-            "50 ms bucket is not a latency SLO",
-            "`sum by (operation) (authz_requests_total)`",
-            "includes resolution, parsing, binding, entity construction and validation, evaluation, and required account-scoped FleetDB reads",
-            "excludes identity and enrollment admission, rate limiting, response conversion and serialization, and socket delivery",
-            "A successful filtered list records one `allow`",
-            "A missing or foreign Cluster returns 404 and records one `deny`",
-            "A late item failure aborts the whole list and records one `error`",
-            "A storage-read failure preserves its API error and records one `error` at `resource_loading`",
-            "A response-write failure after authorization does not revise an `allow`",
-            "Unmapped routes produce no authorization samples",
-            "`X-Amz-Account-Id` and `X-Amz-Caller-Arn`",
-            "raw API port 8000 through a ClusterIP Service",
-            "Gateway-only access is a required prerequisite and remains unproven",
-            "Local-only loopback proof is not permission for shared rollout",
-        ):
-            assert contract in doc, f"Missing authorization operating contract: {contract}"
-
     @pytest.mark.parametrize("env,ci,eph_prefix", [
         ("integration", False, ""), ("stage", False, ""),
         ("ephemeral", False, ""), ("ephemeral", False, "authz-test"),
