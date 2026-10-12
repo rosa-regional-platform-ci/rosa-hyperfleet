@@ -19,8 +19,8 @@ seaplane:
 
   helmValues:
     image:
-      repository: quay.io/rrp-dev-ci/hyperfleet-operator
-      tag: "f59b0034c13cf39d506e2ead73ebd0b5cd42cd1e"
+      repository: quay.io/redhat-user-workloads/rosa-tenant/hyperfleet-operator
+      tag: "on-pr-bb56e40b5cb148c7d6371bc08a69ffe667d20f58@sha256:2764b07452fe95ff7de46a9a7ca361b91af48d3bfdd437ae4e2fa96ec487186e"
       pullPolicy: Always
 
     replicaCount: 2
