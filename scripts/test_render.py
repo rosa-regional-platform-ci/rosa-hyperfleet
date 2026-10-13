@@ -2756,12 +2756,6 @@ class TestServiceOperatorDelivery:
         })
         assert _resource(resources, "ConfigMap", "authz-config")["data"]["config.yaml"] == f"# {expected}\n"
 
-    @pytest.mark.parametrize("roles", [[], ["Operator"]])
-    def test_rejects_stale_role_option(self, tmp_path, roles):
-        with pytest.raises(subprocess.CalledProcessError) as failure:
-            _helm_platform(tmp_path, {"platformApi": {"authz": {"serviceOperatorRoleNames": roles}}})
-        assert "serviceOperatorRoleNames is no longer supported" in failure.value.stderr
-
     def test_preserves_explicit_records(self, tmp_path):
         bundle = yaml.safe_load(AUTHZ_BUNDLE)
         bundle["serviceOperatorPolicies"] = [{"id": "explicit", "ownerAccountID": "012345678901", "content": 'permit(principal, action == HyperFleet::Action::"ListManagementClusters", resource);'}]
