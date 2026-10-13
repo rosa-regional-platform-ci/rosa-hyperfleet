@@ -1,7 +1,4 @@
 {{- $config := required "platformApi.authz.config is required" .Values.platformApi.authz.config -}}
-{{- if hasKey .Values.platformApi.authz "serviceOperatorRoleNames" -}}
-  {{- fail "platformApi.authz.serviceOperatorRoleNames is no longer supported; author serviceOperatorPolicies and serviceOperatorAttachments in platformApi.authz.config" -}}
-{{- end -}}
 {{- if contains "@@AWS_ACCOUNT_ID@@" $config -}}
   {{- $account := .Values.global.aws_account_id -}}
   {{- if or (not (kindIs "string" $account)) (not (regexMatch "^[0-9]{12}$" (toString $account))) -}}
