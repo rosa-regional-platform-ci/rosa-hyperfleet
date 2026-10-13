@@ -1,5 +1,7 @@
 provision_mcs:
-  mc01: {}
+  mc01:
+    delete: true
 aws:
   account_id: '720644165472'
   management_cluster_account_id: '129678139271'
+delete: true
