@@ -51,7 +51,7 @@ Use [`rosa-seaplane-api`](https://github.com/openshift-online/rosa-seaplane-api)
 - `platform-api` — `.tekton/rosa-seaplane-api-*.yaml`
 - `seaplane-operator` — `.tekton/rosa-seaplane-operator-*.yaml`
 
-For step 1, copy an existing overlay (for example `rosa-boundary` or `rosa-seaplane-api` under `rosa-tenant`) and adjust:
+For step 1, copy an existing overlay (for example `rosa-boundary`, `rosa-seaplane-zoa`, or `rosa-seaplane-api` under `rosa-tenant`) and adjust:
 
 - `application-patch.yaml` — Application name
 - `component-patch.yaml` — Component name, git URL, branch, `spec.build-nudges-ref` if needed
