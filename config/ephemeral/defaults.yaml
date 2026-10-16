@@ -1,112 +1,53 @@
-# Ephemeral environment template
-#
-# This is not a living environment — it is a template for short-lived
-# environments used by CI e2e tests and developer workflows. A UUID
-# (eph_prefix) is injected at render time to isolate each instance within
-# shared CI or dev AWS accounts.
-#
-# DNS account pool selection:
-#   Ephemeral environments run in two account pools with separate DNS:
-#     - dev accounts  → dev0.rosa.devshift.net  (local developer environments)
-#     - CI accounts   → ci00.rosa.devshift.net  (CI e2e test environments)
-#   The `ci` template variable (true when both EPH_PREFIX and BUILD_ID are
-#   set) selects the correct pool. BUILD_ID is set by CI pipelines; when
-#   rendering locally or during CI lint checks (no EPH_PREFIX), the default
-#   dev0 domain is used so rendered files match what is committed.
-
-deployment_name: "{{ aws_region }}{% if eph_prefix %}-{{ eph_prefix }}{% endif %}"
-
+deployment_name: '{{ aws_region }}{% if eph_prefix %}-{{ eph_prefix }}{% endif %}'
 dns:
-  domain: "{% if ci %}ci00{% else %}dev0{% endif %}.rosa.devshift.net"
-
-# Pin a specific AMI for all worker nodes (RC + MC), covering both the Karpenter
-# EC2NodeClass and the Terraform bootstrap node group. ami-056d5e72aa5cf51f1 is a
-# RHEL EKS image bootstrapped via nodeadm. amiFamily AL2023: Karpenter generates
-# the nodeadm NodeConfig itself, including apiServerEndpoint, certificateAuthority,
-# and cidr. The image is nodeadm-compatible, so the AL2023-family bootstrap works
-# on RHEL. (A name-only Custom NodeConfig fails: nodeadm hard-fails validation with
-# "Apiserver endpoint is missing" rather than resolving it via eks:DescribeCluster.)
+  domain: '{% if ci %}ci00{% else %}dev0{% endif %}.rosa.devshift.net'
 worker_node_ami:
   family: AL2023
   id: ami-056d5e72aa5cf51f1
-
 regional_cluster:
   enable_bastion: true
   enable_write_sre_tools: true
-  node_instance_families: ["m8i-flex", "m7i-flex"]
-  hyperfleet_db_instance_class: "db.t4g.medium"
+  node_instance_families:
+  - m8i-flex
+  - m7i-flex
+  hyperfleet_db_instance_class: db.t4g.medium
   hyperfleet_db_deletion_protection: false
   hyperfleet_db_skip_final_snapshot: true
   hyperfleet_db_performance_insights_enabled: false
   hyperfleet_db_monitoring_interval: 0
   enable_sre_tools_gateway: true
   enable_sre_public_access: false
-
 applications:
   regional-cluster:
     platformApi:
       authz:
-        config: |
-          {% set operator_account = account_id if account_id is string and account_id | length == 12 and account_id.isascii() and account_id.isdigit() else "@@AWS_ACCOUNT_ID@@" -%}
-          {% set registered_accounts = ["720644165472", "313828097858"] if ci else [] -%}
-          formatVersion: 1
-
-          registeredAccounts: {{ (registered_accounts + [operator_account]) | unique | list | tojson }}
-          {% if ci -%}
-          policies:
-            - id: ci-read-clusters-720644165472
-              ownerAccountID: "720644165472"
-              content: |
-                permit(principal, action in HyperFleet::Action::"AllActions", resource)
-                when { context.accountId == "720644165472" && context.region == "us-east-1" };
-            - id: ci-read-clusters-313828097858
-              ownerAccountID: "313828097858"
-              content: |
-                permit(principal, action in HyperFleet::Action::"AllActions", resource)
-                when { context.accountId == "313828097858" && context.region == "us-east-1" };
-          attachments:
-            - id: ci-readers-720644165472
-              policyID: ci-read-clusters-720644165472
-              principalARN: arn:aws:iam::720644165472:role/{{ aws.child_admin_role_name }}
-              scope: regional
-              region: us-east-1
-            - id: ci-readers-313828097858
-              policyID: ci-read-clusters-313828097858
-              principalARN: arn:aws:iam::313828097858:role/{{ aws.child_admin_role_name }}
-              scope: regional
-              region: us-east-1
-            - id: ci-e2e-720644165472
-              policyID: ci-read-clusters-720644165472
-              principalARN: arn:aws:iam::720644165472:user/e2e
-              scope: regional
-              region: us-east-1
-            - id: ci-e2e-313828097858
-              policyID: ci-read-clusters-313828097858
-              principalARN: arn:aws:iam::313828097858:user/rrp-hcp-customer
-              scope: regional
-              region: us-east-1
-          {% else -%}
-          policies: []
-          attachments: []
-          {% endif %}
-          serviceOperatorPolicies:
-            - id: provision-management-clusters
-              ownerAccountID: "{{ operator_account }}"
-              content: |
-                permit(principal, action in [HyperFleet::Action::"CreateManagementCluster", HyperFleet::Action::"ListManagementClusters", HyperFleet::Action::"DescribeManagementCluster"], resource);
-          serviceOperatorAttachments:
-            - id: regional-provisioner
-              policyID: provision-management-clusters
-              principalARN: arn:aws:iam::{{ operator_account }}:role/{{ child_admin_role_name }}
-              scope: regional
-              region: "{{ aws_region }}"
+        config: "formatVersion: 1\nregisteredAccounts: [\"599476212575\", \"114594328247\"\
+          ]\npolicies:\n  - id: read-clusters-599476212575\n    ownerAccountID: \"\
+          599476212575\"\n    content: |\n      permit(principal, action in HyperFleet::Action::\"\
+          AllActions\", resource)\n      when { context.accountId == \"599476212575\"\
+          \ && context.region == \"us-east-1\" };\n  - id: read-clusters-114594328247\n\
+          \    ownerAccountID: \"114594328247\"\n    content: |\n      permit(principal,\
+          \ action in HyperFleet::Action::\"AllActions\", resource)\n      when {\
+          \ context.accountId == \"114594328247\" && context.region == \"us-east-1\"\
+          \ };\nattachments:\n  - id: dev-readers-599476212575\n    policyID: read-clusters-599476212575\n\
+          \    principalARN: arn:aws:iam::599476212575:role/{{ aws.child_admin_role_name\
+          \ }}\n    scope: regional\n    region: us-east-1\n  - id: dev-readers-114594328247\n\
+          \    policyID: read-clusters-114594328247\n    principalARN: arn:aws:iam::114594328247:role/{{\
+          \ aws.child_admin_role_name }}\n    scope: regional\n    region: us-east-1\n\
+          serviceOperatorPolicies:\n  - id: provision-management-clusters\n    ownerAccountID:\
+          \ \"599476212575\"\n    content: |\n      permit(principal, action in [HyperFleet::Action::\"\
+          CreateManagementCluster\", HyperFleet::Action::\"ListManagementClusters\"\
+          , HyperFleet::Action::\"DescribeManagementCluster\"], resource);\nserviceOperatorAttachments:\n\
+          \  - id: regional-provisioner\n    policyID: provision-management-clusters\n\
+          \    principalARN: arn:aws:iam::599476212575:role/{{ child_admin_role_name\
+          \ }}\n    scope: regional\n    region: us-east-1\n"
     hyperfleet:
-      oidcS3Bucket: "hypershift-{{ eph_prefix }}-regional-oidc-{{ account_id }}"
-
+      oidcS3Bucket: hypershift-{{ eph_prefix }}-regional-oidc-{{ account_id }}
 management_cluster_defaults:
   enable_bastion: true
-  node_instance_families: ["m8i-flex", "m7i-flex"]
-
+  node_instance_families:
+  - m8i-flex
+  - m7i-flex
 observability:
   pagerduty:
     enabled: false

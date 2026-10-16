@@ -13,15 +13,15 @@ eksNodePool:
     family: AL2023
     id: ami-056d5e72aa5cf51f1
   rootVolumeSize: 50Gi
-baseDomain: us-east-1.dev0.rosa.devshift.net
+baseDomain: us-east-1-eph-ff3e5362.dev0.rosa.devshift.net
 platformApi:
   authz:
-    config: "formatVersion: 1\n\nregisteredAccounts: [\"@@AWS_ACCOUNT_ID@@\"]\npolicies: []\nattachments: []\n\nserviceOperatorPolicies:\n  - id: provision-management-clusters\n    ownerAccountID: \"@@AWS_ACCOUNT_ID@@\"\n    content: |\n      permit(principal, action in [HyperFleet::Action::\"CreateManagementCluster\", HyperFleet::Action::\"ListManagementClusters\", HyperFleet::Action::\"DescribeManagementCluster\"], resource);\nserviceOperatorAttachments:\n  - id: regional-provisioner\n    policyID: provision-management-clusters\n    principalARN: arn:aws:iam::@@AWS_ACCOUNT_ID@@:role/OrganizationAccountAccessRole\n    scope: regional\n    region: \"us-east-1\""
+    config: "formatVersion: 1\nregisteredAccounts: [\"599476212575\", \"114594328247\"]\npolicies:\n  - id: read-clusters-599476212575\n    ownerAccountID: \"599476212575\"\n    content: |\n      permit(principal, action in HyperFleet::Action::\"AllActions\", resource)\n      when { context.accountId == \"599476212575\" && context.region == \"us-east-1\" };\n  - id: read-clusters-114594328247\n    ownerAccountID: \"114594328247\"\n    content: |\n      permit(principal, action in HyperFleet::Action::\"AllActions\", resource)\n      when { context.accountId == \"114594328247\" && context.region == \"us-east-1\" };\nattachments:\n  - id: dev-readers-599476212575\n    policyID: read-clusters-599476212575\n    principalARN: arn:aws:iam::599476212575:role/OrganizationAccountAccessRole\n    scope: regional\n    region: us-east-1\n  - id: dev-readers-114594328247\n    policyID: read-clusters-114594328247\n    principalARN: arn:aws:iam::114594328247:role/OrganizationAccountAccessRole\n    scope: regional\n    region: us-east-1\nserviceOperatorPolicies:\n  - id: provision-management-clusters\n    ownerAccountID: \"599476212575\"\n    content: |\n      permit(principal, action in [HyperFleet::Action::\"CreateManagementCluster\", HyperFleet::Action::\"ListManagementClusters\", HyperFleet::Action::\"DescribeManagementCluster\"], resource);\nserviceOperatorAttachments:\n  - id: regional-provisioner\n    policyID: provision-management-clusters\n    principalARN: arn:aws:iam::599476212575:role/OrganizationAccountAccessRole\n    scope: regional\n    region: us-east-1"
   app:
     args:
       defaultClusterExpiration: ''
 hyperfleet:
-  oidcS3Bucket: hypershift--regional-oidc-ssm:///infra/ephemeral/us-east-1/account_id
+  oidcS3Bucket: hypershift-eph-ff3e5362-regional-oidc-599476212575
 pagerduty:
   enabled: false
 grafana:
