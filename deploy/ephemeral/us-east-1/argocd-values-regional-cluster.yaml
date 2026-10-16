@@ -13,13 +13,22 @@ eksNodePool:
     family: AL2023
     id: ami-056d5e72aa5cf51f1
   rootVolumeSize: 50Gi
-baseDomain: us-east-1.dev0.rosa.devshift.net
+baseDomain: us-east-1-eph-9057e76b.dev0.rosa.devshift.net
 platformApi:
   app:
     args:
       defaultClusterExpiration: ''
+    image:
+      repository: quay.io/redhat-user-workloads/rosa-tenant/platform-api
+      tag: on-pr-5f0dd39a08e96fb66c76cd457b456817cd19a946
 hyperfleet:
-  oidcS3Bucket: hypershift--regional-oidc-ssm:///infra/ephemeral/us-east-1/account_id
+  oidcS3Bucket: hypershift-eph-9057e76b-regional-oidc-599476212575
+  source:
+    targetRevision: on-pr-5f0dd39a08e96fb66c76cd457b456817cd19a946
+  helmValues:
+    image:
+      repository: quay.io/redhat-user-workloads/rosa-tenant/hyperfleet-operator
+      tag: on-pr-5f0dd39a08e96fb66c76cd457b456817cd19a946
 pagerduty:
   enabled: false
 grafana:
