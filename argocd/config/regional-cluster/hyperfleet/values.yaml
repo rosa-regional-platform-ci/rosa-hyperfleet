@@ -20,7 +20,7 @@ hyperfleet:
   helmValues:
     image:
       repository: quay.io/willkutler/hyperfleet-operator
-      tag: "dev-d738dce0"
+      tag: "dev-6b3429f1"
       pullPolicy: Always
 
     replicaCount: 2
