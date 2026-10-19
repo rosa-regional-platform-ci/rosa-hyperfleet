@@ -20,7 +20,7 @@ seaplane:
   helmValues:
     image:
       repository: quay.io/willkutler/hyperfleet-operator
-      tag: "dev-c750c0d9"
+      tag: "dev-eef1faef"
       pullPolicy: Always
 
     replicaCount: 2
