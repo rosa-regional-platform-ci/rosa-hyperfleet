@@ -1,6 +1,6 @@
 # Zero Operator Access (ZOA) — Architecture
 
-**Last Updated Date**: 2026-10-14
+**Last Updated Date**: 2026-10-19
 
 ## Summary
 
@@ -29,7 +29,7 @@ Each target VPC (RC and every MC) gets **API** and **Worker** Lambdas from the s
 | **Worker** | `BUFFERED`        | EventBridge Scheduler + self-invoke | Reconciler (1m), GC (5m), boundary reaper (5m), async/approved TA | 300s    | 10          |
 | **Access** | `BUFFERED`        | Function URL (IAM auth)             | Boundary session lifecycle, target discovery (RC, no VPC)         | 30s     | 10          |
 
-API and Worker timeouts/concurrency are tunable via `modules/zoa-lambda` (defaults 300s / 50 / 10). **Access** is deployed only from `modules/zoa-access`: Lambda **timeout is 30s** (one HTTP request per session API call; `RunTask` is async). **Reserved concurrency defaults to 10** (`lambda_access_concurrency`) so session APIs keep capacity during incidents when TA/API/Worker load is high; reserved concurrency has **no extra AWS charge** (unlike provisioned concurrency). Long-lived work happens in the boundary ECS task (`session_max_duration_hours`, reaper idle timeout), not inside the Access invocation.
+API and Worker timeouts/concurrency are tunable via `modules/zoa-lambda` (defaults 300s / 50 / 10). **Access** is deployed only from `modules/zoa-access`: Lambda **timeout is 30s** (one HTTP request per session API call; `RunTask` is async). In **production**, reserved concurrency isolates capacity: API **50**, Worker **10** (see self-invocation below), Access **10** so session APIs stay available when TA load is high — reserved concurrency has **no extra AWS charge** (unlike provisioned concurrency). Values must be **-1** (unreserved pool) or **≥ 1**; **0** disables the function. Ephemeral dev uses **-1** for all three (see [Tunable Parameters](#tunable-parameters)). Long-lived work happens in the boundary ECS task (`session_max_duration_hours`, reaper idle timeout), not inside the Access invocation.
 
 Both use `lambda.Start()` from `aws-lambda-go`. The API Lambda uses a native Go streaming adapter (`LambdaFunctionURLStreamingResponse`) supporting responses up to 200MB — no external proxy or sidecar. The Worker uses standard JSON responses for EventBridge and self-invocation events.
 
@@ -180,7 +180,7 @@ The Worker Lambda invokes **itself** to dispatch approved TA executions. Each se
    - **Sync mode**: Creates SA + RBAC → impersonates SA → executes TA directly against EKS API → uploads output to S3 → cleans up K8s resources → updates DynamoDB. All within one Lambda invocation.
    - **Async mode**: Creates SA + RBAC + STS Secret (scoped S3 upload credentials) + K8s Job → updates DynamoDB to `running` → returns. Future reconciler ticks monitor the Job status, update DynamoDB on completion, and clean up K8s resources.
 
-`reserved_concurrency=10` ensures max 9 concurrent TA executions + 1 slot reserved for the reconciler/GC tick. Excess invocations queue in Lambda's internal retry queue (up to 6 hours). This avoids SQS complexity while maintaining concurrency control and backpressure.
+With the production default **Worker reserved concurrency = 10**, the design targets roughly nine concurrent TA executions plus one slot for the reconciler/GC tick on the same function. Excess self-invocations queue in Lambda's internal retry queue (up to 6 hours). Ephemeral environments set Worker (and API/Access) concurrency to **-1**, so this backpressure model does not apply there.
 
 ### DLQ Semantics
 
@@ -218,10 +218,10 @@ terraform/modules/zoa-access/   → Session control plane (RC only)
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | DynamoDB (executions)        | PK=`executionId`. GSIs: `target-status-index`, `date-bucket-index`. TTL 365d (`DYNAMODB_TTL_DAYS`). On-demand billing, PITR (non-ephemeral), deletion protection (non-ephemeral).                                                 |
 | DynamoDB (audit)             | PK=`accountId`, SK=`timestamp`. GSI: `date-bucket-index`. TTL 365d. Every audited API call.                                                                                                                                       |
-| DynamoDB (boundary sessions) | PK=`sessionId`. GSIs: `task-id-index` (identity bridge), `status-deadline-index` (reaper), `date-bucket-index` (list/history). TTL 365d. See `terraform/modules/zoa/dynamodb.tf`.                                                 |
+| DynamoDB (boundary sessions) | PK=`sessionId`. GSIs: `task-id-index` (identity bridge), `target-status-index` (reaper, per `targetCluster`), `date-bucket-index` (list/history). TTL 365d. See `terraform/modules/zoa/dynamodb.tf`.                                 |
 | S3 bucket                    | `zoa-artifacts-{region}`. KMS-SSE, versioning, lifecycle (Intelligent-Tiering 30d, expire 365d). Stores output.json and execution.log per execution.                                                                              |
 | KMS key                      | Symmetric CMK for DynamoDB, S3, boundary + Lambda CloudWatch Logs, ECS Exec session encryption. Key policy: Lambda, `zoa-aws-*`, `zoa-boundary-*`, and CloudWatch Logs service (RC + cross-account MC). See `modules/zoa/kms.tf`. |
-| ECR repository               | Hosts `zoa-lambda` images mirrored from Quay via skopeo. Lifecycle retains last 20 images. Cross-account pull policy scoped to MC OU path.                                                                                        |
+| ECR repository               | **Lambda image only** (`zoa-lambda`), mirrored from Quay via skopeo in `modules/zoa`. Runner and boundary images are referenced by tag from the source registry (Konflux/Quay), not stored in this ECR repo. Lifecycle retains last 20 lambda images. Cross-account pull policy scoped to MC OU path. |
 | IAM: zoa-uploader            | Scoped `s3:PutObject` + `kms:GenerateDataKey` for async runner K8s Jobs. Assumed via STS from runner pods.                                                                                                                        |
 | IAM: zoa-data-access         | Cross-account role for MC Lambdas to reach RC's DynamoDB and S3. Trust policy scoped to MC account OU.                                                                                                                            |
 
@@ -293,8 +293,8 @@ All configuration is via Terraform variables that map to Lambda environment vari
 | ----------------------------------- | ------- | ----------------------------------- | --------------- | -------------------------------------------------------------------------------------------------- |
 | `lambda_api_timeout`                | 300     | Lambda timeout config               | API Lambda      | Hard ceiling (seconds) for sync TA execution + streaming                                           |
 | `lambda_worker_timeout`             | 300     | Lambda timeout config               | Worker Lambda   | Hard ceiling — real deadlines via env vars below                                                   |
-| `lambda_api_concurrency`            | 50      | Reserved concurrency                | API Lambda      | **-1** unreserved or **≥ 1** reserved; **0** disables. Ephemeral: **-1**.                          |
-| `lambda_worker_concurrency`         | 10      | Reserved concurrency                | Worker Lambda   | Same as API. Ephemeral: **-1**.                                                                     |
+| `lambda_api_concurrency`            | 50      | Reserved concurrency                | API Lambda      | Production: reserved pool for sync TAs and Function URL traffic. **-1** or **≥ 1** only; **0** disables. |
+| `lambda_worker_concurrency`         | 10      | Reserved concurrency                | Worker Lambda   | Production: caps fan-out + leaves headroom for scheduled reconciler/GC/reaper ticks.                  |
 | `lambda_memory_size`                | 512     | Lambda memory config                | API + Worker    | Memory in MB (CPU scales proportionally)                                                           |
 | `reconciler_deadline_seconds`       | 55      | `RECONCILER_DEADLINE_SECONDS`       | Worker Lambda   | Code-level deadline for reconciler/GC ticks                                                        |
 | `max_batch_per_tick`                | 30      | `MAX_BATCH_PER_TICK`                | Worker Lambda   | Items processed per scheduled phase per tick                                                       |
@@ -312,10 +312,12 @@ All configuration is via Terraform variables that map to Lambda environment vari
 
 | Variable                       | Default | Lambda Env Var / Config        | Purpose                                                                                                                 |
 | ------------------------------ | ------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| `lambda_access_concurrency`    | 10      | Reserved concurrency           | Max concurrent Access invocations (session plane). Use **-1** for unreserved pool or **≥ 1** reserved; **0** disables the Lambda. Ephemeral: **-1** (see `config/ephemeral/defaults.yaml`). |
+| `lambda_access_concurrency`    | 10      | Reserved concurrency           | Production: dedicated session-plane capacity under heavy TA/API load. **-1** or **≥ 1** only; **0** disables. |
 | _(Lambda timeout)_             | 30      | Lambda timeout config          | Hard ceiling per Access HTTP request (not session length). Not yet a Terraform variable.                                |
 | `session_max_duration_hours`   | 4       | `SESSION_MAX_DURATION_HOURS`   | Default and max session deadline (hours)                                                                                |
 | `session_idle_timeout_seconds` | 3600    | `SESSION_IDLE_TIMEOUT_SECONDS` | Access Lambda env; same value as Worker (reaper). RunTask sets `ZOA_SESSION_IDLE_TIMEOUT_SECONDS` on the boundary task. |
+
+Ephemeral environments set `zoa_lambda_api_concurrency`, `zoa_lambda_worker_concurrency`, and `zoa_lambda_access_concurrency` to **-1** in `config/ephemeral/defaults.yaml` (shared dev account pool, simpler than tuning reserved limits).
 
 ## Security Model
 
@@ -340,21 +342,20 @@ For the full security model (threat model, SA isolation strategies, RBAC design)
 
 ## Deployment Flow
 
+Konflux/Tekton builds three images (`zoa-lambda`, `zoa-runner`, `zoa-boundary`) and publishes them to Quay (or the configured CI registry). Terraform pins each workload by tag in environment config:
+
+| Image          | Consumed by                         | How it reaches the cluster                                                                 |
+| -------------- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
+| `zoa-lambda`   | API, Worker, and Access Lambdas     | Mirrored into RC **ECR** (`modules/zoa`, skopeo); Lambdas pull from ECR (MC Lambdas use the RC ECR URL). |
+| `zoa-runner`   | Async TA K8s Jobs                   | **Source registry** (`zoa_runner_source_image` + tag); EKS nodes pull directly — no RC ECR mirror.     |
+| `zoa-boundary` | Boundary ECS Fargate tasks          | **Source registry** (`zoa_boundary_source_image` + tag); task definition references the full image ref. |
+
 ```
-Konflux/Tekton → builds 3 container images (x86_64, UBI-minimal/UBI9)
+Konflux/Tekton → Quay (3 images, :<commit-sha>)
      │
-     ├── zoa-lambda   (Containerfile — Lambda handler, UBI-minimal)
-     ├── zoa-runner   (Containerfile.runner — async K8s Jobs, UBI9)
-     └── zoa-boundary (Containerfile.boundary — SRE shell + tools, UBI9)
-     │
-     ▼
-Quay registry (quay.io/redhat-user-workloads/rosa-tenant/zoa-{lambda,runner,boundary}:<commit-sha>)
-     │
-     ▼ (pipeline step: skopeo mirror — temporary until Konflux pushes to ECR directly)
-ECR repository (in RC account, cross-account pull policy for MC accounts)
-     │
-     ▼ (Terraform variables: zoa_lambda_image_tag / zoa_runner_image_tag / zoa_boundary_image_tag)
-terraform apply → updates Lambda functions, K8s Job runner, and ECS task definition
+     ├── zoa-lambda  ──skopeo──► ECR (RC) ──► Lambda functions (RC + MC)
+     ├── zoa-runner  ─────────► Job image URI in TF (nodes pull from Quay)
+     └── zoa-boundary ────────► ECS task definition (Fargate pulls from Quay)
 ```
 
 **Rollback**: Set `zoa_lambda_image_tag`, `zoa_runner_image_tag`, or `zoa_boundary_image_tag` to a previous commit SHA and `terraform apply`. Lambda picks up the new image on next cold start; ECS tasks use the new task definition on next `session start`. No draining, no rolling update.

@@ -7,11 +7,11 @@ Manages the shared ZOA data layer deployed once per region in the Regional Clust
 - **DynamoDB** — Three tables (all KMS-encrypted, TTL default 365d via `DYNAMODB_TTL_DAYS` on writers):
   - **Executions** — PK `executionId`; GSIs `target-status-index`, `date-bucket-index`
   - **Audit** — PK `accountId`, SK `timestamp`; GSI `date-bucket-index`
-  - **Boundary sessions** — PK `sessionId`; GSIs `task-id-index`, `status-deadline-index`, `date-bucket-index`
+  - **Boundary sessions** — PK `sessionId`; GSIs `task-id-index`, `target-status-index` (reaper), `date-bucket-index`
 - **S3** — Artifact bucket for TA output, logs, and large files
 - **KMS** — Regional CMK for DynamoDB, S3, boundary/Lambda CloudWatch Logs, and ECS Exec encryption (see `kms.tf`)
 - **IAM** — Uploader role (for async Job S3 uploads), data-access role (for MC cross-account access)
-- **ECR** — Container image repositories for Lambda and runner images
+- **ECR** — Repository for the **Lambda** image only (`zoa-lambda`), mirrored from the source registry via skopeo. Async **runner** and **boundary** images use `zoa_runner_source_image` / deploy config boundary source refs (nodes and Fargate pull from Quay/Konflux, not this ECR repo).
 
 Boundary **targets** are registered in RC SSM (`/zoa/targets/<deployment>/<cluster>`): RC via `zoa-lambda`; MC via `terraform/config/mc-zoa-target-ssm-provisioning/` (MC pipeline). See `dynamodb.tf`.
 

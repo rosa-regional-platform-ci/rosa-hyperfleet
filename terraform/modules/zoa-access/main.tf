@@ -299,7 +299,9 @@ resource "aws_iam_role_policy" "lambda_ecs" {
   })
 }
 
-# STS: cross-account boundary ECS + exec credential vending (MC targets)
+# STS: cross-account boundary ECS + exec credential vending (MC targets).
+# Resource patterns use mc account id + *-zoa-boundary-* role names (not per-MC role ARNs)
+# so RC zoa-access can apply while MC boundary IAM is still being created in parallel pipelines.
 resource "aws_iam_role_policy" "lambda_sts" {
   name = "${local.function_name}-sts"
   role = local.lambda_role_id

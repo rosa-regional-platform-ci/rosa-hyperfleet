@@ -48,6 +48,9 @@ module "zoa_lambda" {
   deployment_name           = var.deployment_name
   sessions_table_name       = module.zoa.sessions_table_name
   targets_ssm_prefix        = "/zoa/targets/${var.deployment_name}"
+  # MC only (from RC terraform output zoa_access_lambda_role_arn):
+  # access_lambda_role_arn  = var.zoa_access_lambda_role_arn
+  # data_access_role_arn    = var.zoa_data_access_role_arn
 }
 ```
 
@@ -58,6 +61,23 @@ After apply, wire **`module.zoa_access`** with boundary outputs and `access_lamb
 MC deployments set `data_access_role_arn` to assume a role in the RC account for DynamoDB and S3 access. The data layer always lives in the RC account.
 
 RC target metadata uses `aws_ssm_parameter.zoa_target` when `targets_ssm_prefix` is set (RC regional-cluster only). MC stacks omit that variable; MC targets use the **Provision-McZoaTargetSSM** pipeline stage (`mc-zoa-target-ssm-provisioning`).
+
+### MC-only: `access_lambda_role_arn`
+
+When `target_type = "mc"`, set `access_lambda_role_arn` to the RC output `zoa_access_lambda_role_arn` (from `module.zoa_lambda` on the regional stack). MC boundary IAM trusts that role so the RC Access Lambda can `AssumeRole` and `RunTask` in the MC account. On apply, `scripts/buildspec/provision-infra-mc.sh` polls RC Terraform state for this ARN (with OIDC, KMS, and related outputs).
+
+### `terraform destroy` (MC)
+
+Destroy still evaluates the full module graph, including `access_lambda_role_arn` validation for `target_type = "mc"`. If RC state is already gone, the MC buildspec exports placeholder values for destroy-only runs so `terraform destroy` can complete — see `provision-infra-mc.sh` when `DELETE_FLAG=true`.
+
+### Reserved concurrency
+
+| Variable                   | Production default | Notes                                                                 |
+| -------------------------- | ------------------ | --------------------------------------------------------------------- |
+| `lambda_api_concurrency`   | 50                 | **-1** = unreserved account pool; **≥ 1** = reserved; **0** disables |
+| `lambda_worker_concurrency`| 10                 | Production: reconciler + fan-out cap (see ADR self-invocation).       |
+
+Ephemeral config sets API and Worker to **-1** (`config/ephemeral/defaults.yaml`).
 
 ## Timeout Hierarchy
 

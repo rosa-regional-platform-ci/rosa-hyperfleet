@@ -113,6 +113,9 @@ resource "aws_iam_role" "data_access" {
   name        = "${var.regional_id}-zoa-data-access"
   description = "Cross-account role for MC Lambda DynamoDB+S3 access to RC data layer"
 
+  # Trust uses OrgPath + *-zoa-lambda ArnLike (not explicit MC role ARNs) so RC CreateRole
+  # succeeds while MC zoa-lambda applies in parallel — same pattern as uploader above.
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{

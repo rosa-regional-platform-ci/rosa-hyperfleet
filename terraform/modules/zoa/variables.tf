@@ -30,7 +30,8 @@ variable "output_retention_days" {
   default     = 365
 }
 
-# --- Container images (mirrored from source registry → ECR) ---
+# --- Lambda image (mirrored from source registry → ECR in this module) ---
+# Runner and boundary images are referenced by tag from the source registry in zoa-lambda / deploy config.
 
 variable "zoa_lambda_source_image" {
   description = "Source registry image for ZOA Lambda (mirrored to ECR at deploy time)"

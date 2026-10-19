@@ -9,17 +9,20 @@
 #
 #   | Operation (code path)                | Index              | Frequency          |
 #   |--------------------------------------|--------------------|--------------------|
-#   | Reconciler: QueryByTargetAndStatus   | target-status-index| Every 5-30s/cluster|
-#   | GC: QueryTerminalByTarget            | target-status-index| Every 60s/cluster  |
+#   | Reconciler: QueryByTargetAndStatus   | target-status-index| EventBridge 1m/VPC |
+#   | GC: QueryTerminalByTarget            | target-status-index| EventBridge 5m/VPC |
 #   | Concurrency limiter: CountActiveByTarget | target-status-index| Per dispatch   |
 #   | Dispatch cooldown: ListByTargetAndAction  | date-bucket-index  | Per write-TA only |
 #   | CLI: zoa runs [filters]              | date-bucket-index  | Human-driven       |
 #   | Get by ID: Get                       | Table PK           | Per dispatch/get   |
 #
+# Boundary session reaper (max duration + idle) uses the sessions table, not this one
+# (target-status-index; EventBridge 5m/VPC — see boundary-sessions block below).
+#
 # GSI Architecture (2 indexes):
 #
 #   target-status-index (PK=targetCluster, SK=targetStatusKey)
-#     Machine-driven hot path. Runs every 5-30 seconds per cluster.
+#     Machine-driven hot path. Reconciler/GC driven by EventBridge (1m / 5m per VPC).
 #     Composite sort key format: "{status}#{timestamp}" enables begins_with queries.
 #     - Reconciler: finds dispatched/approved executions for THIS cluster only
 #     - GC: finds terminal executions (succeeded/failed) older than cleanup threshold
@@ -191,8 +194,8 @@ resource "aws_dynamodb_table" "audit_log" {
 #   | Operation (code path)                          | Index                 | Frequency          |
 #   |------------------------------------------------|-----------------------|--------------------|
 #   | API: ResolveIdentity → GetByTaskID             | task-id-index         | Per boundary TA    |
-#   | Worker reaper: ListExpired                     | status-deadline-index | EventBridge tick   |
-#   | Worker reaper: ListActiveBeforeDeadline (idle) | status-deadline-index | EventBridge tick   |
+#   | Worker reaper: ListExpired                     | target-status-index   | EventBridge 5m/VPC |
+#   | Worker reaper: ListActiveBeforeDeadline (idle) | target-status-index   | EventBridge 5m/VPC |
 #   | Access: GET /sessions (list/history)           | date-bucket-index     | Human-driven       |
 #   | Get by session UUID: Get                         | Table PK (sessionId)  | Join/stop/exec     |
 #
@@ -205,10 +208,12 @@ resource "aws_dynamodb_table" "audit_log" {
 #     Query (Limit 1) to map task id → human operator + sessionId. No scan.
 #     See rosa-hyperfleet-zoa docs/design/boundary-identity-and-storage.md
 #
-#   status-deadline-index (PK=status, SK=deadline)
-#     Worker Lambda session reaper (pkg/scheduler/reaper.go). Two query patterns on the
-#     same GSI: active items with deadline <= now (max duration), and active items with
-#     deadline > now (idle candidates). EventBridge schedule per VPC — not per request.
+#   target-status-index (PK=targetCluster, SK=targetStatusKey)
+#     Worker session reaper (pkg/scheduler/reaper.go; pkg/store/session.go). Same index
+#     name and key shape as executions; active rows use targetStatusKey "active#<deadline>"
+#     (RFC3339Nano). Queries are scoped to TARGET_CLUSTER (one partition per MC/RC).
+#     Idle path queries active#deadline > now, then checks Exec/CW activity.
+#     Schedule: rate(5 minutes) per VPC (same Worker Lambda as GC).
 #
 #   date-bucket-index (PK=dateBucket, SK=createdAt)
 #     Human-driven path. Access ListAll for zoa session list / session history — same
@@ -245,6 +250,14 @@ resource "aws_dynamodb_table" "boundary_sessions" {
     name = "taskId"
     type = "S"
   }
+  attribute {
+    name = "targetCluster"
+    type = "S"
+  }
+  attribute {
+    name = "targetStatusKey"
+    type = "S"
+  }
 
   global_secondary_index {
     name            = "date-bucket-index"
@@ -254,9 +267,9 @@ resource "aws_dynamodb_table" "boundary_sessions" {
   }
 
   global_secondary_index {
-    name            = "status-deadline-index"
-    hash_key        = "status"
-    range_key       = "deadline"
+    name            = "target-status-index"
+    hash_key        = "targetCluster"
+    range_key       = "targetStatusKey"
     projection_type = "ALL"
   }
 

@@ -17,8 +17,8 @@
 # Design decisions:
 #   - Lambda timeout (300s) is a safety net ceiling. Real deadlines are enforced
 #     in code via context.WithTimeout (tunable via env vars without code change).
-#   - Worker self-invokes for TA execution (fan-out). reserved_concurrency=10
-#     allows reconciler + up to 9 concurrent TAs.
+#   - Worker self-invokes for TA execution (fan-out). Default worker reserved
+#     concurrency is 10 (reconciler headroom + TA cap); tunable via variables (-1 in ephemeral).
 #   - All timeouts are env-var tunable (RECONCILER_DEADLINE_SECONDS, etc.)
 # =============================================================================
 
@@ -487,8 +487,9 @@ resource "aws_lambda_function_url" "api" {
 #   - TA execution: EXECUTION_DEADLINE_SECONDS (295s)
 #   - Batch size per tick: MAX_BATCH_PER_TICK (30)
 #
-# reserved_concurrency=10: 1 slot for reconciler + up to 9 concurrent TA execs.
-# Lambda internal queue holds excess invocations until a slot frees up.
+# Default reserved worker concurrency 10: reconciler headroom + concurrent TA execs
+# (see lambda_worker_concurrency; -1 = unreserved pool in ephemeral). Excess
+# self-invocations queue in Lambda until a slot frees up.
 
 resource "aws_lambda_function" "worker" {
   function_name = "${local.function_prefix}-worker"
