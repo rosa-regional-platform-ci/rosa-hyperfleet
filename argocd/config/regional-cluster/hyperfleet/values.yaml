@@ -1,35 +1,26 @@
 seaplane:
   applicationName: seaplane-operator
-
   namespace: argocd
-
   targetNamespace: seaplane
-
   project: default
-
   source:
     repoURL: https://github.com/openshift-online/rosa-seaplane-api.git
     targetRevision: 455ce3077b946bf7bc8aae7b43aaa713a4c352cb
     path: seaplane-operator/charts
-
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-
   helmValues:
     image:
       repository: quay.io/redhat-user-workloads/rosa-tenant/hyperfleet-operator
-      tag: "455ce3077b946bf7bc8aae7b43aaa713a4c352cb"
+      tag: 455ce3077b946bf7bc8aae7b43aaa713a4c352cb
       pullPolicy: Always
-
     replicaCount: 2
-
     serviceAccount:
       create: true
       name: seaplane-operator
       annotations: {}
-
     resources:
       limits:
         cpu: 500m
@@ -37,4 +28,6 @@ seaplane:
       requests:
         cpu: 100m
         memory: 128Mi
-
+hyperfleet:
+  helmValues:
+    controlPlaneOperatorImage: quay.io/rrp-dev-ci/control-plane-operator:ci-87318-2112224661533102080
