@@ -24,7 +24,7 @@ from aws import AWSCredentials
 @pytest.mark.parametrize("account,role,build_id", [
     ("599476212575", "OrganizationAccountAccessRole", ""),
     ("720644165472", "OrganizationAccountAccessRole", "ci-test"),
-    ("987654321098", "rosa-hyperfleet-account-admin", ""),
+    ("987654321098", "rosa-seaplane-account-admin", ""),
 ])
 def test_ephemeral_operator_config(tmp_path, monkeypatch, operation, account, role, build_id):
     monkeypatch.setenv("BUILD_ID", build_id)
@@ -73,7 +73,7 @@ def test_ephemeral_operator_config(tmp_path, monkeypatch, operation, account, ro
     assert "111111111111" not in bundle["registeredAccounts"]
     assert bundle["serviceOperatorPolicies"] == [{
         "id": "provision-management-clusters", "ownerAccountID": account,
-        "content": 'permit(principal, action in [HyperFleet::Action::"CreateManagementCluster", HyperFleet::Action::"ListManagementClusters", HyperFleet::Action::"DescribeManagementCluster"], resource);\n',
+        "content": 'permit(principal, action in [Seaplane::Action::"CreateManagementCluster", Seaplane::Action::"ListManagementClusters", Seaplane::Action::"DescribeManagementCluster"], resource);\n',
     }]
     assert bundle["serviceOperatorAttachments"] == [{
         "id": "regional-provisioner", "policyID": "provision-management-clusters",

@@ -236,7 +236,7 @@ applications:
             - id: provision-management-clusters
               ownerAccountID: "@@AWS_ACCOUNT_ID@@"
               content: |
-                permit(principal, action in [HyperFleet::Action::"CreateManagementCluster", HyperFleet::Action::"ListManagementClusters", HyperFleet::Action::"DescribeManagementCluster"], resource);
+                permit(principal, action in [Seaplane::Action::"CreateManagementCluster", Seaplane::Action::"ListManagementClusters", Seaplane::Action::"DescribeManagementCluster"], resource);
           serviceOperatorAttachments:
             - id: regional-provisioner
               policyID: provision-management-clusters

@@ -2,7 +2,7 @@
 
 This repository delivers the Platform API's authorization bundle. Bundle format,
 evaluation rules, actions, and metrics are defined in
-`rosa-hyperfleet-api/docs/authz.md`.
+`rosa-seaplane-api/docs/authz.md`.
 
 Authorization is mandatory and denies by default. Enrollment grants nothing.
 
@@ -50,7 +50,7 @@ serviceOperatorPolicies:
   - id: provision-management-clusters
     ownerAccountID: "@@AWS_ACCOUNT_ID@@"
     content: |
-      permit(principal, action in [HyperFleet::Action::"CreateManagementCluster", HyperFleet::Action::"ListManagementClusters", HyperFleet::Action::"DescribeManagementCluster"], resource);
+      permit(principal, action in [Seaplane::Action::"CreateManagementCluster", Seaplane::Action::"ListManagementClusters", Seaplane::Action::"DescribeManagementCluster"], resource);
 serviceOperatorAttachments:
   - id: regional-provisioner
     policyID: provision-management-clusters
@@ -97,6 +97,12 @@ E2E runs ManagementCluster checks with `E2E_SERVICE_OPERATOR_PROFILE`. When unse
 `ci/setup-service-operator-profile.sh` assumes the RC
 `OrganizationAccountAccessRole`; failure fails the suite.
 
+## Customer label permissions
+
+Label routes, actions, and validation are defined in the API document. `ReadOnly`
+includes `ListLabelsForResource`; `AllActions` includes `LabelAdmin`. Grant
+label administration only to callers trusted to change authorization inputs.
+
 ## Render and roll out
 
 ```sh
@@ -112,13 +118,17 @@ helm template platform-api argocd/config/regional-cluster/platform-api \
   change rolls the Deployment.
 - The API reads the bundle only at startup. An invalid bundle fails startup. Old
   pods keep old permissions until replaced, so revocation is not instantaneous.
-- The `platform-api` and `hyperfleet-operator` images must be pinned to the same
+  Logs carry `bundle_hash` (SHA-256 of the loaded bundle) to identify it.
+- The `platform-api` and `seaplane-operator` images must be pinned to the same
   API commit: both run FleetDB migrations at startup.
+- Bundles naming actions or a schema namespace an older API lacks fail its
+  startup. Change the image pin in the same commit as such a bundle, and never
+  deploy a more permissive interim bundle.
 
 ## Metrics
 
 The Service exposes port `metrics` (9090) and the ServiceMonitor scrapes
-`/metrics`. Metric names and labels: `rosa-hyperfleet-api/docs/authz.md`.
+`/metrics`. Metric names and labels: `rosa-seaplane-api/docs/authz.md`.
 
 ## Tests
 

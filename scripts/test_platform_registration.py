@@ -190,7 +190,7 @@ else:
 def test_registration_current_contract(tmp_path, status, success, extra):
     env = install_mocks(tmp_path)
     env.update(TARGET_ACCOUNT_ID="012345678901", TARGET_REGION="us-east-1", MANAGEMENT_ID="mc01",
-               ENVIRONMENT="stage", CHILD_ADMIN_ROLE_NAME="rosa-hyperfleet-account-admin", MOCK_STATUS=str(status))
+               ENVIRONMENT="stage", CHILD_ADMIN_ROLE_NAME="rosa-seaplane-account-admin", MOCK_STATUS=str(status))
     env.update(extra)
     scripts = tmp_path / "scripts"
     scripts.mkdir()
@@ -208,7 +208,7 @@ def test_registration_current_contract(tmp_path, status, success, extra):
     calls = [json.loads(line) for line in Path(env["MOCK_LOG"]).read_text().splitlines()]
     assumptions = [c for c in calls if c["command"] == "aws" and c["args"][:2] == ["sts", "assume-role"]]
     assert len(assumptions) == 1
-    assert "arn:aws:iam::012345678901:role/rosa-hyperfleet-account-admin" in assumptions[0]["args"]
+    assert "arn:aws:iam::012345678901:role/rosa-seaplane-account-admin" in assumptions[0]["args"]
     posts = [c for c in calls if c["command"] == "curl" and "POST" in c["args"]]
     if extra.get("MOCK_CURL_EXIT"):
         assert not posts

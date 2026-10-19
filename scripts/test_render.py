@@ -2399,7 +2399,7 @@ policies:
   - id: read-clusters
     ownerAccountID: "012345678901"
     content: |
-      permit(principal, action in HyperFleet::Action::"ReadOnly", resource)
+      permit(principal, action in Seaplane::Action::"ReadOnly", resource)
       when { context.region == "us-east-1" && context.accountId == "012345678901" };
 attachments:
   - id: readers
@@ -2456,7 +2456,7 @@ def _assert_operator_grants(bundle, account, role, region):
     assert bundle["formatVersion"] == 1
     assert bundle["serviceOperatorPolicies"] == [{
         "id": "provision-management-clusters", "ownerAccountID": account,
-        "content": 'permit(principal, action in [HyperFleet::Action::"CreateManagementCluster", HyperFleet::Action::"ListManagementClusters", HyperFleet::Action::"DescribeManagementCluster"], resource);\n',
+        "content": 'permit(principal, action in [Seaplane::Action::"CreateManagementCluster", Seaplane::Action::"ListManagementClusters", Seaplane::Action::"DescribeManagementCluster"], resource);\n',
     }]
     assert bundle["serviceOperatorAttachments"] == [{
         "id": "regional-provisioner", "policyID": "provision-management-clusters",
@@ -2481,7 +2481,7 @@ class TestAuthzDelivery:
         assert bundle["policies"] == bundle["attachments"] == []
         _assert_operator_grants(
             bundle, "@@AWS_ACCOUNT_ID@@",
-            "rosa-hyperfleet-account-admin" if env == "stage" else "OrganizationAccountAccessRole",
+            "rosa-seaplane-account-admin" if env == "stage" else "OrganizationAccountAccessRole",
             "us-east-1" if env == "ephemeral" else "@@AWS_REGION@@",
         )
 
@@ -2521,7 +2521,7 @@ class TestAuthzDelivery:
         ):
             assert policy == {
                 "id": f"ci-read-clusters-{account}", "ownerAccountID": account,
-                "content": 'permit(principal, action in HyperFleet::Action::"AllActions", resource)\n'
+                "content": 'permit(principal, action in Seaplane::Action::"AllActions", resource)\n'
                            f'when {{ context.accountId == "{account}" && context.region == "us-east-1" }};\n',
             }
             assert attachment == {
@@ -2573,7 +2573,7 @@ class TestAuthzDelivery:
         ):
             assert policy == {
                 "id": f"read-clusters-{account}", "ownerAccountID": account,
-                "content": 'permit(principal, action in HyperFleet::Action::"AllActions", resource)\n'
+                "content": 'permit(principal, action in Seaplane::Action::"AllActions", resource)\n'
                            f'when {{ context.accountId == "{account}" && context.region == "us-east-1" }};\n',
             }
             assert attachment == {
@@ -2675,7 +2675,7 @@ class TestServiceOperatorDelivery:
             "attachments": [],
             "serviceOperatorPolicies": [{
                 "id": "provision-management-clusters", "ownerAccountID": "012345678901",
-                "content": 'permit(principal, action in [HyperFleet::Action::"CreateManagementCluster", HyperFleet::Action::"ListManagementClusters", HyperFleet::Action::"DescribeManagementCluster"], resource);\n',
+                "content": 'permit(principal, action in [Seaplane::Action::"CreateManagementCluster", Seaplane::Action::"ListManagementClusters", Seaplane::Action::"DescribeManagementCluster"], resource);\n',
             }],
             "serviceOperatorAttachments": [{
                 "id": "regional-provisioner", "policyID": "provision-management-clusters",
@@ -2687,7 +2687,7 @@ class TestServiceOperatorDelivery:
     @pytest.mark.parametrize("env,role", [
         ("ephemeral", "OrganizationAccountAccessRole"),
         ("integration", "OrganizationAccountAccessRole"),
-        ("stage", "rosa-hyperfleet-account-admin"),
+        ("stage", "rosa-seaplane-account-admin"),
     ])
     def test_runtime_operator_delivery(self, tmp_path, env, role):
         values = _authz_values(tmp_path, env)
@@ -2758,7 +2758,7 @@ class TestServiceOperatorDelivery:
 
     def test_preserves_explicit_records(self, tmp_path):
         bundle = yaml.safe_load(AUTHZ_BUNDLE)
-        bundle["serviceOperatorPolicies"] = [{"id": "explicit", "ownerAccountID": "012345678901", "content": 'permit(principal, action == HyperFleet::Action::"ListManagementClusters", resource);'}]
+        bundle["serviceOperatorPolicies"] = [{"id": "explicit", "ownerAccountID": "012345678901", "content": 'permit(principal, action == Seaplane::Action::"ListManagementClusters", resource);'}]
         bundle["serviceOperatorAttachments"] = [{"id": "explicit-role", "policyID": "explicit", "principalARN": "arn:aws:iam::012345678901:role/Other", "scope": "regional", "region": "us-east-1"}]
         content = yaml.safe_dump(bundle, default_style='"')
         resources, _ = _helm_platform(tmp_path, {
@@ -2811,9 +2811,10 @@ class TestServiceOperatorDelivery:
             values["global"]["aws_region"] = "us-west-2"
         else:
             original, replacement = (
-                ('HyperFleet::Action::"CreateManagementCluster", ', "") if change == "servicePolicy"
-                else ("role/rosa-hyperfleet-account-admin", "role/Other")
+                ('Seaplane::Action::"CreateManagementCluster", ', "") if change == "servicePolicy"
+                else ("role/rosa-seaplane-account-admin", "role/Other")
             )
+            assert original in values["platformApi"]["authz"]["config"]
             values["platformApi"]["authz"]["config"] = values["platformApi"]["authz"]["config"].replace(original, replacement)
         after, _ = _helm_platform(tmp_path, values)
         annotation = lambda resources: _resource(resources, "Deployment", "platform-api")["spec"]["template"]["metadata"]["annotations"]
