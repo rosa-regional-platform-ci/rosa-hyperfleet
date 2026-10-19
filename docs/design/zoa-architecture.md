@@ -138,11 +138,11 @@ ZOA Access Lambda                               API Lambda (same VPC)
 2. `zoa run …` uses `ZOA_API_URL` → per-VPC API Lambda Function URL.
 3. API Lambda validates the caller against the boundary task role for that VPC.
 
-**Session enforcement:** Worker Lambda **reaper** (EventBridge every 5m, `route=reaper`) stops boundary tasks when the **deadline** passes (`SESSION_MAX_DURATION_HOURS` on Access at start) or when **idle** exceeds `SESSION_IDLE_TIMEOUT_SECONDS` (SSM + CloudWatch Exec log stream timestamps; see [session reaper](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/design/boundary-session-reaper.md)).
+**Session enforcement:** Worker Lambda **reaper** (EventBridge every 5m, `route=reaper`) stops boundary tasks when the **deadline** passes (`SESSION_MAX_DURATION_HOURS` on Access at start) or when **idle** exceeds `SESSION_IDLE_TIMEOUT_SECONDS` (SSM + CloudWatch Exec log stream timestamps; see [session reaper](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/boundary/session-reaper.md)).
 
 This separation means a compromised invoker role cannot execute arbitrary TAs against cluster APIs without a boundary task — it can only manage sessions. A boundary task role can reach only its VPC's API Lambda.
 
-Session logging: container stdout → `/ecs/<cluster_id>/zoa-boundary`; ECS Exec transcripts → `.../zoa-boundary/ssm-sessions` (see [boundary session logging](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/design/boundary-session-logging.md) in the ZOA repo).
+Session logging: container stdout → `/ecs/<cluster_id>/zoa-boundary`; ECS Exec transcripts → `.../zoa-boundary/ssm-sessions` (see [boundary session logging](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/boundary/session-logging.md) in the ZOA repo).
 
 ### Execution Modes (Sync vs Async)
 
@@ -248,7 +248,7 @@ Each target VPC (RC and every MC) gets one instance of this module. It deploys t
 | Resource                      | Details                                                                                                                                                                                                                                                                                                           |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ECS cluster + task definition | Fargate `zoa-boundary` image, ECS Exec enabled, shared regional ZOA CMK (`kms_key_arn`).                                                                                                                                                                                                                          |
-| CloudWatch Logs               | `/ecs/<cluster_id>/zoa-boundary` + `.../ssm-sessions` (KMS via regional CMK; **365d** retention — `max(365, boundary_log_retention_days)`). API/Worker Lambda log groups: 365d. See [session logging](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/design/boundary-session-logging.md). |
+| CloudWatch Logs               | `/ecs/<cluster_id>/zoa-boundary` + `.../ssm-sessions` (KMS via regional CMK; **365d** retention — `max(365, boundary_log_retention_days)`). API/Worker Lambda log groups: 365d. See [session logging](https://github.com/openshift-online/rosa-hyperfleet-zoa/blob/main/docs/boundary/session-logging.md). |
 | Bedrock IAM                   | Boundary task role gets `bedrock:InvokeModel`. Account agreements/budget: `modules/bedrock`.                                                                                                                                                                                                                      |
 | SSM target registration       | RC: `zoa-lambda` when `targets_ssm_prefix` is set. MC: `mc-zoa-target-ssm-provisioning` (pipeline stage). CLI autodiscovery via `/zoa/targets/<deployment>/`.                                                                                                                                                      |
 

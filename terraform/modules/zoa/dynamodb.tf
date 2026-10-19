@@ -206,7 +206,7 @@ resource "aws_dynamodb_table" "audit_log" {
 #     ECS sets RoleSessionName on the boundary task role to the task UUID; that value is
 #     written to taskId when the session becomes active. Each boundary zoa run does one
 #     Query (Limit 1) to map task id → human operator + sessionId. No scan.
-#     See rosa-hyperfleet-zoa docs/design/boundary-identity-and-storage.md
+#     See rosa-hyperfleet-zoa docs/boundary/identity-bridge.md and architecture/storage.md
 #
 #   target-status-index (PK=targetCluster, SK=targetStatusKey)
 #     Worker session reaper (pkg/scheduler/reaper.go; pkg/store/session.go). Same index
