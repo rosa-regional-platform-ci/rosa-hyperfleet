@@ -51,9 +51,9 @@ regional_cluster:
   zoa_lambda_api_concurrency: -1
   zoa_lambda_worker_concurrency: -1
   zoa_lambda_access_concurrency: -1
-  zoa_lambda_image_tag: "ea46fa7"
-  zoa_runner_image_tag: "ea46fa7"
-  zoa_boundary_image_tag: "ea46fa7"
+  zoa_lambda_image_tag: "8e32d72"
+  zoa_runner_image_tag: "8e32d72"
+  zoa_boundary_image_tag: "8e32d72"
 
 applications:
   regional-cluster:

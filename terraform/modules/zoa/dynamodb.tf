@@ -231,19 +231,11 @@ resource "aws_dynamodb_table" "boundary_sessions" {
     type = "S"
   }
   attribute {
-    name = "status"
-    type = "S"
-  }
-  attribute {
     name = "createdAt"
     type = "S"
   }
   attribute {
     name = "dateBucket"
-    type = "S"
-  }
-  attribute {
-    name = "deadline"
     type = "S"
   }
   attribute {
