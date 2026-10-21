@@ -138,6 +138,10 @@ export TF_VAR_zoa_boundary_session_idle_timeout_seconds=$(jq -r '.zoa_boundary_s
 export TF_VAR_zoa_lambda_api_concurrency=$(jq -r '.zoa_lambda_api_concurrency' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_zoa_lambda_worker_concurrency=$(jq -r '.zoa_lambda_worker_concurrency' "$DEPLOY_CONFIG_FILE")
 export TF_VAR_worker_node_ami_id=$(jq -r '.worker_node_ami_id // ""' "$DEPLOY_CONFIG_FILE")
+# HCP slots on this MC; must match the hcp-slots chart and the Seaplane Operator.
+# A plain assignment so a missing value fails the script (set -e).
+TF_VAR_hcp_slot_count=$(jq -er '.hcp_slot_count' "$DEPLOY_CONFIG_FILE")
+export TF_VAR_hcp_slot_count
 
 # Deployment id for /zoa/targets/<deployment>/<cluster> and central /zoa/deployments/* (rendered in deploy JSON).
 export TF_VAR_zoa_deployment_name=$(jq -r '.zoa_deployment_name // empty' "$DEPLOY_CONFIG_FILE")

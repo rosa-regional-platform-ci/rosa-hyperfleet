@@ -77,6 +77,11 @@ spec:
             --external-dns-domain-filter {{ .Values.hypershift.externalDns.domain }} \
             --external-dns-secret external-dns \
             --external-dns-image {{ .Values.hypershift.externalDns.image }} \
+            {{- if .Values.hypershift.controlPlaneAutoscaling.enabled }}
+            {{- /* Installs the ControlPlaneVerticalAutoscalingConfiguration CRD and enables the
+            ControlPlaneVerticalAutoscaling gate. This enables every TechPreviewNoUpgrade gate. */}}
+            --tech-preview-no-upgrade \
+            {{- end }}
 
           # TODO(hypershift): Upstream --aws-assume-role + Pod Identity support
           # to hypershift install CLI, then replace this post-install patch

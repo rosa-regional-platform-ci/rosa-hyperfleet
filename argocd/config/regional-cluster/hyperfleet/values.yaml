@@ -38,3 +38,7 @@ seaplane:
         cpu: 100m
         memory: 128Mi
 
+# HCP slots per management cluster (config: management_cluster_defaults.hcp_slot_count).
+# The Seaplane Operator places each HostedCluster on a free slot, so this is the
+# most HostedClusters an MC holds. Required, 1 to 99.
+hcpSlotCount: null

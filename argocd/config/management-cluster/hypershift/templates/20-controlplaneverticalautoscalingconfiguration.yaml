@@ -1,0 +1,75 @@
+{{- with .Values.hypershift.controlPlaneAutoscaling }}
+{{- if .enabled }}
+{{- $cfg := . }}
+apiVersion: scheduling.hypershift.openshift.io/v1alpha1
+kind: ControlPlaneVerticalAutoscalingConfiguration
+metadata:
+  # Only the instance named "cluster" is honoured.
+  name: cluster
+  annotations:
+    # The CRD is installed by the hypershift-install Job and may not exist yet
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  # Only HostedClusters placed on an HCP slot are autoscaled; clusters
+  # on shared nodes keep their template requests.
+  hostedClusters:
+    type: Selector
+    selector:
+      matchExpressions:
+        - key: {{ $cfg.labels.slot }}
+          operator: Exists
+  # Every matching profile applies in order; each field a later profile sets
+  # replaces the earlier value, so later profiles only state what differs.
+  profiles:
+    # Every HostedCluster on a slot. minReplicas 1 so single-replica
+    # operators are resized too.
+    - name: base
+      hostedClusters:
+        type: All
+      allWorkloads:
+        updatePolicy:
+          updateMode: InPlaceOrRecreate
+          minReplicas: 1
+      workloads:
+        {{- range $cfg.workloads }}
+        {{- include "hypershift.cpvacWorkload" (dict "workload" . "defaultMaxAllowed" $cfg.defaultMaxAllowed) | nindent 8 }}
+        {{- end }}
+    # Raised minimums for new clusters. Clusters with an SRE tier skip it, so
+    # a tier's minimums apply as set.
+    - name: warmup
+      hostedClusters:
+        type: Selector
+        selector:
+          matchLabels:
+            {{ $cfg.labels.warmup }}: "true"
+          matchExpressions:
+            - key: {{ $cfg.labels.tier }}
+              operator: DoesNotExist
+      workloads:
+        {{- range $cfg.warmup }}
+        {{- $name := .name }}
+        {{- $base := dict }}
+        {{- range $cfg.workloads }}{{ if eq .name $name }}{{ $base = . }}{{ end }}{{ end }}
+        {{- if not $base }}{{ fail (printf "warmup entry %s is not in workloads" $name) }}{{ end }}
+        - resource: {{ $base.resource | default "deployments" }}
+          name: {{ $name }}
+          resourcePolicy:
+            containerPolicies:
+              - containerName: {{ $base.container | default $name }}
+                minAllowed:
+                  {{- toYaml .minAllowed | nindent 18 }}
+        {{- end }}
+    # Last, so it wins over every other profile. Initial stops resizing running
+    # pods; pods that restart get the current recommendation rather than
+    # dropping to their template requests.
+    - name: paused
+      hostedClusters:
+        type: Selector
+        selector:
+          matchLabels:
+            {{ $cfg.labels.paused }}: "true"
+      allWorkloads:
+        updatePolicy:
+          updateMode: Initial
+{{- end }}
+{{- end }}

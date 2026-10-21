@@ -1,0 +1,237 @@
+{{- if .Values.vpa.enabled }}
+{{- $ns := .Release.Namespace }}
+# Adapted from openshift/kubernetes-autoscaler vertical-pod-autoscaler/deploy/vpa-rbac.yaml
+# at the commit the pinned image is built from. Every recommender Deployment
+# shares the vpa-recommender ServiceAccount. The admission controller doesn't
+# register its own webhook (the chart does), so it gets no access to
+# MutatingWebhookConfigurations.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vpa-recommender
+  namespace: {{ $ns }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vpa-updater
+  namespace: {{ $ns }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vpa-admission-controller
+  namespace: {{ $ns }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vertical-pod-autoscaler:metrics-reader
+rules:
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vertical-pod-autoscaler:actor
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "limitranges"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["", "events.k8s.io"]
+    resources: ["events"]
+    verbs: ["create", "get", "list", "watch", "patch", "update"]
+  - apiGroups: ["autoscaling.k8s.io"]
+    resources: ["verticalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vertical-pod-autoscaler:status-actor
+rules:
+  - apiGroups: ["autoscaling.k8s.io"]
+    resources: ["verticalpodautoscalers/status"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vertical-pod-autoscaler:checkpoint-actor
+rules:
+  - apiGroups: ["autoscaling.k8s.io"]
+    resources: ["verticalpodautoscalercheckpoints"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vertical-pod-autoscaler:target-reader
+rules:
+  - apiGroups: ["*"]
+    resources: ["*/scale"]
+    verbs: ["get", "watch"]
+  - apiGroups: [""]
+    resources: ["replicationcontrollers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets", "deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vertical-pod-autoscaler:evictioner
+rules:
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods/eviction"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vertical-pod-autoscaler:updater-in-place
+rules:
+  - apiGroups: [""]
+    # pods: the updater annotates pods it resized in place.
+    resources: ["pods/resize", "pods"]
+    verbs: ["patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vertical-pod-autoscaler:admission-controller
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "configmaps", "nodes", "limitranges"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling.k8s.io"]
+    resources: ["verticalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+---
+{{- $bindings := list
+  (dict "role" "metrics-reader" "sas" (list "vpa-recommender"))
+  (dict "role" "actor" "sas" (list "vpa-recommender" "vpa-updater"))
+  (dict "role" "status-actor" "sas" (list "vpa-recommender"))
+  (dict "role" "checkpoint-actor" "sas" (list "vpa-recommender"))
+  (dict "role" "target-reader" "sas" (list "vpa-recommender" "vpa-updater" "vpa-admission-controller"))
+  (dict "role" "evictioner" "sas" (list "vpa-updater"))
+  (dict "role" "updater-in-place" "sas" (list "vpa-updater"))
+  (dict "role" "admission-controller" "sas" (list "vpa-admission-controller")) }}
+{{- range $bindings }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vertical-pod-autoscaler:{{ .role }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vertical-pod-autoscaler:{{ .role }}
+subjects:
+  {{- range .sas }}
+  - kind: ServiceAccount
+    name: {{ . }}
+    namespace: {{ $ns }}
+  {{- end }}
+---
+{{- end }}
+# Leases: leader election for the recommenders and the updater; the admission
+# controller publishes a status lease that the updater reads before resizing.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vpa-recommender-leader-election
+  namespace: {{ $ns }}
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    resourceNames:
+      {{- range .Values.vpa.recommenders }}
+      - {{ include "vpa.recommenderLease" . }}
+      {{- end }}
+    verbs: ["get", "watch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vpa-recommender-leader-election
+  namespace: {{ $ns }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vpa-recommender-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: vpa-recommender
+    namespace: {{ $ns }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vpa-updater-leases
+  namespace: {{ $ns }}
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create"]
+  # Reads the admission controller's status lease.
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    resourceNames: ["vpa-updater"]
+    verbs: ["update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vpa-updater-leases
+  namespace: {{ $ns }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vpa-updater-leases
+subjects:
+  - kind: ServiceAccount
+    name: vpa-updater
+    namespace: {{ $ns }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vpa-admission-controller-status
+  namespace: {{ $ns }}
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create", "update", "get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vpa-admission-controller-status
+  namespace: {{ $ns }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vpa-admission-controller-status
+subjects:
+  - kind: ServiceAccount
+    name: vpa-admission-controller
+    namespace: {{ $ns }}
+{{- end }}

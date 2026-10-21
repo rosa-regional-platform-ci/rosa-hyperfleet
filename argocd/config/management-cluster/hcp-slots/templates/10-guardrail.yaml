@@ -1,0 +1,61 @@
+{{- if gt (int .Values.hcpSlots.count) 0 }}
+# Slot nodes carry no per-HCP taint, so isolation relies on every pod in a
+# control plane namespace selecting its own cluster and its own slot. HyperShift
+# sets this from HostedCluster.spec.nodeSelector on the pods it creates; this
+# policy rejects any pod that doesn't have it, for example one created by
+# another operator in the namespace, or a compromised workload trying to land
+# in another HCP's slot.
+#
+# The Seaplane Operator creates each control plane namespace labelled
+# seaplane.io/hcp-slot. Workloads in the namespace can't change that label:
+# namespaces are cluster-scoped. Every HostedCluster has a slot, so a control
+# plane namespace without the label is rejected outright (fail closed). Pods
+# created before kube-applier has labelled a new namespace are rejected and
+# their ReplicaSet or StatefulSet retries.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: hcp-pod-placement
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        hypershift.openshift.io/hosted-control-plane: "true"
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+  variables:
+    - name: slot
+      expression: "namespaceObject.metadata.?labels[?'seaplane.io/hcp-slot'].orValue('')"
+    - name: nodeSelector
+      expression: "object.spec.?nodeSelector.orValue({})"
+  validations:
+    - expression: "variables.slot != ''"
+      messageExpression: >-
+        'control plane namespace ' + namespaceObject.metadata.name +
+        ' has no seaplane.io/hcp-slot label; its pods are admitted once the Seaplane Operator has labelled it'
+      reason: Forbidden
+    - expression: >-
+        variables.slot == '' || (
+          variables.nodeSelector[?'hypershift.openshift.io/cluster'].orValue('') == namespaceObject.metadata.name &&
+          variables.nodeSelector[?'hypershift.openshift.io/control-plane'].orValue('') == 'true' &&
+          variables.nodeSelector[?'seaplane.io/hcp-slot'].orValue('') == variables.slot
+        )
+      messageExpression: >-
+        'control plane pods must run on their own nodes: nodeSelector needs hypershift.openshift.io/cluster=' +
+        namespaceObject.metadata.name + ', hypershift.openshift.io/control-plane=true and seaplane.io/hcp-slot=' +
+        variables.slot
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: hcp-pod-placement
+spec:
+  policyName: hcp-pod-placement
+  validationActions:
+    {{- toYaml .Values.hcpSlots.guardrail.validationActions | nindent 4 }}
+{{- end }}

@@ -16,3 +16,166 @@ hypershift:
   # Hypershift configuration
   hypershift:
     image: quay.io/acm-d/rhtap-hypershift-operator@sha256:19d4055eb8e83378a7427688cac597d8a0c326d65524a7e124f4f9e3f1f345da
+
+  # Control plane vertical autoscaling. When enabled, the operator is installed
+  # with --tech-preview-no-upgrade (which installs the
+  # ControlPlaneVerticalAutoscalingConfiguration CRD and enables its feature gate) and
+  # the chart creates the configuration below. HyperShift then creates one VPA
+  # per listed workload of every HostedCluster placed on an HCP slot.
+  # Requires the vertical-pod-autoscaler chart.
+  controlPlaneAutoscaling:
+    enabled: false
+
+    # HostedCluster labels set by the seaplane-operator.
+    labels:
+      # Present on every HostedCluster placed on a slot; only those are autoscaled.
+      slot: seaplane.io/hcp-slot
+      # Set for the first 48 hours of a cluster; raises the floors below.
+      warmup: seaplane.io/hcp-warmup
+      # SRE sizing tier (ISO-7). Tier profiles aren't defined yet; warm-up
+      # skips clusters that have one.
+      tier: seaplane.io/hcp-tier
+      # Stops resizing on one cluster during an incident.
+      paused: seaplane.io/hcp-autoscaling-paused
+
+    # Default upper bound for a workload's main container, for workloads that
+    # don't set maxAllowed. Fits a 2xlarge next to the DaemonSets.
+    defaultMaxAllowed:
+      cpu: "4"
+      memory: 16Gi
+
+    # Every control plane Deployment and StatefulSet. A name missing on a
+    # release is reported in the HostedCluster condition, not an error.
+    # `resource` is deployments (the default) or statefulsets.
+    # Only the main container (`container`, defaulting to the workload name) is
+    # autoscaled; HyperShift leaves the others at their template requests.
+    # minAllowed is its template request, so it never goes below the defaults;
+    # maxAllowed defaults to defaultMaxAllowed. Quantities must be strings.
+    workloads:
+      - name: kube-apiserver
+        minAllowed: { cpu: 350m, memory: 2Gi }
+        maxAllowed: { cpu: "14", memory: 56Gi }
+      - name: etcd
+        resource: statefulsets
+        minAllowed: { cpu: 300m, memory: 600Mi }
+        maxAllowed: { cpu: "14", memory: 56Gi }
+      - name: openshift-apiserver
+        minAllowed: { cpu: 100m, memory: 200Mi }
+      - name: openshift-oauth-apiserver
+        minAllowed: { cpu: 150m, memory: 80Mi }
+      - name: oauth-openshift
+        minAllowed: { cpu: 25m, memory: 40Mi }
+      - name: kube-controller-manager
+        minAllowed: { cpu: 100m, memory: 600Mi }
+      - name: kube-scheduler
+        minAllowed: { cpu: 25m, memory: 150Mi }
+      - name: openshift-controller-manager
+        minAllowed: { cpu: 100m, memory: 100Mi }
+      - name: openshift-route-controller-manager
+        minAllowed: { cpu: 100m, memory: 100Mi }
+      - name: cluster-policy-controller
+        minAllowed: { cpu: 10m, memory: 200Mi }
+      - name: control-plane-operator
+        minAllowed: { cpu: 10m, memory: 80Mi }
+      - name: control-plane-pki-operator
+        minAllowed: { cpu: 10m, memory: 80Mi }
+      - name: hosted-cluster-config-operator
+        minAllowed: { cpu: 60m, memory: 80Mi }
+      - name: ignition-server
+        minAllowed: { cpu: 10m, memory: 40Mi }
+      - name: ignition-server-proxy
+        container: haproxy
+        minAllowed: { cpu: 10m, memory: 20Mi }
+      - name: konnectivity-agent
+        minAllowed: { cpu: 40m, memory: 50Mi }
+      - name: router
+        minAllowed: { cpu: 50m, memory: 40Mi }
+      - name: cluster-version-operator
+        minAllowed: { cpu: 20m, memory: 70Mi }
+      - name: cluster-network-operator
+        minAllowed: { cpu: 10m, memory: 100Mi }
+      - name: cluster-storage-operator
+        minAllowed: { cpu: 10m, memory: 20Mi }
+      - name: csi-snapshot-controller-operator
+        minAllowed: { cpu: 10m, memory: 65Mi }
+      - name: cluster-image-registry-operator
+        minAllowed: { cpu: 10m, memory: 50Mi }
+      - name: cluster-node-tuning-operator
+        minAllowed: { cpu: 10m, memory: 50Mi }
+      - name: dns-operator
+        minAllowed: { cpu: 10m, memory: 29Mi }
+      - name: ingress-operator
+        minAllowed: { cpu: 10m, memory: 80Mi }
+      - name: cloud-controller-manager
+        minAllowed: { cpu: 75m, memory: 60Mi }
+      - name: cloud-credential-operator
+        minAllowed: { cpu: 10m, memory: 75Mi }
+      - name: cluster-api
+        container: manager
+        minAllowed: { cpu: 10m, memory: 40Mi }
+      - name: capi-provider
+        container: manager
+        minAllowed: { cpu: 10m, memory: 100Mi }
+      - name: machine-approver
+        minAllowed: { cpu: 10m, memory: 50Mi }
+      - name: cluster-autoscaler
+        minAllowed: { cpu: 10m, memory: 60Mi }
+      - name: aws-node-termination-handler
+        minAllowed: { cpu: 50m, memory: 64Mi }
+      - name: catalog-operator
+        minAllowed: { cpu: 10m, memory: 80Mi }
+      - name: olm-operator
+        minAllowed: { cpu: 10m, memory: 160Mi }
+      - name: packageserver
+        minAllowed: { cpu: 10m, memory: 250Mi }
+      - name: certified-operators-catalog
+        container: registry
+        minAllowed: { cpu: 10m, memory: 160Mi }
+      - name: community-operators-catalog
+        container: registry
+        minAllowed: { cpu: 10m, memory: 160Mi }
+      - name: redhat-operators-catalog
+        container: registry
+        minAllowed: { cpu: 10m, memory: 420Mi }
+      - name: metrics-proxy
+        minAllowed: { cpu: 10m, memory: 40Mi }
+      - name: endpoint-resolver
+        minAllowed: { cpu: 5m, memory: 20Mi }
+      - name: karpenter
+        minAllowed: { cpu: 10m, memory: 60Mi }
+      - name: karpenter-operator
+        minAllowed: { cpu: 10m, memory: 60Mi }
+      - name: kube-storage-version-migrator
+        container: migrator
+        minAllowed: { cpu: 10m, memory: 200Mi }
+      # Created in the control plane namespace by the hosted cluster's operators.
+      - name: ovnkube-control-plane
+        minAllowed: { cpu: 10m, memory: 200Mi }
+      - name: multus-admission-controller
+        minAllowed: { cpu: 10m, memory: 50Mi }
+      - name: network-node-identity
+        container: webhook
+        minAllowed: { cpu: 10m, memory: 50Mi }
+      - name: aws-ebs-csi-driver-operator
+        minAllowed: { cpu: 10m, memory: 50Mi }
+      # Container names and template requests not yet verified; no minAllowed
+      # until they are.
+      - name: aws-ebs-csi-driver-controller
+        container: csi-driver
+      - name: csi-snapshot-controller
+        container: snapshot-controller
+      - name: csi-snapshot-webhook
+        container: webhook
+
+    # Raised floors while the warm-up label is set, so new clusters start big
+    # enough before VPA has history. Each entry only sets minAllowed; the
+    # container and maxAllowed come from workloads.
+    warmup:
+      - name: kube-apiserver
+        minAllowed: { cpu: "2", memory: 8Gi }
+      - name: etcd
+        minAllowed: { cpu: "1", memory: 2Gi }
+      - name: openshift-apiserver
+        minAllowed: { cpu: 500m, memory: 1Gi }
+      - name: kube-controller-manager
+        minAllowed: { cpu: 500m, memory: 1Gi }

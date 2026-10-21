@@ -13,6 +13,7 @@ eksNodePool:
     family: AL2023
     id: ami-056d5e72aa5cf51f1
   rootVolumeSize: 50Gi
+hcpSlotCount: 60
 baseDomain: us-east-1.stg0.rosa.devshift.org
 platformApi:
   app:

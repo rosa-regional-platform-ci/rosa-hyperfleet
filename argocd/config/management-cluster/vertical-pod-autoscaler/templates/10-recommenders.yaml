@@ -1,0 +1,58 @@
+{{- if .Values.vpa.enabled }}
+{{- range .Values.vpa.recommenders }}
+{{- $name := include "vpa.recommenderName" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ $name }}
+spec:
+  replicas: {{ $.Values.vpa.recommender.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+    spec:
+      serviceAccountName: vpa-recommender
+      {{- include "vpa.podCommon" $ | nindent 6 }}
+      {{- include "vpa.spread" $name | nindent 6 }}
+      containers:
+        - name: recommender
+          image: {{ $.Values.vpa.image }}
+          command: ["/usr/bin/recommender"]
+          args:
+            - --v={{ $.Values.vpa.logLevel }}
+            {{- if ne .name "default" }}
+            - --recommender-name={{ .name }}
+            {{- end }}
+            {{- include "vpa.leaderElectionArgs" (dict "namespace" $.Release.Namespace "lease" (include "vpa.recommenderLease" .)) | nindent 12 }}
+            {{- with .args }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: prometheus
+              containerPort: 8942
+          {{- include "vpa.probes" $ | nindent 10 }}
+          resources:
+            {{- toYaml $.Values.vpa.recommender.resources | nindent 12 }}
+          securityContext:
+            {{- include "vpa.containerSecurityContext" $ | nindent 12 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: {{ $name }}
+---
+{{- end }}
+{{- end }}

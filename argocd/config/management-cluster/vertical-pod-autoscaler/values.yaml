@@ -1,0 +1,65 @@
+# Vertical Pod Autoscaler for hosted control plane sizing.
+#
+# HyperShift creates one VPA per control plane workload from the
+# ControlPlaneVerticalAutoscalingConfiguration (see the hypershift chart). This chart runs
+# the components that act on those VPAs.
+#
+# The upstream VPA Helm chart can't run the Red Hat image (it ships all three
+# binaries in one image and the upstream chart can't set the command), so the
+# Deployments are templated here.
+
+vpa:
+  # Deploy the VPA components. Off renders nothing but the CRDs.
+  enabled: false
+
+  # Red Hat build of VPA 1.6.0 (OCP 4.22): one image with /usr/bin/recommender,
+  # /usr/bin/updater and /usr/bin/admission-controller. crds/vpa-v1-crd-gen.yaml
+  # is vendored from the commit this image is built from; update both together.
+  image: registry.redhat.io/openshift4/ose-vertical-pod-autoscaler-rhel9@sha256:f0b4cda153d398ec34d8fd38e5c003f59bd2ff1b7db47b4667d7bfffb6d924e7
+
+  # klog verbosity for every component.
+  logLevel: 2
+
+  # One Deployment per recommender. "default" serves VPAs that name no
+  # recommender, which is every VPA HyperShift creates: the
+  # ControlPlaneVerticalAutoscalingConfiguration API has no recommender field
+  # yet. Other entries only serve VPAs that select them by name.
+  recommenders:
+    - name: default
+      args: []
+
+  recommender:
+    replicas: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+
+  updater:
+    replicas: 2
+    extraArgs: []
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+
+  admissionController:
+    replicas: 2
+    # Only control plane namespaces use VPA. The webhook fails open, so an
+    # outage leaves new pods at their template requests.
+    namespaceSelector:
+      matchLabels:
+        hypershift.openshift.io/hosted-control-plane: "true"
+    timeoutSeconds: 5
+    resources:
+      requests:
+        cpu: 50m
+        memory: 200Mi
+      limits:
+        memory: 500Mi
+
+  priorityClassName: system-cluster-critical

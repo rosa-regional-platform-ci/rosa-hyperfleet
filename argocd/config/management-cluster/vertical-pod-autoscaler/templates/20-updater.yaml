@@ -1,0 +1,57 @@
+{{- if .Values.vpa.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpa-updater
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: vpa-updater
+spec:
+  replicas: {{ .Values.vpa.updater.replicas }}
+  selector:
+    matchLabels:
+      app: vpa-updater
+  template:
+    metadata:
+      labels:
+        app: vpa-updater
+    spec:
+      serviceAccountName: vpa-updater
+      {{- include "vpa.podCommon" . | nindent 6 }}
+      {{- include "vpa.spread" "vpa-updater" | nindent 6 }}
+      containers:
+        - name: updater
+          image: {{ .Values.vpa.image }}
+          command: ["/usr/bin/updater"]
+          env:
+            # Namespace of the admission controller's status lease.
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          args:
+            - --v={{ .Values.vpa.logLevel }}
+            {{- include "vpa.leaderElectionArgs" (dict "namespace" .Release.Namespace "lease" "vpa-updater") | nindent 12 }}
+            {{- with .Values.vpa.updater.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: prometheus
+              containerPort: 8943
+          {{- include "vpa.probes" . | nindent 10 }}
+          resources:
+            {{- toYaml .Values.vpa.updater.resources | nindent 12 }}
+          securityContext:
+            {{- include "vpa.containerSecurityContext" . | nindent 12 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vpa-updater
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: vpa-updater
+{{- end }}
