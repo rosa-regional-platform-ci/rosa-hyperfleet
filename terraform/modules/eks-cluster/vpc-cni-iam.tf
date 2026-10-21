@@ -70,6 +70,14 @@ resource "aws_iam_role_policy" "scoped_cni" {
         Resource = concat(each.value.subnets, [local.node_security_group_arn])
       },
       {
+        # No ec2:Subnet condition here. AssignPrivateIpAddresses,
+        # AttachNetworkInterface and ModifyNetworkInterfaceAttribute don't
+        # populate ec2:Subnet in the request context, so an ArnEquals on it
+        # evaluates false and denies the CNI's normal IP/ENI operations. The
+        # subnet boundary is enforced at creation instead: CreateInOwnSubnets
+        # only allows ec2:CreateNetworkInterface in the role's own subnets, so a
+        # node can only ever own interfaces there and can't reach another slot's
+        # subnet by attaching or re-addressing one.
         Sid    = "OwnNetworkInterfaces"
         Effect = "Allow"
         Action = [
@@ -83,9 +91,6 @@ resource "aws_iam_role_policy" "scoped_cni" {
           "ec2:CreateTags",
         ]
         Resource = "${local.ec2_arn_prefix}:network-interface/*"
-        Condition = {
-          ArnEquals = { "ec2:Subnet" = each.value.subnets }
-        }
       },
       # Attach and detach also act on the instance.
       merge(

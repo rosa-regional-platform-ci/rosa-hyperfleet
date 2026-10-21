@@ -19,8 +19,8 @@ seaplane:
 
   helmValues:
     image:
-      repository: quay.io/rrp-dev-ci/hyperfleet-operator
-      tag: "f59b0034c13cf39d506e2ead73ebd0b5cd42cd1e"
+      repository: quay.io/cbusse_openshift/seaplane-operator
+      tag: "hcp-isolation-8c94eac"
       pullPolicy: Always
 
     replicaCount: 2
