@@ -1,18 +1,7 @@
-# Default values for hypershift-install chart
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
-# All values are namespaced under 'hypershift' to maintain consistency
-# with the rendering system and avoid conflicts with other charts
 hypershift:
-  # AWS region — used by the ASCP SecretProviderClass to fetch from Secrets Manager
   region: us-east-1
-
-  # External DNS domain filter — set from config via render.py
   externalDns:
-    domain: ""
+    domain: ''
     image: registry.redhat.io/edo/external-dns-rhel9:c8f7fbd233b9fbcc312672a6e5afd020655c791f
-
-  # Hypershift configuration
   hypershift:
-    image: quay.io/acm-d/rhtap-hypershift-operator@sha256:19d4055eb8e83378a7427688cac597d8a0c326d65524a7e124f4f9e3f1f345da
+    image: quay.io/hypershift/hypershift-operator:latest
