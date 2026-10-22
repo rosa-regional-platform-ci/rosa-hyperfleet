@@ -92,12 +92,17 @@ resource "aws_iam_role_policy" "scoped_cni" {
         ]
         Resource = "${local.ec2_arn_prefix}:network-interface/*"
       },
-      # Attach and detach also act on the instance.
+      # Attach, detach and setting an attachment attribute all act on the
+      # instance. The CNI calls ModifyNetworkInterfaceAttribute after attaching
+      # a secondary ENI (to set the attachment's DeleteOnTermination); AWS
+      # evaluates that call against the instance resource, so without it here
+      # the ENI is created but never usably attached and the IP pool can't grow
+      # past the primary ENI ("no available IP/Prefix addresses").
       merge(
         {
           Sid      = "OwnInstances"
           Effect   = "Allow"
-          Action   = ["ec2:AttachNetworkInterface", "ec2:DetachNetworkInterface"]
+          Action   = ["ec2:AttachNetworkInterface", "ec2:DetachNetworkInterface", "ec2:ModifyNetworkInterfaceAttribute"]
           Resource = "${local.ec2_arn_prefix}:instance/*"
         },
         each.value.instance_profile == null ? {} : {

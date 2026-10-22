@@ -15,7 +15,7 @@ hypershift:
 
   # Hypershift configuration
   hypershift:
-    image: quay.io/cbusse_openshift/hypershift-operator:hcp-isolation-97e383e9a
+    image: quay.io/cbusse_openshift/hypershift-operator:hcp-isolation-1e5f12888
 
   # Control plane vertical autoscaling. When enabled, the operator is installed
   # with --tech-preview-no-upgrade (which installs the
