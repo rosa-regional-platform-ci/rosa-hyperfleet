@@ -35,7 +35,8 @@ spec:
         {{- include "hypershift.cpvacWorkload" (dict "workload" . "defaultMaxAllowed" $cfg.defaultMaxAllowed) | nindent 8 }}
         {{- end }}
     # Raised minimums for new clusters. Clusters with an SRE tier skip it, so
-    # a tier's minimums apply as set.
+    # a tier's minimums apply as set. Omitted entirely when warmup is unset/empty.
+    {{- if $cfg.warmup }}
     - name: warmup
       hostedClusters:
         type: Selector
@@ -59,6 +60,7 @@ spec:
                 minAllowed:
                   {{- toYaml .minAllowed | nindent 18 }}
         {{- end }}
+    {{- end }}
     # Last, so it wins over every other profile. Initial stops resizing running
     # pods; pods that restart get the current recommendation rather than
     # dropping to their template requests.

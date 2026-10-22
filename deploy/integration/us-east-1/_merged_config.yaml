@@ -276,9 +276,9 @@ applications:
           # @doc applications.management-cluster.karpenter.settings.featureGates.nodeRepair Replace unhealthy nodes, so an HCP's etcd member gets a new node in its volume's AZ after a node failure.
           # @used-by applications.management-cluster.karpenter.settings.featureGates.nodeRepair _context
           nodeRepair: true
-          # @doc applications.management-cluster.karpenter.settings.featureGates.capacityBuffer Keep spare room on each hosted control plane's nodes (the CapacityBuffer the Seaplane Operator creates per slotted HostedCluster), so VPA resizes pods in place.
+          # @doc applications.management-cluster.karpenter.settings.featureGates.capacityBuffer Keep spare room on each hosted control plane's nodes (the CapacityBuffer the Seaplane Operator creates per slotted HostedCluster), so VPA resizes pods in place. Disabled for now while control-plane sizing is being tuned (no warm-up, lean initial footprint); the operator still renders the CapacityBuffer CR but Karpenter ignores it with the gate off.
           # @used-by applications.management-cluster.karpenter.settings.featureGates.capacityBuffer _context
-          capacityBuffer: true
+          capacityBuffer: false
     hypershift:
       controlPlaneAutoscaling:
         # @doc applications.management-cluster.hypershift.controlPlaneAutoscaling.enabled Create the ControlPlaneVerticalAutoscalingConfiguration (one VPA per control plane workload of every HostedCluster on an HCP slot) and install HyperShift with --tech-preview-no-upgrade.

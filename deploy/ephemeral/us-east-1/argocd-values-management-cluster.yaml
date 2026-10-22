@@ -30,7 +30,7 @@ karpenter:
   settings:
     featureGates:
       nodeRepair: true
-      capacityBuffer: true
+      capacityBuffer: false
 hypershift:
   controlPlaneAutoscaling:
     enabled: true

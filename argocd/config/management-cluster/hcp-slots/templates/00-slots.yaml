@@ -1,6 +1,5 @@
 {{- $clusterName := required "global.cluster_name must be set via ApplicationSet valuesObject" .Values.global.cluster_name -}}
 {{- $cfg := .Values.hcpSlots -}}
-{{- $repackEnd := mod (add $cfg.disruption.repackWindowStartHourUTC $cfg.disruption.repackWindowHours) 24 -}}
 {{- /* Slots are numbered from 1, matching Terraform and the Seaplane Operator. */}}
 {{- range $i := until (int $cfg.count) }}
 {{- $slot := printf "%02d" (add $i 1) }}
@@ -124,13 +123,8 @@ spec:
     consolidationPolicy: WhenEmptyOrUnderutilized
     consolidateAfter: {{ $cfg.disruption.consolidateAfter }}
     budgets:
-      # One node at a time, for any reason.
+      # One node at a time, for any reason (including underutilized repacking,
+      # which moves etcd members — so never more than one slot node at once).
       - nodes: "1"
-      # No repacking of underused nodes outside the daily window.
-      - nodes: "0"
-        reasons:
-          - Underutilized
-        schedule: "0 {{ $repackEnd }} * * *"
-        duration: {{ sub 24 $cfg.disruption.repackWindowHours }}h
 ---
 {{- end }}

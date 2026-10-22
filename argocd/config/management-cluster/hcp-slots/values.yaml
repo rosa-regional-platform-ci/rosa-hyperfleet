@@ -41,12 +41,10 @@ hcpSlots:
   expireAfter: 504h
 
   disruption:
-    # Empty nodes are removed after this long.
-    consolidateAfter: 30m
-    # Underused nodes are repacked (which moves etcd members) only in this
-    # daily window (UTC), one node at a time per slot.
-    repackWindowStartHourUTC: 3
-    repackWindowHours: 2
+    # Empty or underutilized nodes are consolidated after they've been in that
+    # state this long. Underutilized repacking moves etcd members, but the
+    # budget below caps it at one slot node at a time.
+    consolidateAfter: 15m
 
   # Pods in a slotted control plane namespace must select their own cluster and
   # the namespace's slot (templates/10-guardrail.yaml).

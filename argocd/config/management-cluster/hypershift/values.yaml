@@ -170,12 +170,16 @@ hypershift:
     # Raised floors while the warm-up label is set, so new clusters start big
     # enough before VPA has history. Each entry only sets minAllowed; the
     # container and maxAllowed come from workloads.
-    warmup:
-      - name: kube-apiserver
-        minAllowed: { cpu: "2", memory: 8Gi }
-      - name: etcd
-        minAllowed: { cpu: "1", memory: 2Gi }
-      - name: openshift-apiserver
-        minAllowed: { cpu: 500m, memory: 1Gi }
-      - name: kube-controller-manager
-        minAllowed: { cpu: 500m, memory: 1Gi }
+    # Disabled for now: the raised floors (kas 2/8Gi, etcd 1/2Gi) size nodes for
+    # a 48h burst that short-lived/idle clusters never use. Re-enable by
+    # uncommenting; the warmup profile is only rendered when this list is set.
+    warmup: []
+    # warmup:
+    #   - name: kube-apiserver
+    #     minAllowed: { cpu: "2", memory: 8Gi }
+    #   - name: etcd
+    #     minAllowed: { cpu: "1", memory: 2Gi }
+    #   - name: openshift-apiserver
+    #     minAllowed: { cpu: 500m, memory: 1Gi }
+    #   - name: kube-controller-manager
+    #     minAllowed: { cpu: 500m, memory: 1Gi }
