@@ -9,7 +9,7 @@ seaplane:
 
   source:
     repoURL: https://github.com/openshift-online/rosa-seaplane-api.git
-    targetRevision: 8c94eac85584fdbaf852ba29ec28cd25d955d11c
+    targetRevision: d5b3d26182dff389f38396398167300fc4f59069
     path: seaplane-operator/charts
 
   syncPolicy:
@@ -20,7 +20,7 @@ seaplane:
   helmValues:
     image:
       repository: quay.io/cbusse_openshift/seaplane-operator
-      tag: "hcp-isolation-8c94eac"
+      tag: "hcp-isolation-d5b3d26"
       pullPolicy: Always
 
     replicaCount: 2

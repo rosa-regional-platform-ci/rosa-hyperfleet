@@ -1,23 +1,26 @@
 {{- if gt (int .Values.hcpSlots.count) 0 }}
 # Slot nodes carry no per-HCP taint, so isolation relies on every pod in a
-# control plane namespace selecting its own cluster and its own slot. HyperShift
-# sets this from HostedCluster.spec.nodeSelector on the pods it creates; this
-# policy rejects any pod that doesn't have it, for example one created by
-# another operator in the namespace, or a compromised workload trying to land
-# in another HCP's slot.
+# control plane namespace selecting its own cluster and slot. HyperShift sets
+# that nodeSelector on the pods it creates from HostedCluster.spec.nodeSelector
+# (which the Seaplane Operator sets to the cluster + slot, and HyperShift copies
+# onto the HostedControlPlane). This policy rejects any pod whose nodeSelector
+# does not carry the whole of the HostedControlPlane's nodeSelector — for
+# example one created by another operator in the namespace, or a workload trying
+# to land on another HCP's nodes.
 #
-# The Seaplane Operator creates each control plane namespace labelled
-# seaplane.io/hcp-slot. Workloads in the namespace can't change that label:
-# namespaces are cluster-scoped. Every HostedCluster has a slot, so a control
-# plane namespace without the label is rejected outright (fail closed). Pods
-# created before kube-applier has labelled a new namespace are rejected and
-# their ReplicaSet or StatefulSet retries.
+# The source of truth is the HostedControlPlane's spec.nodeSelector (the policy
+# parameter), not a label the operator has to stamp on the namespace. Before the
+# HostedControlPlane exists, parameterNotFoundAction: Deny fails closed; the
+# pod's ReplicaSet or StatefulSet retries until it does.
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
   name: hcp-pod-placement
 spec:
   failurePolicy: Fail
+  paramKind:
+    apiVersion: hypershift.openshift.io/v1beta1
+    kind: HostedControlPlane
   matchConstraints:
     namespaceSelector:
       matchLabels:
@@ -28,26 +31,26 @@ spec:
         operations: ["CREATE"]
         resources: ["pods"]
   variables:
-    - name: slot
-      expression: "namespaceObject.metadata.?labels[?'seaplane.io/hcp-slot'].orValue('')"
-    - name: nodeSelector
+    - name: hcpSelector
+      expression: "params.spec.?nodeSelector.orValue({})"
+    - name: podSelector
       expression: "object.spec.?nodeSelector.orValue({})"
   validations:
-    - expression: "variables.slot != ''"
+    # The HostedControlPlane must pin its pods somewhere; an empty nodeSelector
+    # would make the subset check below vacuous and admit any pod.
+    - expression: "size(variables.hcpSelector) > 0"
       messageExpression: >-
-        'control plane namespace ' + namespaceObject.metadata.name +
-        ' has no seaplane.io/hcp-slot label; its pods are admitted once the Seaplane Operator has labelled it'
+        'HostedControlPlane in ' + object.metadata.namespace +
+        ' has no spec.nodeSelector; its pods are admitted once it is set'
       reason: Forbidden
+    # Every key the HostedControlPlane selects on must be present on the pod with
+    # the same value, so the pod can only land on this control plane's nodes.
     - expression: >-
-        variables.slot == '' || (
-          variables.nodeSelector[?'hypershift.openshift.io/cluster'].orValue('') == namespaceObject.metadata.name &&
-          variables.nodeSelector[?'hypershift.openshift.io/control-plane'].orValue('') == 'true' &&
-          variables.nodeSelector[?'seaplane.io/hcp-slot'].orValue('') == variables.slot
-        )
+        variables.hcpSelector.all(k,
+          k in variables.podSelector && variables.podSelector[k] == variables.hcpSelector[k])
       messageExpression: >-
-        'control plane pods must run on their own nodes: nodeSelector needs hypershift.openshift.io/cluster=' +
-        namespaceObject.metadata.name + ', hypershift.openshift.io/control-plane=true and seaplane.io/hcp-slot=' +
-        variables.slot
+        'control plane pods must carry the HostedControlPlane nodeSelector: ' +
+        variables.hcpSelector.map(k, k + '=' + variables.hcpSelector[k]).join(', ')
       reason: Forbidden
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -56,6 +59,12 @@ metadata:
   name: hcp-pod-placement
 spec:
   policyName: hcp-pod-placement
+  # The parameter is the HostedControlPlane in the pod's own namespace: namespace
+  # is left unset so the request's namespace is used, and Deny fails closed when
+  # it does not exist yet.
+  paramRef:
+    selector: {}
+    parameterNotFoundAction: Deny
   validationActions:
     {{- toYaml .Values.hcpSlots.guardrail.validationActions | nindent 4 }}
 {{- end }}
