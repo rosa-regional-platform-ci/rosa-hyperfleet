@@ -21,5 +21,6 @@
   "worker_node_ami_id": "ami-056d5e72aa5cf51f1",
   "worker_node_root_volume_size": 50,
   "eph_prefix": "eph-e472b5",
-  "enable_bastion": true
+  "enable_bastion": true,
+  "delete": true
 }
