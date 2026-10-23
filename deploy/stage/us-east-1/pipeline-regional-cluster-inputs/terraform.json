@@ -26,15 +26,15 @@
   "sre_prometheus_oidc_client_id": "rosa-seaplane-prometheus-sre-stage-us-east-1",
   "sre_thanos_oidc_client_id": "rosa-seaplane-thanos-sre-stage-us-east-1",
   "environment_domain": "stg0.rosa.devshift.org",
-  "regional_id": "regional",
-  "eph_prefix": "",
+  "regional_id": "eph-05efcc-regional",
+  "eph_prefix": "eph-05efcc",
   "seaplane_db_instance_class": "db.r6g.large",
   "seaplane_db_deletion_protection": true,
   "seaplane_db_skip_final_snapshot": false,
   "seaplane_db_performance_insights_enabled": true,
   "seaplane_db_monitoring_interval": 60,
-  "zoa_lambda_image_tag": "3e94eef",
-  "zoa_runner_image_tag": "3e94eef",
+  "zoa_lambda_image_tag": "ci-136-2113588931080491008",
+  "zoa_runner_image_tag": "ci-136-2113588931080491008",
   "zoa_lambda_source_image": "quay.io/rrp-dev-ci/zoa-lambda",
   "zoa_runner_source_image": "quay.io/rrp-dev-ci/zoa-runner",
   "zoa_boundary_image_tag": "3e94eef",
@@ -47,5 +47,5 @@
   "zoa_access_trusted_assumer_role_names": ["OrganizationAccountAccessRole"],
   "worker_node_ami_id": "ami-056d5e72aa5cf51f1",
   "worker_node_root_volume_size": 50,
-  "management_clusters_info": [{"account_id": "ssm:///infra/stage/us-east-1/mc01/account_id", "id": "mc01"}]
+  "management_clusters_info": [{"account_id": "ssm:///infra/stage/us-east-1/mc01/account_id", "id": "eph-05efcc-mc01"}]
 }
