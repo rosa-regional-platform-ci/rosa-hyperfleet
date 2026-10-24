@@ -26,8 +26,8 @@
   "sre_prometheus_oidc_client_id": "rosa-seaplane-prometheus-sre-stage-us-east-1",
   "sre_thanos_oidc_client_id": "rosa-seaplane-thanos-sre-stage-us-east-1",
   "environment_domain": "stg0.rosa.devshift.org",
-  "regional_id": "regional",
-  "eph_prefix": "",
+  "regional_id": "eph-c5d9cb55-regional",
+  "eph_prefix": "eph-c5d9cb55",
   "seaplane_db_instance_class": "db.r6g.large",
   "seaplane_db_deletion_protection": true,
   "seaplane_db_skip_final_snapshot": false,
@@ -48,5 +48,5 @@
   "zoa_access_trusted_assumer_role_name_suffixes": ["rosa-seaplane-zoa-operator-stage"],
   "worker_node_ami_id": "ami-056d5e72aa5cf51f1",
   "worker_node_root_volume_size": 50,
-  "management_clusters_info": [{"account_id": "ssm:///infra/stage/us-east-1/mc01/account_id", "id": "mc01"}]
+  "management_clusters_info": [{"account_id": "ssm:///infra/stage/us-east-1/mc01/account_id", "id": "eph-c5d9cb55-mc01"}]
 }
