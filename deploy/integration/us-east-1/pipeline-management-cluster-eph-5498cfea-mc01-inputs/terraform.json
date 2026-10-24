@@ -6,8 +6,8 @@
   "environment": "integration",
   "account_id": "ssm:///infra/integration/us-east-1/mc01/account_id",
   "region": "us-east-1",
-  "alias": "mc01",
-  "management_id": "mc01",
+  "alias": "eph-5498cfea-mc01",
+  "management_id": "eph-5498cfea-mc01",
   "regional_aws_account_id": "ssm:///infra/integration/us-east-1/account_id",
   "zoa_lambda_image_tag": "3e94eef",
   "zoa_runner_image_tag": "3e94eef",
@@ -20,5 +20,6 @@
   "zoa_deployment_name": "us-east-1",
   "worker_node_ami_id": "ami-056d5e72aa5cf51f1",
   "worker_node_root_volume_size": 50,
+  "eph_prefix": "eph-5498cfea",
   "enable_bastion": true
 }
